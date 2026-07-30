@@ -1,0 +1,35 @@
+# v3 pipeline — standalone stack, own repo, own database, no shared runtime
+# with the real conductor-server. Run with: docker compose up -d --build
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: conductor
+      POSTGRES_PASSWORD: conductor
+      POSTGRES_DB: conductor
+    ports:
+      - "127.0.0.1:5435:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U conductor -d conductor"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  app:
+    build: .
+    env_file: .env.local
+    environment:
+      PYTHONUNBUFFERED: "1"
+    depends_on:
+      db:
+        condition: service_healthy
+    # No exposed port, no default command — client-less pipeline, driven via
+    # `docker compose exec app python -m app.run_scenarios` (or similar).
+    # Container just needs to stay up so exec has something to attach to.
+    command: ["sleep", "infinity"]
+
+volumes:
+  pgdata:
