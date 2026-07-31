@@ -18,6 +18,16 @@ from app.prompt import SYSTEM_PROMPT
 
 MAX_ITERATIONS = 6
 
+# Hard, code-enforced cap on lookup_concept calls within one turn — a prompt
+# instruction to "stop retrying" is a request, not a guarantee. Found live
+# 2026-07-30: a genuinely absent topic ("wheres the monitor button") kept
+# returning a *different* wrong match on every retried phrasing, so the model
+# never hit a clean, repeated "nothing here" signal and just kept trying new
+# wording until it hit the overall iteration ceiling with no answer at all.
+# This intervenes explicitly before that happens, distinct from the overall
+# MAX_ITERATIONS safety net below (which covers any tool, not just this one).
+LOOKUP_ATTEMPT_LIMIT = 4
+
 _client = AsyncAnthropic(api_key=CENTRAL_ANTHROPIC_KEY)
 
 _EXECUTORS = {
@@ -39,6 +49,7 @@ async def respond(messages: list[dict], ax_fixture: dict | None = None) -> Resul
     msgs = list(messages)
     trace: list[dict] = []
     walkthrough_steps: list | None = None
+    lookup_attempts = 0
 
     for _ in range(MAX_ITERATIONS):
         resp = await _client.messages.create(
@@ -58,8 +69,20 @@ async def respond(messages: list[dict], ax_fixture: dict | None = None) -> Resul
         msgs.append({"role": "assistant", "content": resp.content})
         tool_results = []
         for tu in tool_uses:
-            executor = _EXECUTORS.get(tu.name)
-            result = {"error": f"unknown tool {tu.name!r}"} if executor is None else await executor(tu.input, ax_fixture)
+            if tu.name == "lookup_concept":
+                lookup_attempts += 1
+            if tu.name == "lookup_concept" and lookup_attempts > LOOKUP_ATTEMPT_LIMIT:
+                result = {
+                    "error": (
+                        f"Too many lookup attempts ({lookup_attempts}) without a clear answer. "
+                        "Stop searching now — answer from general Logic Pro knowledge if you're "
+                        "genuinely confident, or tell the user you don't have a verified answer "
+                        "for this. Do not call lookup_concept again this turn."
+                    )
+                }
+            else:
+                executor = _EXECUTORS.get(tu.name)
+                result = {"error": f"unknown tool {tu.name!r}"} if executor is None else await executor(tu.input, ax_fixture)
             trace.append({"tool": tu.name, "input": tu.input, "output": result})
             if tu.name == "get_walkthrough" and result.get("attached"):
                 walkthrough_steps = result.get("steps")
@@ -70,9 +93,15 @@ async def respond(messages: list[dict], ax_fixture: dict | None = None) -> Resul
             })
         msgs.append({"role": "user", "content": tool_results})
 
-    return Result(
-        text="[max tool-call iterations reached without a final answer]",
-        walkthrough_steps=walkthrough_steps,
-        trace=trace,
+    # Safety net: never return a truly empty response, regardless of why the
+    # loop didn't converge on its own. Force one final tools-off call so the
+    # model must synthesize whatever it already learned into a real answer.
+    final = await _client.messages.create(
+        model=MODEL,
+        max_tokens=MAX_TOKENS,
+        system=SYSTEM_PROMPT + "\n\nAnswer now with your best available information — no more tool calls.",
         messages=msgs,
     )
+    text = "".join(b.text for b in final.content if b.type == "text")
+    msgs.append({"role": "assistant", "content": final.content})
+    return Result(text=text, walkthrough_steps=walkthrough_steps, trace=trace, messages=msgs)

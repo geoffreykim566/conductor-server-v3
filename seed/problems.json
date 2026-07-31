@@ -4,17 +4,31 @@
       "name": "sample rate mismatch",
       "tier": "established",
       "content": {
-        "symptom": "the entire project plays back sped up or slowed down and pitched up or down accordingly (like a record at the wrong RPM) — not just one region, and not fixed by changing tempo or Smart Tempo settings",
-        "cause": "the project's sample rate doesn't match the audio interface's actual output sample rate — Logic's engine and the interface disagree on how many samples per second make up a second of audio, so playback runs at the wrong rate",
-        "fix": "Step 1: Open File > Project Settings > Audio and check the project's Sample Rate. Step 2: Open macOS Audio MIDI Setup (Spotlight search) and confirm the interface's own sample rate matches — some interfaces have a hardware switch or their own control panel that can override what Logic requests. Step 3: Set both to the same value (44.1 kHz and 48 kHz are the most common) and restart playback.",
-        "do_not": "do not chase this as a tempo or Smart Tempo problem — tempo changes preserve pitch (time-stretching), a true sample-rate mismatch does not; if speed and pitch are both off together, it's the sample rate, not the tempo"
+        "symptom": "the entire project plays back sped up or slowed down and pitched up or down accordingly (like a record at the wrong RPM) \u2014 not just one region, and not fixed by changing tempo or Smart Tempo settings",
+        "cause": "the project's sample rate doesn't match the audio interface's actual output sample rate \u2014 Logic's engine and the interface disagree on how many samples per second make up a second of audio, so playback runs at the wrong rate",
+        "fix": "Step 1: Open File > Project Settings > Audio and check the project's Sample Rate. Step 2: Open macOS Audio MIDI Setup (Spotlight search) and confirm the interface's own sample rate matches \u2014 some interfaces have a hardware switch or their own control panel that can override what Logic requests. Step 3: Set both to the same value (44.1 kHz and 48 kHz are the most common) and restart playback.",
+        "do_not": "do not chase this as a tempo or Smart Tempo problem \u2014 tempo changes preserve pitch (time-stretching), a true sample-rate mismatch does not; if speed and pitch are both off together, it's the sample rate, not the tempo"
       },
       "path": [
-        {"type": "menu", "value": "File"},
-        {"type": "menu", "value": "Project Settings"},
-        {"type": "menu", "value": "Audio"},
-        {"type": "click_value_of", "value": "Sample Rate"}
-      ]
+        {
+          "type": "menu",
+          "value": "File"
+        },
+        {
+          "type": "menu",
+          "value": "Project Settings"
+        },
+        {
+          "type": "menu",
+          "value": "Audio"
+        },
+        {
+          "type": "click_value_of",
+          "value": "Sample Rate"
+        }
+      ],
+      "kind": "diagnosis",
+      "aliases": []
     },
     {
       "name": "Smart Tempo stretching imported audio",
@@ -23,54 +37,64 @@
         "symptom": "a sample or recorded audio region sounds warped, sped up, or slowed down after being imported or after changing the project tempo",
         "cause": "Logic's Smart Tempo is set to 'Keep' or 'Automatic' and is stretching the audio to match the project tempo",
         "fix": "To fix one region: select it, open the Region Inspector (press I), click the 'Region:' disclosure header to expand it if needed, and set the 'Smart Tempo' dropdown to Off. To prevent it for all future imports: File > Project Settings > Smart Tempo > set 'Set Imported Files To' to Flex Off.",
-        "do_not": "do not change the project tempo to try to match the audio — this affects the whole project"
+        "do_not": "do not change the project tempo to try to match the audio \u2014 this affects the whole project"
       },
-      "path": null
+      "path": null,
+      "kind": "diagnosis",
+      "aliases": []
     },
     {
       "name": "muddy bass",
       "tier": "established",
       "content": {
-        "zone": "low-mid resonance, roughly 100–300 Hz",
+        "zone": "low-mid resonance, roughly 100\u2013300 Hz",
         "remove_when": "bass sounds unclear, conflicts with the kick, or makes the low end feel soupy",
-        "remove_move": "narrow bell cut in the 150–300 Hz range; sweep to find the buildup peak on this bass",
-        "do_not": "do not boost the sub (60–80 Hz) to compensate — that makes the problem worse on small speakers"
+        "remove_move": "narrow bell cut in the 150\u2013300 Hz range; sweep to find the buildup peak on this bass",
+        "do_not": "do not boost the sub (60\u201380 Hz) to compensate \u2014 that makes the problem worse on small speakers"
       },
-      "path": null
+      "path": null,
+      "kind": "diagnosis",
+      "aliases": []
     },
     {
       "name": "muddy vocals",
       "tier": "established",
       "content": {
-        "zone": "low-mid buildup, roughly 200–400 Hz",
+        "zone": "low-mid buildup, roughly 200\u2013400 Hz",
         "remove_when": "vocals sound unclear, masked, or hard to hear in the mix",
-        "remove_move": "narrow bell cut 2–4 dB somewhere in the 200–350 Hz range — sweep slowly to find where the buildup lives on this specific vocal",
+        "remove_move": "narrow bell cut 2\u20134 dB somewhere in the 200\u2013350 Hz range \u2014 sweep slowly to find where the buildup lives on this specific vocal",
         "do_not": "do not boost high frequencies to try to cut through the mud; remove the mud first, then judge"
       },
-      "path": null
+      "path": null,
+      "kind": "diagnosis",
+      "aliases": []
     },
     {
       "name": "kick and bass clash",
       "tier": "established",
       "content": {
-        "zone": "low end, 60–200 Hz — kick sub weight and bass fundamental overlap",
+        "zone": "low end, 60\u2013200 Hz \u2014 kick sub weight and bass fundamental overlap",
         "remove_when": "the kick and bass sound like one unclear blob, cancel each other out, or the low end feels congested",
-        "remove_move": "sidechain compress the bass to the kick, and EQ the kick and bass to own different sub zones — e.g. kick peaks at 60 Hz, bass peaks at 80–100 Hz",
-        "do_not": "do not boost both the kick and bass at the same sub frequency — choose one to own that zone"
+        "remove_move": "sidechain compress the bass to the kick, and EQ the kick and bass to own different sub zones \u2014 e.g. kick peaks at 60 Hz, bass peaks at 80\u2013100 Hz",
+        "do_not": "do not boost both the kick and bass at the same sub frequency \u2014 choose one to own that zone"
       },
-      "path": null
+      "path": null,
+      "kind": "diagnosis",
+      "aliases": []
     },
     {
       "name": "deep bass",
       "tier": "preference",
       "content": {
-        "zone": "sub, 60–80 Hz; low-mid mud at 200–350 Hz",
+        "zone": "sub, 60\u201380 Hz; low-mid mud at 200\u2013350 Hz",
         "remove_when": "bass is overpowering, flabby, or makes small speakers distort",
         "add_when": "bass feels thin, weak, or lacks sub weight",
-        "add_move": "gentle bell boost at 60–80 Hz; cut 200–350 Hz to clear the mud that competes with the sub",
-        "do_not": "do not boost sub without cutting the muddy low-mid zone — you'll add weight and mud at the same time"
+        "add_move": "gentle bell boost at 60\u201380 Hz; cut 200\u2013350 Hz to clear the mud that competes with the sub",
+        "do_not": "do not boost sub without cutting the muddy low-mid zone \u2014 you'll add weight and mud at the same time"
       },
-      "path": null
+      "path": null,
+      "kind": "diagnosis",
+      "aliases": []
     },
     {
       "name": "wide mix",
@@ -78,22 +102,26 @@
       "content": {
         "zone": "stereo field; mid/side balance",
         "add_when": "mix sounds narrow, mono-ish, or elements feel crowded in the center",
-        "add_move": "pan complementary elements away from center; use Stereo Spread on pads/synths/reverb; keep bass and kick mono below 100–150 Hz",
+        "add_move": "pan complementary elements away from center; use Stereo Spread on pads/synths/reverb; keep bass and kick mono below 100\u2013150 Hz",
         "remove_when": "mix doesn't translate to mono, sounds hollow in the center, or elements phase-cancel",
-        "do_not": "do not widen the bass below 100–150 Hz — it causes phase cancellation in mono"
+        "do_not": "do not widen the bass below 100\u2013150 Hz \u2014 it causes phase cancellation in mono"
       },
-      "path": null
+      "path": null,
+      "kind": "diagnosis",
+      "aliases": []
     },
     {
       "name": "mix collapses in mono",
       "tier": "established",
       "content": {
-        "zone": "stereo field — phase relationship between L and R channels, especially below 200 Hz",
+        "zone": "stereo field \u2014 phase relationship between L and R channels, especially below 200 Hz",
         "remove_when": "the mix sounds full and wide in stereo but becomes thin, hollow, or loses instruments when played in mono (phone speaker, Bluetooth)",
         "remove_move": "mono the mix and solo tracks one by one to find what disappears; common culprits are stereo widening on bass, out-of-phase samples, or a doubled vocal that phase-cancels",
-        "do_not": "do not assume a mix that sounds wide in stereo will translate to mono — always check in mono before finishing"
+        "do_not": "do not assume a mix that sounds wide in stereo will translate to mono \u2014 always check in mono before finishing"
       },
-      "path": null
+      "path": null,
+      "kind": "diagnosis",
+      "aliases": []
     },
     {
       "name": "no sound output",
@@ -105,25 +133,47 @@
         "do_not": "do not adjust track faders or EQ before confirming the output routing is correct"
       },
       "path": [
-        {"type": "menu", "value": "Logic Pro"},
-        {"type": "menu", "value": "Settings"},
-        {"type": "menu", "value": "Audio"}
-      ]
+        {
+          "type": "menu",
+          "value": "Logic Pro"
+        },
+        {
+          "type": "menu",
+          "value": "Settings"
+        },
+        {
+          "type": "menu",
+          "value": "Audio"
+        }
+      ],
+      "kind": "diagnosis",
+      "aliases": []
     },
     {
       "name": "Core Audio goes silent mid-session",
       "tier": "established",
       "content": {
         "symptom": "Logic's meters show activity and playback runs normally, but there is no sound from speakers or headphones; other apps may also go silent at the same time",
-        "cause": "macOS Core Audio has entered a bad state and lost its connection to the output device — a known macOS bug",
+        "cause": "macOS Core Audio has entered a bad state and lost its connection to the output device \u2014 a known macOS bug",
         "fix": "Toggle Core Audio off and back on: Logic Pro > Settings > Audio > Devices tab > uncheck 'Enable Core Audio', wait 2 seconds, then re-enable it. If other apps are also silent, restart the Mac.",
-        "do_not": "do not adjust faders, output routing, or plugin settings first — the issue is at the macOS audio system level"
+        "do_not": "do not adjust faders, output routing, or plugin settings first \u2014 the issue is at the macOS audio system level"
       },
       "path": [
-        {"type": "menu", "value": "Logic Pro"},
-        {"type": "menu", "value": "Settings"},
-        {"type": "menu", "value": "Audio"}
-      ]
+        {
+          "type": "menu",
+          "value": "Logic Pro"
+        },
+        {
+          "type": "menu",
+          "value": "Settings"
+        },
+        {
+          "type": "menu",
+          "value": "Audio"
+        }
+      ],
+      "kind": "diagnosis",
+      "aliases": []
     },
     {
       "name": "audio interface not recognized in Logic",
@@ -131,10 +181,12 @@
       "content": {
         "symptom": "the interface doesn't appear in Logic Pro > Settings > Audio device list, or Logic shows no input signal even with the interface connected and working in other apps",
         "cause": "the interface is not visible to macOS Core Audio, Logic lacks microphone privacy permission, or a driver conflict exists",
-        "fix": "Step 1: Open macOS Audio MIDI Setup — if the interface doesn't appear there, Logic won't see it either; try a different USB port/cable. Step 2: Check System Settings > Privacy & Security > Microphone and ensure Logic Pro has access. Step 3: Reinstall the interface's driver if one is required.",
+        "fix": "Step 1: Open macOS Audio MIDI Setup \u2014 if the interface doesn't appear there, Logic won't see it either; try a different USB port/cable. Step 2: Check System Settings > Privacy & Security > Microphone and ensure Logic Pro has access. Step 3: Reinstall the interface's driver if one is required.",
         "do_not": "do not adjust buffer size or device settings in Logic until the interface appears correctly in macOS Audio MIDI Setup"
       },
-      "path": null
+      "path": null,
+      "kind": "diagnosis",
+      "aliases": []
     },
     {
       "name": "CPU overload",
@@ -143,14 +195,28 @@
         "symptom": "spinning beach ball, dropout clicks, or Logic's System Overload alert",
         "cause": "real-time plugin processing demand exceeds what the buffer can deliver",
         "fix": "increase the I/O buffer size (try 256 or 512 samples while mixing); then freeze CPU-heavy tracks (right-click the track header > Freeze Track)",
-        "do_not": "do not dismiss the alert and keep working at the same settings — the dropout will keep happening"
+        "do_not": "do not dismiss the alert and keep working at the same settings \u2014 the dropout will keep happening"
       },
       "path": [
-        {"type": "menu", "value": "Logic Pro"},
-        {"type": "menu", "value": "Settings"},
-        {"type": "menu", "value": "Audio"},
-        {"type": "click_value_of", "value": "I/O Buffer Size"}
-      ]
+        {
+          "type": "menu",
+          "value": "Logic Pro"
+        },
+        {
+          "type": "menu",
+          "value": "Settings"
+        },
+        {
+          "type": "menu",
+          "value": "Audio"
+        },
+        {
+          "type": "click_value_of",
+          "value": "I/O Buffer Size"
+        }
+      ],
+      "kind": "diagnosis",
+      "aliases": []
     },
     {
       "name": "system overload on Apple Silicon Mac",
@@ -159,111 +225,284 @@
         "symptom": "Logic shows a 'System Overload' or 'Disk Too Slow' alert despite the Mac being a powerful M1/M2/M3/M4 machine",
         "cause": "Logic is not using all available CPU threads (a known issue with the 'Automatic' thread setting on Apple Silicon), or macOS Voice Isolation is adding processing overhead",
         "fix": "Set Processing Threads to the maximum available number rather than 'Automatic'. Change Multithreading from 'Playback and Live Tracks' to 'Playback'. Disable macOS Voice Isolation in Control Center if active. Freeze CPU-heavy tracks.",
-        "do_not": "do not dismiss the overload alert and keep working — freeze the most CPU-intensive tracks before continuing"
+        "do_not": "do not dismiss the overload alert and keep working \u2014 freeze the most CPU-intensive tracks before continuing"
       },
       "path": [
-        {"type": "menu", "value": "Logic Pro"},
-        {"type": "menu", "value": "Settings"},
-        {"type": "menu", "value": "Audio"},
-        {"type": "click_value_of", "value": "Processing Threads"}
-      ]
+        {
+          "type": "menu",
+          "value": "Logic Pro"
+        },
+        {
+          "type": "menu",
+          "value": "Settings"
+        },
+        {
+          "type": "menu",
+          "value": "Audio"
+        },
+        {
+          "type": "click_value_of",
+          "value": "Processing Threads"
+        }
+      ],
+      "kind": "diagnosis",
+      "aliases": []
     },
     {
       "name": "microphone permissions",
       "tier": "established",
       "content": {
         "symptom": "channel strip meters don't move or respond at all when you sing or play, even with a working, correctly-configured audio interface connected",
-        "fix": "macOS System Settings > Privacy & Security > Microphone — toggle Logic Pro on. After granting access, quit and relaunch Logic Pro — macOS does not apply a newly granted permission to an already-running process."
+        "fix": "macOS System Settings > Privacy & Security > Microphone \u2014 toggle Logic Pro on. After granting access, quit and relaunch Logic Pro \u2014 macOS does not apply a newly granted permission to an already-running process."
       },
-      "path": null
+      "path": null,
+      "kind": "diagnosis",
+      "aliases": []
     },
     {
       "name": "recording latency and monitoring delay",
       "tier": "established",
       "content": {
-        "symptom": "you can hear yourself delayed by 20–50ms or more when singing or playing through Logic with software monitoring active; recorded audio appears slightly late on the timeline",
+        "symptom": "you can hear yourself delayed by 20\u201350ms or more when singing or playing through Logic with software monitoring active; recorded audio appears slightly late on the timeline",
         "cause": "the I/O buffer size is too large, or plugins with high latency in the channel strip are adding monitoring delay (PDC)",
         "fix": "Step 1: Reduce the I/O buffer size to 64 or 128 samples. Step 2: Choose Record > Low Latency Monitoring Mode to bypass latency-adding plugins on record-enabled tracks. Step 3: If your interface supports direct monitoring, use that instead.",
-        "do_not": "do not leave a large buffer and try to sing or play along to the delayed signal — the perceived delay will affect your performance and the recorded timing"
+        "do_not": "do not leave a large buffer and try to sing or play along to the delayed signal \u2014 the perceived delay will affect your performance and the recorded timing"
       },
       "path": [
-        {"type": "menu", "value": "Record"},
-        {"type": "menu", "value": "Low Latency Monitoring Mode"}
+        {
+          "type": "menu",
+          "value": "Record"
+        },
+        {
+          "type": "menu",
+          "value": "Low Latency Monitoring Mode"
+        }
+      ],
+      "kind": "diagnosis",
+      "aliases": []
+    },
+    {
+      "name": "buffer size",
+      "tier": "established",
+      "kind": "destination",
+      "aliases": [
+        "I/O buffer size",
+        "audio buffer",
+        "buffer settings",
+        "sample buffer"
+      ],
+      "content": {
+        "opens": "Audio settings pane, Devices tab \u2014 I/O Buffer Size pop-up menu (32 to 1024 samples). Use 64-128 samples while recording to minimize latency; switch to 256-512 while mixing to reduce CPU load."
+      },
+      "path": [
+        {
+          "type": "menu",
+          "value": "Logic Pro"
+        },
+        {
+          "type": "menu",
+          "value": "Settings"
+        },
+        {
+          "type": "menu",
+          "value": "Audio"
+        },
+        {
+          "type": "click_value_of",
+          "value": "I/O Buffer Size"
+        }
       ]
     }
   ],
-
   "problems": [
     {
       "name": "song sounds slowed",
-      "aliases": ["audio plays slow", "track sounds pitched down", "song sped up after opening", "it sounds slowed now", "why does it sound slowed", "song plays back wrong speed", "beat sounds warped"],
-      "note": "seed_weight is a population prior, not a ranking to execute — override it whenever on-screen or AX evidence points elsewhere.",
+      "aliases": [
+        "audio plays slow",
+        "track sounds pitched down",
+        "song sped up after opening",
+        "it sounds slowed now",
+        "why does it sound slowed",
+        "song plays back wrong speed",
+        "beat sounds warped"
+      ],
+      "note": "seed_weight is a population prior, not a ranking to execute \u2014 override it whenever on-screen or AX evidence points elsewhere.",
       "solutions": [
-        {"ref": "sample rate mismatch", "seed_weight": 100, "distinguisher": "if speed and pitch are both off together, it's the sample rate, not the tempo — tempo changes preserve pitch, a true sample-rate mismatch does not"},
-        {"ref": "Smart Tempo stretching imported audio", "seed_weight": 30, "distinguisher": "affects one imported region specifically, and pitch stays correct (it's time-stretching) — not a project-wide speed+pitch shift"}
+        {
+          "ref": "sample rate mismatch",
+          "seed_weight": 100,
+          "distinguisher": "if speed and pitch are both off together, it's the sample rate, not the tempo \u2014 tempo changes preserve pitch, a true sample-rate mismatch does not"
+        },
+        {
+          "ref": "Smart Tempo stretching imported audio",
+          "seed_weight": 30,
+          "distinguisher": "affects one imported region specifically, and pitch stays correct (it's time-stretching) \u2014 not a project-wide speed+pitch shift"
+        }
       ]
     },
     {
       "name": "mix sounds muddy",
-      "aliases": ["mix sounds unclear", "everything sounds mushy", "cant hear individual elements", "low end sounds muddy", "mix feels congested"],
+      "aliases": [
+        "mix sounds unclear",
+        "everything sounds mushy",
+        "cant hear individual elements",
+        "low end sounds muddy",
+        "mix feels congested"
+      ],
       "note": "ask which element (bass, vocals, or kick-vs-bass specifically) if the query doesn't say.",
       "solutions": [
-        {"ref": "muddy bass", "seed_weight": 50, "distinguisher": "the low end specifically (bass) sounds unclear or soupy — not the vocals, not the overall mix"},
-        {"ref": "muddy vocals", "seed_weight": 50, "distinguisher": "vocals specifically sound masked or hard to hear — not the low end"},
-        {"ref": "kick and bass clash", "seed_weight": 30, "distinguisher": "kick and bass sound like one indistinct blob or cancel each other, not just general low-mid buildup"}
+        {
+          "ref": "muddy bass",
+          "seed_weight": 50,
+          "distinguisher": "the low end specifically (bass) sounds unclear or soupy \u2014 not the vocals, not the overall mix"
+        },
+        {
+          "ref": "muddy vocals",
+          "seed_weight": 50,
+          "distinguisher": "vocals specifically sound masked or hard to hear \u2014 not the low end"
+        },
+        {
+          "ref": "kick and bass clash",
+          "seed_weight": 30,
+          "distinguisher": "kick and bass sound like one indistinct blob or cancel each other, not just general low-mid buildup"
+        }
       ]
     },
     {
       "name": "song sounds thin or hollow",
-      "aliases": ["my song sounds thin and hollow on my phone speaker", "mix loses body on small speakers", "sounds empty in the middle", "no low end weight", "sounds narrow and weak"],
-      "note": "genuinely three-way ambiguous without more information — ask which listening context and whether it's the low end or the stereo width that feels missing.",
+      "aliases": [
+        "my song sounds thin and hollow on my phone speaker",
+        "mix loses body on small speakers",
+        "sounds empty in the middle",
+        "no low end weight",
+        "sounds narrow and weak"
+      ],
+      "note": "genuinely three-way ambiguous without more information \u2014 ask which listening context and whether it's the low end or the stereo width that feels missing.",
       "solutions": [
-        {"ref": "deep bass", "seed_weight": 40, "distinguisher": "thinness is about missing sub weight — check if it's specifically the low end that feels absent"},
-        {"ref": "wide mix", "seed_weight": 30, "distinguisher": "thinness is about excessive stereo widening causing a hollow center"},
-        {"ref": "mix collapses in mono", "seed_weight": 30, "distinguisher": "thinness only shows up on mono/small-speaker playback specifically but sounds fine and full in stereo — a phase-cancellation signature"}
+        {
+          "ref": "deep bass",
+          "seed_weight": 40,
+          "distinguisher": "thinness is about missing sub weight \u2014 check if it's specifically the low end that feels absent"
+        },
+        {
+          "ref": "wide mix",
+          "seed_weight": 30,
+          "distinguisher": "thinness is about excessive stereo widening causing a hollow center"
+        },
+        {
+          "ref": "mix collapses in mono",
+          "seed_weight": 30,
+          "distinguisher": "thinness only shows up on mono/small-speaker playback specifically but sounds fine and full in stereo \u2014 a phase-cancellation signature"
+        }
       ]
     },
     {
       "name": "no sound / silent output",
-      "aliases": ["cant hear anything", "no audio coming out", "logic is silent", "no sound from speakers", "playback is completely silent"],
+      "aliases": [
+        "cant hear anything",
+        "no audio coming out",
+        "logic is silent",
+        "no sound from speakers",
+        "playback is completely silent"
+      ],
       "note": "if other apps are also silent at the same time, that points to Core Audio specifically, not an in-app routing issue.",
       "solutions": [
-        {"ref": "no sound output", "seed_weight": 60, "distinguisher": "only Logic is silent — other apps make sound fine, and it's a routing/mute issue inside Logic itself"},
-        {"ref": "Core Audio goes silent mid-session", "seed_weight": 25, "distinguisher": "other apps go silent at the same time, or it happened suddenly mid-session with no setting changed — a macOS-level issue, not a Logic setting"},
-        {"ref": "audio interface not recognized in Logic", "seed_weight": 15, "distinguisher": "the interface doesn't appear in Logic's device list at all, even though it's connected"}
+        {
+          "ref": "no sound output",
+          "seed_weight": 60,
+          "distinguisher": "only Logic is silent \u2014 other apps make sound fine, and it's a routing/mute issue inside Logic itself"
+        },
+        {
+          "ref": "Core Audio goes silent mid-session",
+          "seed_weight": 25,
+          "distinguisher": "other apps go silent at the same time, or it happened suddenly mid-session with no setting changed \u2014 a macOS-level issue, not a Logic setting"
+        },
+        {
+          "ref": "audio interface not recognized in Logic",
+          "seed_weight": 15,
+          "distinguisher": "the interface doesn't appear in Logic's device list at all, even though it's connected"
+        }
       ]
     },
     {
       "name": "crackling during playback",
-      "aliases": ["audio pops and clicks during playback", "crackling sound in logic", "glitchy playback audio", "audio breaks up during playback"],
+      "aliases": [
+        "audio pops and clicks during playback",
+        "crackling sound in logic",
+        "glitchy playback audio",
+        "audio breaks up during playback"
+      ],
       "note": "if it happens consistently regardless of session size, check sample rate first; if it worsens as the project grows, it's CPU overload.",
       "solutions": [
-        {"ref": "sample rate mismatch", "seed_weight": 30, "distinguisher": "causes a full pitch+speed shift, not just crackle/pops — a red flag if speed or pitch also sound wrong, not just glitchy"},
-        {"ref": "CPU overload", "seed_weight": 70, "distinguisher": "gets worse as you add more tracks/plugins, or Logic shows a System Overload message — a load problem, not a rate problem"}
+        {
+          "ref": "sample rate mismatch",
+          "seed_weight": 30,
+          "distinguisher": "causes a full pitch+speed shift, not just crackle/pops \u2014 a red flag if speed or pitch also sound wrong, not just glitchy"
+        },
+        {
+          "ref": "CPU overload",
+          "seed_weight": 70,
+          "distinguisher": "gets worse as you add more tracks/plugins, or Logic shows a System Overload message \u2014 a load problem, not a rate problem"
+        }
       ]
     },
     {
       "name": "recording is silent / mic not picking up",
-      "aliases": ["cant hear my mic in logic", "recording isnt picking up any sound", "input meters not moving", "mic not working in logic pro"],
+      "aliases": [
+        "cant hear my mic in logic",
+        "recording isnt picking up any sound",
+        "input meters not moving",
+        "mic not working in logic pro"
+      ],
       "solutions": [
-        {"ref": "microphone permissions", "seed_weight": 60, "distinguisher": "meters don't move at all, even with a known-working interface — a macOS-level permission block"},
-        {"ref": "audio interface not recognized in Logic", "seed_weight": 40, "distinguisher": "the interface itself doesn't show up in Logic's device list, or works in other apps but not Logic"}
+        {
+          "ref": "microphone permissions",
+          "seed_weight": 60,
+          "distinguisher": "meters don't move at all, even with a known-working interface \u2014 a macOS-level permission block"
+        },
+        {
+          "ref": "audio interface not recognized in Logic",
+          "seed_weight": 40,
+          "distinguisher": "the interface itself doesn't show up in Logic's device list, or works in other apps but not Logic"
+        }
       ]
     },
     {
       "name": "high latency while monitoring",
-      "aliases": ["i hear myself delayed when recording", "monitoring lag while singing", "theres a delay when i play through logic", "input latency too high"],
-      "note": "only one common cause for this exact symptom — no need to ask which one, just confirm buffer size/low latency mode weren't already tried.",
+      "aliases": [
+        "i hear myself delayed when recording",
+        "monitoring lag while singing",
+        "theres a delay when i play through logic",
+        "input latency too high"
+      ],
+      "note": "only one common cause for this exact symptom \u2014 no need to ask which one, just confirm buffer size/low latency mode weren't already tried.",
       "solutions": [
-        {"ref": "recording latency and monitoring delay", "seed_weight": 100, "distinguisher": null}
+        {
+          "ref": "recording latency and monitoring delay",
+          "seed_weight": 100,
+          "distinguisher": null
+        }
       ]
     },
     {
       "name": "system overload / CPU message",
-      "aliases": ["system overload message", "logic keeps overloading", "cpu overload alert", "audio engine not able to process in time"],
+      "aliases": [
+        "system overload message",
+        "logic keeps overloading",
+        "cpu overload alert",
+        "audio engine not able to process in time"
+      ],
       "solutions": [
-        {"ref": "CPU overload", "seed_weight": 60, "distinguisher": "a general overload — happens on any Mac when plugin/track load exceeds the buffer"},
-        {"ref": "system overload on Apple Silicon Mac", "seed_weight": 40, "distinguisher": "specifically on an M1/M2/M3/M4 Mac, and Processing Threads shows fewer threads in use than the Mac actually has available"}
+        {
+          "ref": "CPU overload",
+          "seed_weight": 60,
+          "distinguisher": "a general overload \u2014 happens on any Mac when plugin/track load exceeds the buffer"
+        },
+        {
+          "ref": "system overload on Apple Silicon Mac",
+          "seed_weight": 40,
+          "distinguisher": "specifically on an M1/M2/M3/M4 Mac, and Processing Threads shows fewer threads in use than the Mac actually has available"
+        }
       ]
     }
   ]

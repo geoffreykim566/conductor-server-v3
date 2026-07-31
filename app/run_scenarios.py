@@ -37,7 +37,7 @@ async def run_scenario(scenario: dict) -> None:
             print(f"    tool call: {call['tool']}({call['input']})")
             out = call["output"]
             if call["tool"] == "lookup_concept":
-                print(f"      -> match={out.get('match')!r} problem={out.get('problem')!r}")
+                print(f"      -> match={out.get('match')!r} problem={out.get('problem')!r} confidence={out.get('match_confidence')!r}")
                 for sol in out.get("solutions", []):
                     print(f"         solution: {sol['name']!r} weight={sol.get('seed_weight')} "
                           f"has_path={sol.get('has_path')} distinguisher={sol.get('distinguisher')!r}")

@@ -16,7 +16,24 @@ SEED_FILE = Path(__file__).parent.parent / "seed" / "problems.json"
 
 
 def _solution_embed_text(sol: dict) -> str:
+    """Two embedding modes, deliberately different — mixing them caused a real bug
+    (found live 2026-07-30): a "destination" solution's tight name+aliases doesn't
+    bleed into unrelated diagnoses, but a "diagnosis" solution's rich symptom/cause
+    text does need to match varied symptom phrasing, and letting settings ride
+    along in that rich text caused false collisions ("wheres buffer size" matching
+    an unrelated latency diagnosis whose cause text happened to mention "buffer").
+
+    "destination": name + curated aliases only — no diagnostic prose, so a plain
+    "wheres X" query can't collide with an unrelated diagnosis that merely mentions
+    X in passing.
+    "diagnosis" (default): name + symptom/cause/zone — needs to match varied
+    real-world phrasing of a symptom, not just a name.
+    """
     parts = [sol["name"]]
+    if sol.get("kind") == "destination":
+        parts.extend(sol.get("aliases") or [])
+        return ". ".join(parts)
+
     c = sol.get("content", {})
     for key in ("symptom", "cause", "zone"):
         if c.get(key):

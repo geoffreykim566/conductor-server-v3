@@ -11,9 +11,26 @@ import asyncio
 import json
 
 from app import db
-from app.config import RELEVANCE_FLOOR
 from app.embed import embed
 from app.walkthrough import path_to_walkthrough_steps
+
+# Distance bands are advisory only — informing the model's own judgment, not a
+# hard filter. The old hard `RELEVANCE_FLOOR` SQL cutoff was a leftover from v1,
+# inconsistent with this project's own design direction (leave judgment calls to
+# the model, not a hand-tuned number) and directly implicated in a real bug: it
+# admitted a different wrong match on almost every retried phrasing for a topic
+# with no real KB coverage, which kept the model retrying instead of ever
+# cleanly recognizing "nothing relevant here." Found live 2026-07-30.
+_STRONG_MATCH = 0.40
+_MODERATE_MATCH = 0.60
+
+
+def _confidence_label(distance: float) -> str:
+    if distance <= _STRONG_MATCH:
+        return "strong"
+    if distance <= _MODERATE_MATCH:
+        return "moderate — treat with more skepticism, consider asking or trying a different phrasing"
+    return "weak — likely not actually relevant; don't treat this as a real match"
 
 
 async def _embed_with_retry(texts: list[str], input_type: str) -> list[list[float]]:
@@ -33,16 +50,25 @@ LOOKUP_CONCEPT_SCHEMA = {
     "name": "lookup_concept",
     "description": (
         "Call this before diagnosing any Logic Pro problem or naming any menu path, "
-        "shortcut, or settings location — never state one from memory. Call again "
-        "with a different phrasing if the user says a suggested fix did not work and "
-        "the current bucket of solutions is exhausted."
+        "shortcut, or settings location — never state one from memory. Results include "
+        "a match_confidence ('strong'/'moderate'/'weak') — this is advisory, not a "
+        "filter; judge for yourself whether a 'moderate' or 'weak' result is actually "
+        "relevant rather than treating it as grounded. If you already know the exact "
+        "name of a specific setting or destination (from a solution's own fix text, "
+        "from a bucket you were just given, or from your own knowledge), query with "
+        "that name directly rather than paraphrasing the user's original wording."
     ),
     "input_schema": {
         "type": "object",
         "properties": {
             "problem": {
                 "type": "string",
-                "description": "Your own short (2-8 word) paraphrase of the user's symptom, problem, or destination.",
+                "description": (
+                    "Your own short (2-8 word) query — either a normalized description of the "
+                    "user's symptom (not their literal wording; recognize the underlying issue "
+                    "and phrase it the way this KB names things), or the exact name of a "
+                    "specific setting/destination you already know you want."
+                ),
             }
         },
         "required": ["problem"],
@@ -106,6 +132,7 @@ def _content_summary(name: str, content: dict) -> str:
         ("symptom", "Symptom"), ("cause", "Cause"), ("fix", "Fix"),
         ("zone", "Zone"), ("remove_when", "Remove when"), ("remove_move", "Remove move"),
         ("add_when", "Add when"), ("add_move", "Add move"), ("do_not", "Do not"),
+        ("opens", "Opens"),
     ):
         if content.get(key):
             lines.append(f"{label}: {content[key]}")
@@ -125,16 +152,17 @@ async def lookup_concept(problem: str) -> dict:
                    path, null::text as note, (embedding <=> $1) as distance
             from solutions
         ) combined
-        where distance <= $2
         order by distance
         limit 5
         """,
-        vec, RELEVANCE_FLOOR,
+        vec,
     )
     if not rows:
         return {"match": "none"}
 
     top = rows[0]
+    confidence = _confidence_label(top["distance"])
+
     if top["kind"] == "problem":
         links = await db.pool().fetch(
             """
@@ -159,6 +187,7 @@ async def lookup_concept(problem: str) -> dict:
         return {
             "match": "problem",
             "problem": top["name"],
+            "match_confidence": confidence,
             "solutions": solutions,
             "note": top["note"] or "seed_weight is a population prior — override it on direct evidence.",
         }
@@ -166,6 +195,7 @@ async def lookup_concept(problem: str) -> dict:
     return {
         "match": "single",
         "problem": top["name"],
+        "match_confidence": confidence,
         "solutions": [{
             "name": top["name"],
             "seed_weight": None,
