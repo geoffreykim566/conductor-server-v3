@@ -9,24 +9,8 @@
         "fix": "Step 1: Open File > Project Settings > Audio and check the project's Sample Rate. Step 2: Open macOS Audio MIDI Setup (Spotlight search) and confirm the interface's own sample rate matches \u2014 some interfaces have a hardware switch or their own control panel that can override what Logic requests. Step 3: Set both to the same value (44.1 kHz and 48 kHz are the most common) and restart playback.",
         "do_not": "do not chase this as a tempo or Smart Tempo problem \u2014 tempo changes preserve pitch (time-stretching), a true sample-rate mismatch does not; if speed and pitch are both off together, it's the sample rate, not the tempo"
       },
-      "path": [
-        {
-          "type": "menu",
-          "value": "File"
-        },
-        {
-          "type": "menu",
-          "value": "Project Settings"
-        },
-        {
-          "type": "menu",
-          "value": "Audio"
-        },
-        {
-          "type": "click_value_of",
-          "value": "Sample Rate"
-        }
-      ],
+      "path": null,
+      "extends_to": "sample rate",
       "kind": "diagnosis",
       "aliases": []
     },
@@ -132,20 +116,8 @@
         "fix": "check the master fader is not muted; open Logic Pro > Settings > Audio and confirm the Output Device matches your interface or headphones; check the stereo output channel strip in the Mixer is not muted",
         "do_not": "do not adjust track faders or EQ before confirming the output routing is correct"
       },
-      "path": [
-        {
-          "type": "menu",
-          "value": "Logic Pro"
-        },
-        {
-          "type": "menu",
-          "value": "Settings"
-        },
-        {
-          "type": "menu",
-          "value": "Audio"
-        }
-      ],
+      "path": null,
+      "extends_to": "audio settings",
       "kind": "diagnosis",
       "aliases": []
     },
@@ -158,20 +130,8 @@
         "fix": "Toggle Core Audio off and back on: Logic Pro > Settings > Audio > Devices tab > uncheck 'Enable Core Audio', wait 2 seconds, then re-enable it. If other apps are also silent, restart the Mac.",
         "do_not": "do not adjust faders, output routing, or plugin settings first \u2014 the issue is at the macOS audio system level"
       },
-      "path": [
-        {
-          "type": "menu",
-          "value": "Logic Pro"
-        },
-        {
-          "type": "menu",
-          "value": "Settings"
-        },
-        {
-          "type": "menu",
-          "value": "Audio"
-        }
-      ],
+      "path": null,
+      "extends_to": "audio settings",
       "kind": "diagnosis",
       "aliases": []
     },
@@ -197,24 +157,8 @@
         "fix": "increase the I/O buffer size (try 256 or 512 samples while mixing); then freeze CPU-heavy tracks (right-click the track header > Freeze Track)",
         "do_not": "do not dismiss the alert and keep working at the same settings \u2014 the dropout will keep happening"
       },
-      "path": [
-        {
-          "type": "menu",
-          "value": "Logic Pro"
-        },
-        {
-          "type": "menu",
-          "value": "Settings"
-        },
-        {
-          "type": "menu",
-          "value": "Audio"
-        },
-        {
-          "type": "click_value_of",
-          "value": "I/O Buffer Size"
-        }
-      ],
+      "path": null,
+      "extends_to": "buffer size",
       "kind": "diagnosis",
       "aliases": []
     },
@@ -227,24 +171,8 @@
         "fix": "Set Processing Threads to the maximum available number rather than 'Automatic'. Change Multithreading from 'Playback and Live Tracks' to 'Playback'. Disable macOS Voice Isolation in Control Center if active. Freeze CPU-heavy tracks.",
         "do_not": "do not dismiss the overload alert and keep working \u2014 freeze the most CPU-intensive tracks before continuing"
       },
-      "path": [
-        {
-          "type": "menu",
-          "value": "Logic Pro"
-        },
-        {
-          "type": "menu",
-          "value": "Settings"
-        },
-        {
-          "type": "menu",
-          "value": "Audio"
-        },
-        {
-          "type": "click_value_of",
-          "value": "Processing Threads"
-        }
-      ],
+      "path": null,
+      "extends_to": "processing threads",
       "kind": "diagnosis",
       "aliases": []
     },
@@ -268,16 +196,8 @@
         "fix": "Step 1: Reduce the I/O buffer size to 64 or 128 samples. Step 2: Choose Record > Low Latency Monitoring Mode to bypass latency-adding plugins on record-enabled tracks. Step 3: If your interface supports direct monitoring, use that instead.",
         "do_not": "do not leave a large buffer and try to sing or play along to the delayed signal \u2014 the perceived delay will affect your performance and the recorded timing"
       },
-      "path": [
-        {
-          "type": "menu",
-          "value": "Record"
-        },
-        {
-          "type": "menu",
-          "value": "Low Latency Monitoring Mode"
-        }
-      ],
+      "path": null,
+      "extends_to": "low latency monitoring mode",
       "kind": "diagnosis",
       "aliases": []
     },
@@ -310,6 +230,145 @@
         {
           "type": "click_value_of",
           "value": "I/O Buffer Size"
+        }
+      ]
+    },
+    {
+      "name": "sample rate",
+      "tier": "established",
+      "kind": "destination",
+      "aliases": [
+        "project sample rate",
+        "sample rate setting",
+        "audio sample rate",
+        "44.1 kHz vs 48 kHz"
+      ],
+      "content": {
+        "opens": "Project Settings window, Audio tab — Sample Rate, Spatial Audio, Surround Format, Pan Law, and Apple Loops quality. Change the project's sample rate here (most commonly between 44.1 kHz and 48 kHz)."
+      },
+      "path": [
+        {
+          "type": "menu",
+          "value": "File"
+        },
+        {
+          "type": "menu",
+          "value": "Project Settings"
+        },
+        {
+          "type": "menu",
+          "value": "Audio"
+        },
+        {
+          "type": "click_value_of",
+          "value": "Sample Rate"
+        }
+      ]
+    },
+    {
+      "name": "processing threads",
+      "tier": "established",
+      "kind": "destination",
+      "aliases": [
+        "thread count",
+        "CPU threads",
+        "multithreading setting",
+        "processing threads setting"
+      ],
+      "content": {
+        "opens": "Audio settings pane, Devices tab — Processing Threads pop-up menu. Controls how many CPU threads Logic's audio engine uses; set to the maximum available rather than 'Automatic' on Apple Silicon."
+      },
+      "path": [
+        {
+          "type": "menu",
+          "value": "Logic Pro"
+        },
+        {
+          "type": "menu",
+          "value": "Settings"
+        },
+        {
+          "type": "menu",
+          "value": "Audio"
+        },
+        {
+          "type": "click_value_of",
+          "value": "Processing Threads"
+        }
+      ]
+    },
+    {
+      "name": "low latency monitoring mode",
+      "tier": "established",
+      "kind": "destination",
+      "aliases": [
+        "low latency mode",
+        "monitoring latency setting",
+        "low latency monitoring"
+      ],
+      "content": {
+        "opens": "Toggles Low Latency Monitoring Mode — bypasses latency-adding plugins on record-enabled tracks so software monitoring stays close to real time."
+      },
+      "path": [
+        {
+          "type": "menu",
+          "value": "Record"
+        },
+        {
+          "type": "menu",
+          "value": "Low Latency Monitoring Mode"
+        }
+      ]
+    },
+    {
+      "name": "audio settings",
+      "tier": "established",
+      "kind": "destination",
+      "aliases": [
+        "audio device settings",
+        "output device settings",
+        "core audio settings",
+        "logic audio preferences"
+      ],
+      "content": {
+        "opens": "Settings window, Audio tab — output/input device selection, Core Audio on/off, sample rate, and buffer size all live here."
+      },
+      "path": [
+        {
+          "type": "menu",
+          "value": "Logic Pro"
+        },
+        {
+          "type": "menu",
+          "value": "Settings"
+        },
+        {
+          "type": "menu",
+          "value": "Audio"
+        }
+      ]
+    },
+    {
+      "name": "input monitoring toggle",
+      "tier": "established",
+      "kind": "destination",
+      "aliases": [
+        "monitor button",
+        "track monitor button",
+        "input monitoring button",
+        "I button track header"
+      ],
+      "content": {
+        "opens": "Opens the Configure Track Header panel, where Input Monitoring (the \"I\" button on audio tracks) can be checked or unchecked. If it's already checked, the button is already visible on the track header — check the current state before assuming it needs enabling."
+      },
+      "path": [
+        {
+          "type": "shortcut",
+          "value": "Option+T"
+        },
+        {
+          "type": "click_text",
+          "value": "Input Monitoring"
         }
       ]
     }

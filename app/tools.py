@@ -3,9 +3,15 @@
 lookup_concept queries problems and solutions TOGETHER, in one ranked pass, and
 lets whichever is actually closest by distance win — same fix as the v2 pilot's
 combined-retrieval bug (a type checked first unconditionally starves a better
-match; found live 2026-07-30). get_walkthrough reads a solution's path directly
-off its own row — no fix_via/requires indirection needed, since a solution's
-path lives on the solution itself now, not on a separately-linked entry.
+match; found live 2026-07-30). If the top hit is a solution that belongs to a
+problem bucket, it always resolves as that bucket, never in isolation —
+otherwise raw embedding-distance noise can let a bucket member win the top-1
+slot and hide its siblings entirely (found live 2026-07-31,
+ax_override_critical_test resolving three different ways across three runs).
+get_walkthrough reads a solution's own path if it has one, otherwise follows
+its extends_to link to fetch the real path from the solution it points at
+(never a second embedding call — extends_to is a fixed reference, resolved by
+one join, not a re-search).
 """
 import asyncio
 import json
@@ -101,29 +107,7 @@ GET_WALKTHROUGH_SCHEMA = {
     },
 }
 
-READ_AX_STATE_SCHEMA = {
-    "name": "read_ax_state",
-    "description": (
-        "Reads live ground-truth state from the running Logic project (e.g. the "
-        "project's actual sample rate). Prefer this over guessing whenever a diagnosis "
-        "depends on a checkable setting. In this test environment this returns a "
-        "scripted fixture value, not a live read."
-    ),
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "query": {
-                "type": "string",
-                "enum": ["project_sample_rate"],
-                "description": "Which piece of state to read.",
-            }
-        },
-        "required": ["query"],
-        "additionalProperties": False,
-    },
-}
-
-TOOLS = [LOOKUP_CONCEPT_SCHEMA, GET_WALKTHROUGH_SCHEMA, READ_AX_STATE_SCHEMA]
+TOOLS = [LOOKUP_CONCEPT_SCHEMA, GET_WALKTHROUGH_SCHEMA]
 
 
 def _content_summary(name: str, content: dict) -> str:
@@ -145,11 +129,13 @@ async def lookup_concept(problem: str) -> dict:
         """
         select * from (
             select 'problem'::text as kind, id, name, null::jsonb as content,
-                   null::jsonb as path, note, (embedding <=> $1) as distance
+                   null::jsonb as path, null::uuid as extends_to, note,
+                   (embedding <=> $1) as distance
             from problems
             union all
             select 'solution'::text as kind, id, name, content,
-                   path, null::text as note, (embedding <=> $1) as distance
+                   path, extends_to, null::text as note,
+                   (embedding <=> $1) as distance
             from solutions
         ) combined
         order by distance
@@ -163,16 +149,39 @@ async def lookup_concept(problem: str) -> dict:
     top = rows[0]
     confidence = _confidence_label(top["distance"])
 
+    problem_id = problem_name = problem_note = None
     if top["kind"] == "problem":
+        problem_id, problem_name, problem_note = top["id"], top["name"], top["note"]
+    else:
+        # A solution can belong to more than one bucket (e.g. `sample rate
+        # mismatch` is a candidate for both `song sounds slowed` and
+        # `crackling during playback`) -- when the top hit is the solution
+        # itself rather than either parent, pick deterministically by which
+        # bucket it's most strongly weighted in, not by unordered row order.
+        link = await db.pool().fetchrow(
+            """
+            select p.id, p.name, p.note
+            from problem_solutions ps
+            join problems p on p.id = ps.problem_id
+            where ps.solution_id = $1
+            order by ps.seed_weight desc nulls last
+            limit 1
+            """,
+            top["id"],
+        )
+        if link:
+            problem_id, problem_name, problem_note = link["id"], link["name"], link["note"]
+
+    if problem_id is not None:
         links = await db.pool().fetch(
             """
-            select s.name, s.content, s.path, ps.seed_weight, ps.distinguisher
+            select s.name, s.content, s.path, s.extends_to, ps.seed_weight, ps.distinguisher
             from problem_solutions ps
             join solutions s on s.id = ps.solution_id
             where ps.problem_id = $1
             order by ps.seed_weight desc nulls last
             """,
-            top["id"],
+            problem_id,
         )
         solutions = [
             {
@@ -180,16 +189,16 @@ async def lookup_concept(problem: str) -> dict:
                 "seed_weight": r["seed_weight"],
                 "distinguisher": r["distinguisher"],
                 "summary": _content_summary(r["name"], r["content"] or {}),
-                "has_path": bool(r["path"]),
+                "has_path": bool(r["path"] or r["extends_to"]),
             }
             for r in links
         ]
         return {
             "match": "problem",
-            "problem": top["name"],
+            "problem": problem_name,
             "match_confidence": confidence,
             "solutions": solutions,
-            "note": top["note"] or "seed_weight is a population prior — override it on direct evidence.",
+            "note": problem_note or "seed_weight is a population prior — override it on direct evidence.",
         }
 
     return {
@@ -201,26 +210,32 @@ async def lookup_concept(problem: str) -> dict:
             "seed_weight": None,
             "distinguisher": None,
             "summary": _content_summary(top["name"], top["content"] or {}),
-            "has_path": bool(top["path"]),
+            "has_path": bool(top["path"] or top["extends_to"]),
         }],
         "note": None,
     }
 
 
 async def get_walkthrough(solution: str) -> dict:
-    row = await db.pool().fetchrow("select path from solutions where name = $1", solution)
+    row = await db.pool().fetchrow(
+        "select path, extends_to from solutions where name = $1", solution
+    )
     if not row:
         return {"attached": False, "reason": "solution not found"}
+
     path = row["path"]
+    resolved_name = solution
+    if not path and row["extends_to"]:
+        target = await db.pool().fetchrow(
+            "select name, path from solutions where id = $1", row["extends_to"]
+        )
+        if target:
+            path = target["path"]
+            resolved_name = target["name"]
+
     if not path:
         return {"attached": False, "reason": "no executable path for this solution"}
     steps = path_to_walkthrough_steps(path)
     if not steps:
         return {"attached": False, "reason": "path present but produced no executable steps"}
-    return {"attached": True, "destination": solution, "steps": steps}
-
-
-async def read_ax_state(query: str, fixture: dict | None = None) -> dict:
-    if fixture and query in fixture:
-        return {"value": fixture[query], "source": "fixture"}
-    return {"error": "no fixture value set for this query in this scenario", "source": "fixture"}
+    return {"attached": True, "destination": resolved_name, "steps": steps}

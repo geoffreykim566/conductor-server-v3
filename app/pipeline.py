@@ -31,9 +31,8 @@ LOOKUP_ATTEMPT_LIMIT = 4
 _client = AsyncAnthropic(api_key=CENTRAL_ANTHROPIC_KEY)
 
 _EXECUTORS = {
-    "lookup_concept": lambda inp, fixture: tools.lookup_concept(inp["problem"]),
-    "get_walkthrough": lambda inp, fixture: tools.get_walkthrough(inp["solution"]),
-    "read_ax_state": lambda inp, fixture: tools.read_ax_state(inp["query"], fixture=fixture),
+    "lookup_concept": lambda inp: tools.lookup_concept(inp["problem"]),
+    "get_walkthrough": lambda inp: tools.get_walkthrough(inp["solution"]),
 }
 
 
@@ -51,11 +50,27 @@ async def respond(messages: list[dict], ax_fixture: dict | None = None) -> Resul
     walkthrough_steps: list | None = None
     lookup_attempts = 0
 
+    # Pushed, not pulled: live state (when known for this turn) is handed to the
+    # model automatically rather than waiting on it to decide to call a tool for
+    # it -- a decision point it's already been observed skipping under real
+    # conditions (found live 2026-08-04, the monitor-button hallucination).
+    system = SYSTEM_PROMPT
+    if ax_fixture:
+        state_lines = "\n".join(f"- {k}: {v}" for k, v in ax_fixture.items())
+        system += (
+            "\n\n## Live state for this turn\n\n"
+            "Read directly from the running Logic Pro project via the Accessibility "
+            "API -- ground truth, not something the user said or you inferred. This "
+            "outranks stated claims, seed_weight, and anything read from a screenshot "
+            "when they conflict.\n\n"
+            f"{state_lines}"
+        )
+
     for _ in range(MAX_ITERATIONS):
         resp = await _client.messages.create(
             model=MODEL,
             max_tokens=MAX_TOKENS,
-            system=SYSTEM_PROMPT,
+            system=system,
             tools=tools.TOOLS,
             messages=msgs,
         )
@@ -82,7 +97,7 @@ async def respond(messages: list[dict], ax_fixture: dict | None = None) -> Resul
                 }
             else:
                 executor = _EXECUTORS.get(tu.name)
-                result = {"error": f"unknown tool {tu.name!r}"} if executor is None else await executor(tu.input, ax_fixture)
+                result = {"error": f"unknown tool {tu.name!r}"} if executor is None else await executor(tu.input)
             trace.append({"tool": tu.name, "input": tu.input, "output": result})
             if tu.name == "get_walkthrough" and result.get("attached"):
                 walkthrough_steps = result.get("steps")
@@ -99,7 +114,7 @@ async def respond(messages: list[dict], ax_fixture: dict | None = None) -> Resul
     final = await _client.messages.create(
         model=MODEL,
         max_tokens=MAX_TOKENS,
-        system=SYSTEM_PROMPT + "\n\nAnswer now with your best available information — no more tool calls.",
+        system=system + "\n\nAnswer now with your best available information — no more tool calls.",
         messages=msgs,
     )
     text = "".join(b.text for b in final.content if b.type == "text")

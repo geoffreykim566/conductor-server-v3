@@ -57,6 +57,25 @@ async def main() -> None:
 
     print(f"Loaded {len(solutions)} solutions, {len(problems)} problems from {SEED_FILE}")
 
+    # extends_to must be a single hop -- a path is a concrete, terminal thing,
+    # so a solution's extends_to target must not itself declare extends_to.
+    by_name = {s["name"]: s for s in solutions}
+    for sol in solutions:
+        target_name = sol.get("extends_to")
+        if not target_name:
+            continue
+        target = by_name.get(target_name)
+        if target is None:
+            raise ValueError(f"{sol['name']!r} extends_to unknown solution {target_name!r}")
+        if target.get("extends_to"):
+            raise ValueError(
+                f"{sol['name']!r} extends_to {target_name!r}, which itself extends_to "
+                f"{target['extends_to']!r} -- chaining is not allowed, point directly "
+                f"at the solution that actually holds the path"
+            )
+        if target.get("path") is None:
+            raise ValueError(f"{sol['name']!r} extends_to {target_name!r}, which has no path")
+
     sol_texts = [_solution_embed_text(s) for s in solutions]
     prob_texts = [_problem_embed_text(p) for p in problems]
 
@@ -74,18 +93,30 @@ async def main() -> None:
                 for sol, emb in zip(solutions, sol_embeddings):
                     row = await conn.fetchrow(
                         """
-                        insert into solutions (name, embedding, content, path, tier)
-                        values ($1, $2, $3, $4, $5)
+                        insert into solutions (name, embedding, content, path, tier, extends_to)
+                        values ($1, $2, $3, $4, $5, null)
                         on conflict (name) do update set
-                            embedding = excluded.embedding,
-                            content   = excluded.content,
-                            path      = excluded.path,
-                            tier      = excluded.tier
+                            embedding  = excluded.embedding,
+                            content    = excluded.content,
+                            path       = excluded.path,
+                            tier       = excluded.tier,
+                            extends_to = null
                         returning id
                         """,
                         sol["name"], emb, sol["content"], sol.get("path"), sol.get("tier", "established"),
                     )
                     sol_ids[sol["name"]] = row["id"]
+
+                # Second pass: extends_to references another solution's id, so it
+                # can only be wired up once every solution above has one.
+                for sol in solutions:
+                    target_name = sol.get("extends_to")
+                    if not target_name:
+                        continue
+                    await conn.execute(
+                        "update solutions set extends_to = $1 where id = $2",
+                        sol_ids[target_name], sol_ids[sol["name"]],
+                    )
 
                 prob_ids: dict[str, str] = {}
                 for prob, emb in zip(problems, prob_embeddings):
