@@ -216,12 +216,22 @@ async def lookup_concept(problem: str) -> dict:
     }
 
 
-async def get_walkthrough(solution: str) -> dict:
+async def get_walkthrough(solution: str, ax_fixture: dict | None = None) -> dict:
     row = await db.pool().fetchrow(
-        "select path, extends_to from solutions where name = $1", solution
+        "select path, extends_to, toggle_ax_key from solutions where name = $1", solution
     )
     if not row:
         return {"attached": False, "reason": "solution not found"}
+
+    if row["toggle_ax_key"] and ax_fixture and ax_fixture.get(row["toggle_ax_key"]) is True:
+        return {
+            "attached": False,
+            "reason": (
+                f"already in the target state ({row['toggle_ax_key']} is already true this "
+                "turn) -- attaching would toggle it away, not reveal it; tell the user it's "
+                "already there instead of walking through how to enable it"
+            ),
+        }
 
     path = row["path"]
     resolved_name = solution

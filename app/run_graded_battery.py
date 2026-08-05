@@ -102,6 +102,11 @@ async def run_scenario(scenario: dict) -> dict:
         print(f"\n  --- turn {i}: {turn['text']!r} ---")
         if ax_fixture:
             print(f"  [ax_fixture: {ax_fixture}]")
+        if result.thinking:
+            print("  --- thinking ---")
+            for block in result.thinking:
+                print(f"    {block}")
+            print("  --- end thinking ---")
         for call in result.trace:
             print(f"    tool call: {call['tool']}({call['input']})")
             out = call["output"]

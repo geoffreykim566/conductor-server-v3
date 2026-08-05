@@ -361,6 +361,7 @@
       "content": {
         "opens": "Opens the Configure Track Header panel, where Input Monitoring (the \"I\" button on audio tracks) can be checked or unchecked. If it's already checked, the button is already visible on the track header — check the current state before assuming it needs enabling."
       },
+      "toggle_ax_key": "input_monitoring_button_visible",
       "path": [
         {
           "type": "shortcut",

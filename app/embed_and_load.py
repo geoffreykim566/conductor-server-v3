@@ -93,17 +93,19 @@ async def main() -> None:
                 for sol, emb in zip(solutions, sol_embeddings):
                     row = await conn.fetchrow(
                         """
-                        insert into solutions (name, embedding, content, path, tier, extends_to)
-                        values ($1, $2, $3, $4, $5, null)
+                        insert into solutions (name, embedding, content, path, tier, extends_to, toggle_ax_key)
+                        values ($1, $2, $3, $4, $5, null, $6)
                         on conflict (name) do update set
-                            embedding  = excluded.embedding,
-                            content    = excluded.content,
-                            path       = excluded.path,
-                            tier       = excluded.tier,
-                            extends_to = null
+                            embedding      = excluded.embedding,
+                            content        = excluded.content,
+                            path           = excluded.path,
+                            tier           = excluded.tier,
+                            extends_to     = null,
+                            toggle_ax_key  = excluded.toggle_ax_key
                         returning id
                         """,
                         sol["name"], emb, sol["content"], sol.get("path"), sol.get("tier", "established"),
+                        sol.get("toggle_ax_key"),
                     )
                     sol_ids[sol["name"]] = row["id"]
 
