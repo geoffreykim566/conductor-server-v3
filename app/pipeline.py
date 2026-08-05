@@ -8,7 +8,6 @@ History is the only state — nothing is pinned server-side between turns.
 from __future__ import annotations
 
 import json
-import os
 from dataclasses import dataclass, field
 
 from anthropic import AsyncAnthropic
@@ -18,13 +17,6 @@ from app.config import CENTRAL_ANTHROPIC_KEY, MAX_TOKENS, MODEL
 from app.prompt import SYSTEM_PROMPT
 
 MAX_ITERATIONS = 6
-
-# A/B switch, env-controlled rather than a respond() parameter -- lets the same
-# battery runner be invoked twice (THINKING_ENABLED=true / =false) to isolate
-# whether thinking mode itself changes outcomes, versus just being on for every
-# run and never knowing if a pass was the fix or the reasoning budget (found
-# live 2026-08-05, results were confounded across 3 bundled changes at once).
-THINKING_ENABLED = os.environ.get("THINKING_ENABLED", "true").strip().lower() != "false"
 
 # Hard, code-enforced cap on lookup_concept calls within one turn — a prompt
 # instruction to "stop retrying" is a request, not a guarantee. Found live
@@ -36,25 +28,7 @@ THINKING_ENABLED = os.environ.get("THINKING_ENABLED", "true").strip().lower() !=
 # MAX_ITERATIONS safety net below (which covers any tool, not just this one).
 LOOKUP_ATTEMPT_LIMIT = 4
 
-# Extended thinking -- a real reasoning budget, not just exposing something
-# that was already happening silently. Added 2026-08-05 specifically to
-# investigate two live findings the prompt/trace alone couldn't explain: why
-# no_sound_direct sometimes leads with a lower-weight, unevidenced candidate,
-# and why ax_override_critical_test occasionally attaches a walkthrough for a
-# value already known from pushed AX state. max_tokens is widened by the
-# thinking budget so real output isn't starved by the reasoning budget.
-THINKING_BUDGET_TOKENS = 2048
-
 _client = AsyncAnthropic(api_key=CENTRAL_ANTHROPIC_KEY)
-
-
-def _model_kwargs() -> dict:
-    if THINKING_ENABLED:
-        return {
-            "max_tokens": MAX_TOKENS + THINKING_BUDGET_TOKENS,
-            "thinking": {"type": "enabled", "budget_tokens": THINKING_BUDGET_TOKENS},
-        }
-    return {"max_tokens": MAX_TOKENS}
 
 _EXECUTORS = {
     "lookup_concept": lambda inp, fixture: tools.lookup_concept(inp["problem"]),
@@ -68,13 +42,11 @@ class Result:
     walkthrough_steps: list | None
     trace: list[dict] = field(default_factory=list)
     messages: list[dict] = field(default_factory=list)
-    thinking: list[str] = field(default_factory=list)
 
 
 async def respond(messages: list[dict], ax_fixture: dict | None = None) -> Result:
     msgs = list(messages)
     trace: list[dict] = []
-    thinking: list[str] = []
     walkthrough_steps: list | None = None
     lookup_attempts = 0
 
@@ -97,18 +69,17 @@ async def respond(messages: list[dict], ax_fixture: dict | None = None) -> Resul
     for _ in range(MAX_ITERATIONS):
         resp = await _client.messages.create(
             model=MODEL,
+            max_tokens=MAX_TOKENS,
             system=system,
             tools=tools.TOOLS,
             messages=msgs,
-            **_model_kwargs(),
         )
-        thinking.extend(b.thinking for b in resp.content if b.type == "thinking")
         tool_uses = [b for b in resp.content if b.type == "tool_use"]
 
         if not tool_uses:
             text = "".join(b.text for b in resp.content if b.type == "text")
             msgs.append({"role": "assistant", "content": resp.content})
-            return Result(text=text, walkthrough_steps=walkthrough_steps, trace=trace, messages=msgs, thinking=thinking)
+            return Result(text=text, walkthrough_steps=walkthrough_steps, trace=trace, messages=msgs)
 
         msgs.append({"role": "assistant", "content": resp.content})
         tool_results = []
@@ -155,11 +126,10 @@ async def respond(messages: list[dict], ax_fixture: dict | None = None) -> Resul
     # model must synthesize whatever it already learned into a real answer.
     final = await _client.messages.create(
         model=MODEL,
+        max_tokens=MAX_TOKENS,
         system=system + "\n\nAnswer now with your best available information — no more tool calls.",
         messages=msgs,
-        **_model_kwargs(),
     )
-    thinking.extend(b.thinking for b in final.content if b.type == "thinking")
     text = "".join(b.text for b in final.content if b.type == "text")
     msgs.append({"role": "assistant", "content": final.content})
-    return Result(text=text, walkthrough_steps=walkthrough_steps, trace=trace, messages=msgs, thinking=thinking)
+    return Result(text=text, walkthrough_steps=walkthrough_steps, trace=trace, messages=msgs)
