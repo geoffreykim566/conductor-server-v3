@@ -24,7 +24,7 @@
    "expect": {"match": "problem"},
    "turns": [{"text": "my song sounds thin and hollow on my phone speaker, but it sounds full and fine on my studio monitors"}]},
   {"name": "no_sound_direct", "note": "3-way ambiguous new bucket, no evidence given — committing to the weight-60 default or asking are both acceptable; leading with the weight-25 candidate with zero evidence (found live 2026-08-04) is not, and isn't in the accepted set below",
-   "expect": {"match": "problem", "walkthrough_destination": ["audio settings", null]},
+   "expect": {"match": "problem", "walkthrough_destination": ["audio settings", null], "walkthrough_solution": ["no sound output", null]},
    "turns": [{"text": "i cant hear anything, no sound at all"}]},
   {"name": "no_sound_context_other_apps", "note": "distinguisher: other apps also silent -> should point to Core Audio specifically",
    "expect": {"match": "problem", "walkthrough_destination": "audio settings"},

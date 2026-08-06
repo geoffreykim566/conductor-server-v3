@@ -55,28 +55,34 @@ def _actual_outcome(trace: list[dict]) -> dict:
     attached_destinations = [
         c["output"]["destination"] for c in walkthrough_calls if c["output"].get("attached")
     ]
+    # The solution actually requested, not its resolved destination -- distinct fields
+    # because extends_to lets multiple solutions share one destination (e.g. "no sound
+    # output" and "Core Audio goes silent mid-session" both resolve to "audio settings"),
+    # so attached_destinations alone can't tell a correct pick from a wrong one that
+    # happens to land on the same screen.
+    attached_solutions = [
+        c["input"]["solution"] for c in walkthrough_calls if c["output"].get("attached")
+    ]
 
     return {
         "match": match,
         "attached_destinations": attached_destinations,
+        "attached_solutions": attached_solutions,
         "no_tool_calls": len(trace) == 0,
     }
 
 
-def _walkthrough_destination_pass(expected, attached_destinations: list[str]) -> bool:
+def _membership_pass(expected, attached: list[str]) -> bool:
     """expected forms: None -> nothing should have attached; a string -> that
-    destination must be among the ones attached; a list -> at least one of the
+    value must be among the ones attached; a list -> at least one of the
     acceptable outcomes happened, where a literal None inside the list means
     "attaching nothing is also acceptable" (used for scenarios where asking a
     clarifying question is a legitimate alternative to committing)."""
     if expected is None:
-        return attached_destinations == []
+        return attached == []
     if isinstance(expected, list):
-        return any(
-            (e is None and attached_destinations == []) or e in attached_destinations
-            for e in expected
-        )
-    return expected in attached_destinations
+        return any((e is None and attached == []) or e in attached for e in expected)
+    return expected in attached
 
 
 def _grade(expect: dict, actual: dict) -> list[dict]:
@@ -84,7 +90,10 @@ def _grade(expect: dict, actual: dict) -> list[dict]:
     for key, expected in expect.items():
         if key == "walkthrough_destination":
             got = actual["attached_destinations"]
-            ok = _walkthrough_destination_pass(expected, got)
+            ok = _membership_pass(expected, got)
+        elif key == "walkthrough_solution":
+            got = actual["attached_solutions"]
+            ok = _membership_pass(expected, got)
         else:
             got = actual.get(key)
             ok = got == expected
