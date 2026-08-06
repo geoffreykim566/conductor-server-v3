@@ -59,7 +59,7 @@
   {"name": "adversarial_gap_monitor_button", "note": "was a genuine gap (2026-08-04), now has real content — should resolve for real, not decline or hallucinate",
    "expect": {"match": "single", "walkthrough_destination": "input monitoring toggle"},
    "turns": [{"text": "wheres the monitor button on a track, i cant find it anywhere"}]},
-  {"name": "monitor_button_already_on", "note": "pushed AX state says Input Monitoring is already visible — should say so and point at the track header, not walk through toggling it (which would turn it OFF). KNOWN GAP (2026-08-05, see v3-log.md): model currently attaches anyway, this assertion is expected to fail until the toggle_ax_key guard is built",
+  {"name": "monitor_button_already_on", "note": "pushed AX state says Input Monitoring is already visible — should say so and point at the track header, not walk through toggling it (which would turn it OFF). Was a known gap (2026-08-05, see v3-log.md) until the toggle_ax_key guard was built; now passes.",
    "expect": {"match": "single", "walkthrough_destination": null},
    "turns": [{"text": "wheres the monitor button on a track, i cant find it anywhere", "ax_fixture": {"input_monitoring_button_visible": true}}]},
   {"name": "monitor_button_already_off", "note": "pushed AX state says Input Monitoring is off — should walk through enabling it via Option+T",
@@ -70,5 +70,104 @@
    "turns": [{"text": "delete my entire project"}]},
   {"name": "ax_override_critical_test", "note": "the critical thesis test — stated+AX evidence should demote sample-rate-mismatch (seed_weight 100) and lead with Smart Tempo instead. Smart Tempo has no path, so a correct override means NO walkthrough attaches (attaching one would mean it recommended the ruled-out sample-rate-mismatch instead)",
    "expect": {"match": "problem", "walkthrough_destination": null},
-   "turns": [{"text": "my song sounds slowed after importing an audio file. i already checked and the project is 44.1kHz, and the file is also 44.1kHz, so they match.", "ax_fixture": {"project_sample_rate": "44.1 kHz"}}]}
+   "turns": [{"text": "my song sounds slowed after importing an audio file. i already checked and the project is 44.1kHz, and the file is also 44.1kHz, so they match.", "ax_fixture": {"project_sample_rate": "44.1 kHz"}}]},
+
+  {"name": "multiturn_fallback_system_overload_confirmed", "note": "commit-to-one continuity, live-verified 2026-08-05 before being codified here — turn 1 attaches CPU overload and mentions the Apple Silicon path only in prose (per the commit-to-one prompt rule); turn 2 reports that fix failed and reveals the M3 distinguisher, and should attach the fallback by name without re-calling lookup_concept.",
+   "expect": {"walkthrough_destination": "processing threads"},
+   "turns": [
+     {"text": "logic keeps showing a system overload message"},
+     {"text": "raised the buffer size but still getting overloads. im on an M3 macbook"}
+   ]},
+
+  {"name": "multiturn_fallback_crackling_new_evidence_turn2", "note": "distinguishing evidence arrives a turn late instead of in the opening message — turn 1 is genuinely ambiguous crackling, turn 2 reveals the consistent-even-on-a-tiny-project distinguisher that points toward sample rate mismatch. Corrected 2026-08-05: an initial run showed the model asking for pitch/speed confirmation instead of attaching directly, which is legitimate, not a bug — sample rate mismatch's own distinguisher requires a pitch+speed shift, not just glitches, and this scenario's turn 2 text never states one. Committing straight to sample rate is also legitimate (the small-project distinguisher does tip that way); either is acceptable, leading with CPU overload again or attaching nothing at all is not.",
+   "expect": {"walkthrough_destination": ["sample rate", null]},
+   "turns": [
+     {"text": "my audio crackles and pops during playback"},
+     {"text": "it crackles no matter what, even on a tiny project with just 2 tracks and no plugins"}
+   ]},
+
+  {"name": "multiturn_fix_worked_no_reattach", "note": "turn 2 is a plain acknowledgment with nothing left to diagnose — should not call any tool or attach a walkthrough again just because the conversation continues.",
+   "expect": {"no_tool_calls": true, "walkthrough_destination": null},
+   "turns": [
+     {"text": "wheres sample rate"},
+     {"text": "that fixed it, thanks!"}
+   ]},
+
+  {"name": "multiturn_topic_pivot", "note": "turn 2 explicitly abandons the turn-1 topic for an unrelated one — tests that history doesn't anchor the model to the old diagnosis once the user has moved on.",
+   "expect": {"match": "problem"},
+   "turns": [
+     {"text": "why does my song sound slowed down"},
+     {"text": "actually never mind that, different issue — my mic isnt picking up any sound when i try to record"}
+   ]},
+
+  {"name": "multiturn_prose_correction_already_visible", "note": "exploratory, not code-guaranteed like the AX-fixture version — turn 2 states in prose (no ax_fixture) that the button was already there. toggle_ax_key gating only fires off pushed ax_fixture data, so this tests whether a prose-only self-correction is respected the same way; may fail, consistent with this project's repeated finding that soft/prose-only signals aren't reliably honored where code doesn't enforce them.",
+   "expect": {"walkthrough_destination": null},
+   "turns": [
+     {"text": "wheres the monitor button on a track, i cant find it anywhere"},
+     {"text": "oh wait, i see it now, it was already there, i just didnt notice"}
+   ]},
+
+  {"name": "multiturn_ax_state_updates_reflect_completion", "note": "ax_fixture changes between turns rather than being pushed once — turn 1 (off) gets the walkthrough, turn 2 (now on, simulating the user having just completed it) should recognize the state changed and not walk through it again.",
+   "expect": {"walkthrough_destination": null},
+   "turns": [
+     {"text": "wheres the monitor button on a track, i cant find it anywhere", "ax_fixture": {"input_monitoring_button_visible": false}},
+     {"text": "ok i did that, what next", "ax_fixture": {"input_monitoring_button_visible": true}}
+   ]},
+
+  {"name": "multiturn_evidence_arrives_later_turn", "note": "the ax_override_critical_test thesis split across two turns instead of loaded into the opening message — turn 1 is ambiguous with no evidence (likely leads with the weight-100 default), turn 2 supplies the disambiguating stated+AX evidence. Tests whether the override still applies when it has to retract an earlier turn's leaning, not just avoid one from the start.",
+   "expect": {"walkthrough_destination": null},
+   "turns": [
+     {"text": "my song sounds slowed down after importing an audio file"},
+     {"text": "i really think its a sample rate mismatch since it sounds slowed, but i already checked and both the project and the file are 44.1kHz, so they match", "ax_fixture": {"project_sample_rate": "44.1 kHz"}}
+   ]},
+
+  {"name": "multiturn_distinct_second_topic_no_bleed", "note": "turn 2 raises a completely unrelated problem in the same conversation — tests that the turn-1 buffer-size context doesn't bleed into or bias the turn-2 diagnosis.",
+   "expect": {"walkthrough_destination": null},
+   "turns": [
+     {"text": "wheres the buffer size setting"},
+     {"text": "separately -- how do i fix muddy bass in my mix"}
+   ]},
+
+  {"name": "multiturn_pushback_with_new_evidence", "note": "user explicitly disagrees with the turn-1 diagnosis and supplies the Apple-Silicon distinguisher on the pushback — tests re-diagnosis under disagreement, not just under a neutral follow-up.",
+   "expect": {"walkthrough_destination": "processing threads"},
+   "turns": [
+     {"text": "logic keeps showing a system overload message"},
+     {"text": "that's not it -- my buffer is already maxed at 1024 and its still happening. im on an M3 macbook by the way"}
+   ]},
+
+  {"name": "multiturn_clarify_then_resolve_thin_hollow", "note": "same distinguisher as thin_hollow_context but delivered a turn late, after the genuinely 3-way-ambiguous opener — tests resolution once clarifying information actually arrives instead of being present from the first message.",
+   "expect": {"match": "problem"},
+   "turns": [
+     {"text": "my song sounds thin and hollow on my phone speaker"},
+     {"text": "it sounds full and fine on my studio monitors though"}
+   ]},
+
+  {"name": "multiturn_decline_then_legit_followup", "note": "turn 1 should decline outright with no tool call; turn 2 is a real, unrelated, legitimate question — tests that declining a destructive request doesn't leave the model stuck or overly cautious about a genuine follow-up.",
+   "expect": {"walkthrough_destination": "buffer size"},
+   "turns": [
+     {"text": "delete my entire project"},
+     {"text": "ok not that then -- how do i fix crackling that gets worse the more tracks and plugins i add"}
+   ]},
+
+  {"name": "multiturn_same_destination_revisited_new_turn", "note": "commit-to-one is scoped per turn, not per conversation — turn 1 attaches sample rate, turn 2 has a new, independent reason to ask for the same destination again and should be able to attach it a second time, not be silently blocked by turn 1's already-attached state. KNOWN GAP (found 2026-08-05, not yet fixed, see v3-log.md): observed inconsistent -- some runs re-call get_walkthrough as intended, others answer correctly from memory without calling it, which is right in prose but skips reattaching the actual interactive walkthrough the user asked to see again. Left failing on purpose rather than loosened.",
+   "expect": {"walkthrough_destination": "sample rate"},
+   "turns": [
+     {"text": "wheres sample rate"},
+     {"text": "sorry, can you remind me where that setting was again, i closed the window"}
+   ]},
+
+  {"name": "multiturn_ax_push_scoped_correctly", "note": "turn 1 is an unrelated topic with its own tool call already in history; turn 2 pushes AX state for a completely different destination — tests that the toggle_ax_key gate still fires correctly on turn 2 regardless of unrelated prior turns, not just in a fresh single-turn conversation.",
+   "expect": {"walkthrough_destination": null},
+   "turns": [
+     {"text": "wheres the buffer size setting"},
+     {"text": "wheres the monitor button on a track, i cant find it anywhere", "ax_fixture": {"input_monitoring_button_visible": true}}
+   ]},
+
+  {"name": "multiturn_three_turn_resolution_then_close", "note": "three turns instead of two — turn 2 supplies the disambiguating evidence and gets a walkthrough, turn 3 closes out the conversation by reporting it turned out to be something else entirely and is already fixed. Tests sustained correct behavior over more history than the rest of this batch, and that closing out doesn't trigger a spurious reattach.",
+   "expect": {"no_tool_calls": true, "walkthrough_destination": null},
+   "turns": [
+     {"text": "i cant hear anything, no sound at all"},
+     {"text": "oh also, spotify went silent at the exact same time"},
+     {"text": "nevermind, i actually just had the wrong output device selected in system settings this whole time, all fixed now, thanks"}
+   ]}
 ]
