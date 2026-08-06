@@ -1,12 +1,16 @@
-"""Deterministic regression test for pipeline.py's commit-to-one multi-attach guard.
+"""Deterministic regression tests for pipeline.py's commit-to-one multi-attach guard.
 
 The guard (get_walkthrough refused after a successful attach already happened in the
 same turn) has never actually fired in any real battery run -- the model has always
 voluntarily called it only once, so the code path itself was unverified (found via
 adversarial review, 2026-08-05: every scenario "fixed" by this guard passed because
-of the prompt rule, not the guard). This forces the exact trigger condition -- two
-get_walkthrough tool_use blocks in a single model response -- by mocking the
-Anthropic client directly, instead of hoping a scenario provokes the model into it.
+of the prompt rule, not the guard). These force the exact trigger condition directly
+by mocking the Anthropic client, instead of hoping a scenario provokes the model into
+it, covering the two distinct shapes that hit the same guard condition
+(pipeline.py: walkthrough_steps is not None):
+
+  1. two get_walkthrough tool_use blocks in a single model response
+  2. an attach in one loop iteration, a retry attempt in a later iteration
 
 Run inside the app container:
     docker compose exec app python -m app.test_multiattach_guard
@@ -35,34 +39,26 @@ def _text(text: str) -> SimpleNamespace:
     return SimpleNamespace(type="text", text=text)
 
 
-async def main() -> None:
-    # First model call: two get_walkthrough tool_use blocks in one response -- the
-    # exact shape the prompt instructs the model never to produce, forced directly
-    # here so the guard is tested independently of whether the model would try it.
-    first_response = SimpleNamespace(
-        content=[
-            _tool_use("get_walkthrough", {"solution": "sample rate"}, "call_1"),
-            _tool_use("get_walkthrough", {"solution": "buffer size"}, "call_2"),
-        ],
-        usage=_usage(),
-    )
-    # Second model call, after tool results come back: plain text, ends the turn.
-    second_response = SimpleNamespace(content=[_text("done")], usage=_usage())
-
+async def _run_with_responses(responses: list) -> object:
+    """Drives pipeline.respond() through a scripted sequence of mocked model
+    responses, one per _client.messages.create() call, in order."""
     call_count = 0
 
     async def fake_create(**kwargs):
         nonlocal call_count
+        resp = responses[min(call_count, len(responses) - 1)]
         call_count += 1
-        return first_response if call_count == 1 else second_response
+        return resp
 
     await db.connect()
     try:
         with patch.object(pipeline._client.messages, "create", new=AsyncMock(side_effect=fake_create)):
-            result = await pipeline.respond([{"role": "user", "content": "test"}])
+            return await pipeline.respond([{"role": "user", "content": "test"}])
     finally:
         await db.disconnect()
 
+
+def _assert_second_call_refused(result) -> None:
     walkthrough_calls = [c for c in result.trace if c["tool"] == "get_walkthrough"]
     assert len(walkthrough_calls) == 2, f"expected 2 get_walkthrough calls in trace, got {len(walkthrough_calls)}"
     assert walkthrough_calls[0]["output"]["attached"] is True, \
@@ -73,10 +69,54 @@ async def main() -> None:
         f"refusal reason missing/wrong: {walkthrough_calls[1]['output'].get('reason')!r}"
     assert result.walkthrough_steps == walkthrough_calls[0]["output"]["steps"], \
         "walkthrough_steps should reflect the FIRST successful attach, not the refused second one"
-
-    print("PASS: multi-attach guard correctly refused the second get_walkthrough call in the same turn.")
     print(f"  first call:  {walkthrough_calls[0]['output']}")
     print(f"  second call: {walkthrough_calls[1]['output']}")
+
+
+async def test_same_response_duplicate() -> None:
+    # Both get_walkthrough tool_use blocks in one response -- the exact shape the
+    # prompt instructs the model never to produce, forced directly here so the
+    # guard is tested independently of whether the model would try it.
+    responses = [
+        SimpleNamespace(
+            content=[
+                _tool_use("get_walkthrough", {"solution": "sample rate"}, "call_1"),
+                _tool_use("get_walkthrough", {"solution": "buffer size"}, "call_2"),
+            ],
+            usage=_usage(),
+        ),
+        SimpleNamespace(content=[_text("done")], usage=_usage()),
+    ]
+    result = await _run_with_responses(responses)
+    _assert_second_call_refused(result)
+    print("PASS: guard refused a second get_walkthrough call in the same response.")
+
+
+async def test_later_iteration_duplicate() -> None:
+    # Attach succeeds in loop iteration 1; a *different* model response, in a
+    # later loop iteration, attempts a second get_walkthrough for a different
+    # solution -- the realistic retry shape (e.g. after mentioning a fallback
+    # candidate in prose) that hits the identical guard condition but was never
+    # exercised by test_same_response_duplicate.
+    responses = [
+        SimpleNamespace(
+            content=[_tool_use("get_walkthrough", {"solution": "sample rate"}, "call_1")],
+            usage=_usage(),
+        ),
+        SimpleNamespace(
+            content=[_tool_use("get_walkthrough", {"solution": "buffer size"}, "call_2")],
+            usage=_usage(),
+        ),
+        SimpleNamespace(content=[_text("done")], usage=_usage()),
+    ]
+    result = await _run_with_responses(responses)
+    _assert_second_call_refused(result)
+    print("PASS: guard refused a get_walkthrough retry in a later loop iteration.")
+
+
+async def main() -> None:
+    await test_same_response_duplicate()
+    await test_later_iteration_duplicate()
 
 
 if __name__ == "__main__":
