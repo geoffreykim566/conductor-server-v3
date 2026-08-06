@@ -40,15 +40,19 @@ def _confidence_label(distance: float) -> str:
 
 
 async def _embed_with_retry(texts: list[str], input_type: str) -> list[list[float]]:
-    """Voyage rate-limits on bursty test runs — small retry/backoff rather than
-    letting one transient 429 kill an entire scenario battery run."""
-    for attempt in range(4):
+    """Voyage rate-limits on bursty test runs — retry/backoff rather than letting
+    one transient 429 kill an entire scenario battery run. embed.py now also
+    proactively spaces calls to avoid triggering 429s in the first place; this is
+    the safety net for whatever gets through anyway. Widened 2026-08-06 after two
+    full-battery runs both exhausted the old 4-attempt/60s-total budget and died
+    mid-run -- 6 attempts, longer steps, ~4.5min total budget before giving up."""
+    for attempt in range(6):
         try:
             return await embed(texts, input_type=input_type)
         except Exception as exc:
-            if attempt == 3:
+            if attempt == 5:
                 raise
-            wait = 10 * (attempt + 1)
+            wait = 15 * (attempt + 1)
             print(f"  [retry] embed() failed ({exc}); retrying in {wait}s")
             await asyncio.sleep(wait)
 

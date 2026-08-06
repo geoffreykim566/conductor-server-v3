@@ -45,6 +45,13 @@ class Result:
     usage: list[dict] = field(default_factory=list)
 
 
+_REASK_SIGNALS = (
+    "remind me", "reminder", "again", "one more time", "show me that",
+    "show that again", "where was", "where is that", "closed the window",
+    "forgot", "lost the window", "can't find it",
+)
+
+
 def _backfill_walkthrough(messages: list[dict], text: str) -> dict | None:
     """Commit-to-one is scoped per turn, so a turn that attaches nothing normally
     leaves the user with prose only -- correct when the model is just answering a
@@ -55,25 +62,34 @@ def _backfill_walkthrough(messages: list[dict], text: str) -> dict | None:
     of another prompt instruction -- prompt-only attempts at behaviors like this
     have repeatedly not held (hedge-on-navigation, toggle-gate force flag).
 
-    Only called by respond() when this turn made zero tool calls at all -- not just
-    "nothing attached" -- found live (2026-08-06) that gating on that weaker
-    condition alone produces a real false positive: a turn that legitimately calls
-    lookup_concept and resolves to a same-named destination for an unrelated reason
-    (e.g. the response mentions "sample rate" while pointing the user at a
-    completely different, non-Logic settings screen) also has walkthrough_steps
-    None, so it would wrongly qualify. Requiring zero tool calls restricts this to
-    turns where the model visibly did no fresh work at all -- pure memory recall --
-    which is the actual shape of the gap this is meant to close.
+    Gated on the CURRENT user turn's own message containing explicit re-ask
+    language (_REASK_SIGNALS), not on the model's response text alone. First
+    version matched purely on the destination name appearing anywhere in the
+    response; found live (2026-08-06) that's unreliable -- a turn can legitimately
+    discuss the same general topic (e.g. "sample rate") for an unrelated reason
+    (pointing the user at a different, non-Logic screen) without ever being asked
+    to reattach anything, and the destination's own name is exactly the word most
+    likely to recur regardless of intent. Requiring zero tool calls (this turn did
+    no fresh work at all -- pure memory recall) plus explicit re-ask language in
+    what the user actually typed is a direct signal of intent instead of an
+    inference from response-content overlap. Checked live against the full
+    battery: only this gap's own scenario's turn contains any of these phrases.
 
     Scans prior turns' message history (not this turn's own -- there's nothing to
     find there if this turn made no tool calls) for successful get_walkthrough
     attaches, identified by result shape (attached+destination+steps together, not
-    by tool name -- avoids needing to correlate tool_use_id across blocks).
-    Reattaches only if exactly one distinct prior destination name appears in this
-    turn's response text; zero or multiple matches are left alone rather than
-    guessed, since a wrong reattach is worse than the known, documented gap this is
-    meant to close.
+    by tool name -- avoids needing to correlate tool_use_id across blocks). If the
+    re-ask check passes, reattaches the one destination whose name appears in this
+    turn's response text (now just disambiguating *which* prior destination among
+    possibly several, not deciding *whether* to backfill at all); zero or multiple
+    matches are left alone rather than guessed.
     """
+    if not messages or messages[-1].get("role") != "user":
+        return None
+    user_text = messages[-1].get("content")
+    if not isinstance(user_text, str) or not any(sig in user_text.lower() for sig in _REASK_SIGNALS):
+        return None
+
     attached_by_destination: dict[str, list] = {}
     for msg in messages:
         if msg.get("role") != "user" or not isinstance(msg.get("content"), list):
