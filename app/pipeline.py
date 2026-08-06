@@ -45,6 +45,55 @@ class Result:
     usage: list[dict] = field(default_factory=list)
 
 
+def _backfill_walkthrough(messages: list[dict], text: str) -> dict | None:
+    """Commit-to-one is scoped per turn, so a turn that attaches nothing normally
+    leaves the user with prose only -- correct when the model is just answering a
+    new question, but wrong when the user asked to *see* a destination again and
+    the model answered from memory instead of re-calling get_walkthrough (found
+    live 2026-08-05, multiturn_same_destination_revisited_new_turn: inconsistent,
+    sometimes recalls the tool, sometimes doesn't). Deterministic backfill instead
+    of another prompt instruction -- prompt-only attempts at behaviors like this
+    have repeatedly not held (hedge-on-navigation, toggle-gate force flag).
+
+    Only called by respond() when this turn made zero tool calls at all -- not just
+    "nothing attached" -- found live (2026-08-06) that gating on that weaker
+    condition alone produces a real false positive: a turn that legitimately calls
+    lookup_concept and resolves to a same-named destination for an unrelated reason
+    (e.g. the response mentions "sample rate" while pointing the user at a
+    completely different, non-Logic settings screen) also has walkthrough_steps
+    None, so it would wrongly qualify. Requiring zero tool calls restricts this to
+    turns where the model visibly did no fresh work at all -- pure memory recall --
+    which is the actual shape of the gap this is meant to close.
+
+    Scans prior turns' message history (not this turn's own -- there's nothing to
+    find there if this turn made no tool calls) for successful get_walkthrough
+    attaches, identified by result shape (attached+destination+steps together, not
+    by tool name -- avoids needing to correlate tool_use_id across blocks).
+    Reattaches only if exactly one distinct prior destination name appears in this
+    turn's response text; zero or multiple matches are left alone rather than
+    guessed, since a wrong reattach is worse than the known, documented gap this is
+    meant to close.
+    """
+    attached_by_destination: dict[str, list] = {}
+    for msg in messages:
+        if msg.get("role") != "user" or not isinstance(msg.get("content"), list):
+            continue
+        for block in msg["content"]:
+            if not isinstance(block, dict) or block.get("type") != "tool_result":
+                continue
+            try:
+                result = json.loads(block["content"])
+            except (TypeError, ValueError):
+                continue
+            if result.get("attached") and result.get("destination") and result.get("steps"):
+                attached_by_destination[result["destination"]] = result["steps"]
+
+    matches = [dest for dest in attached_by_destination if dest.lower() in text.lower()]
+    if len(matches) != 1:
+        return None
+    return {"destination": matches[0], "steps": attached_by_destination[matches[0]]}
+
+
 def _usage_dict(u) -> dict:
     return {
         "input_tokens": u.input_tokens,
@@ -97,6 +146,20 @@ async def respond(messages: list[dict], ax_fixture: dict | None = None) -> Resul
         if not tool_uses:
             text = "".join(b.text for b in resp.content if b.type == "text")
             msgs.append({"role": "assistant", "content": resp.content})
+            if not trace:
+                backfilled = _backfill_walkthrough(messages, text)
+                if backfilled:
+                    walkthrough_steps = backfilled["steps"]
+                    trace.append({
+                        "tool": "get_walkthrough",
+                        "input": {"solution": None},
+                        "output": {
+                            "attached": True,
+                            "destination": backfilled["destination"],
+                            "steps": backfilled["steps"],
+                            "backfilled": True,
+                        },
+                    })
             return Result(text=text, walkthrough_steps=walkthrough_steps, trace=trace, messages=msgs, usage=usage)
 
         msgs.append({"role": "assistant", "content": resp.content})
@@ -154,4 +217,18 @@ async def respond(messages: list[dict], ax_fixture: dict | None = None) -> Resul
     usage.append(_usage_dict(final.usage))
     text = "".join(b.text for b in final.content if b.type == "text")
     msgs.append({"role": "assistant", "content": final.content})
+    if not trace:
+        backfilled = _backfill_walkthrough(messages, text)
+        if backfilled:
+            walkthrough_steps = backfilled["steps"]
+            trace.append({
+                "tool": "get_walkthrough",
+                "input": {"solution": None},
+                "output": {
+                    "attached": True,
+                    "destination": backfilled["destination"],
+                    "steps": backfilled["steps"],
+                    "backfilled": True,
+                },
+            })
     return Result(text=text, walkthrough_steps=walkthrough_steps, trace=trace, messages=msgs, usage=usage)

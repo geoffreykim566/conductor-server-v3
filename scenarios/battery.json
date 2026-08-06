@@ -149,7 +149,7 @@
      {"text": "ok not that then -- how do i fix crackling that gets worse the more tracks and plugins i add"}
    ]},
 
-  {"name": "multiturn_same_destination_revisited_new_turn", "note": "commit-to-one is scoped per turn, not per conversation — turn 1 attaches sample rate, turn 2 has a new, independent reason to ask for the same destination again and should be able to attach it a second time, not be silently blocked by turn 1's already-attached state. KNOWN GAP (found 2026-08-05, not yet fixed, see v3-log.md): observed inconsistent -- some runs re-call get_walkthrough as intended, others answer correctly from memory without calling it, which is right in prose but skips reattaching the actual interactive walkthrough the user asked to see again. Left failing on purpose rather than loosened.",
+  {"name": "multiturn_same_destination_revisited_new_turn", "note": "commit-to-one is scoped per turn, not per conversation — turn 1 attaches sample rate, turn 2 has a new, independent reason to ask for the same destination again and should be able to attach it a second time, not be silently blocked by turn 1's already-attached state. FIXED 2026-08-06 (see v3-log.md): pipeline.py's _backfill_walkthrough reattaches from message history when a turn makes zero tool calls and its response text names exactly one prior destination -- covers the 'answers correctly from memory without calling get_walkthrough' case without needing another prompt instruction (this project's prompt-only attempts at similar behaviors have repeatedly not held).",
    "expect": {"walkthrough_destination": "sample rate"},
    "turns": [
      {"text": "wheres sample rate"},
