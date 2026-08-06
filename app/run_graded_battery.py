@@ -19,6 +19,7 @@ from __future__ import annotations
 import asyncio
 import json
 import sys
+import time
 from pathlib import Path
 
 from app import db
@@ -91,6 +92,7 @@ async def run_scenario(scenario: dict) -> dict:
 
     messages: list[dict] = []
     trace: list[dict] = []
+    scenario_usage: list[dict] = []
     for i, turn in enumerate(scenario["turns"], 1):
         messages.append({"role": "user", "content": turn["text"]})
         ax_fixture = turn.get("ax_fixture")
@@ -98,6 +100,7 @@ async def run_scenario(scenario: dict) -> dict:
         result = await respond(messages, ax_fixture=ax_fixture)
         messages = result.messages
         trace = result.trace  # graded on the final turn's trace
+        scenario_usage.extend(result.usage)
 
         print(f"\n  --- turn {i}: {turn['text']!r} ---")
         if ax_fixture:
@@ -125,7 +128,7 @@ async def run_scenario(scenario: dict) -> dict:
             status = "PASS" if v["pass"] else "FAIL"
             print(f"    [{status}] {v['field']}: expected={v['expected']!r} actual={v['actual']!r}")
 
-    return {"name": scenario["name"], "verdicts": verdicts}
+    return {"name": scenario["name"], "verdicts": verdicts, "usage": scenario_usage}
 
 
 async def main() -> None:
@@ -137,6 +140,7 @@ async def main() -> None:
         print(f"WARNING: scenario(s) not found: {missing}", file=sys.stderr)
 
     results = []
+    wall_start = time.monotonic()
     await db.connect()
     try:
         for i, scenario in enumerate(scenarios):
@@ -145,6 +149,7 @@ async def main() -> None:
                 await asyncio.sleep(BETWEEN_SCENARIOS_DELAY_S)
     finally:
         await db.disconnect()
+    wall_elapsed = time.monotonic() - wall_start
 
     print(f"\n{'=' * 100}\nSUMMARY")
     total_assertions = 0
@@ -160,6 +165,23 @@ async def main() -> None:
         flag = "" if n_pass == n_total else "  <-- has failing assertion(s)"
         print(f"  {r['name']}: {n_pass}/{n_total} assertions passed{flag}")
     print(f"\nTotal: {total_pass}/{total_assertions} assertions passed across {len(results)} scenario(s).")
+
+    all_usage = [u for r in results for u in r["usage"]]
+    totals = {
+        "input_tokens": sum(u["input_tokens"] for u in all_usage),
+        "output_tokens": sum(u["output_tokens"] for u in all_usage),
+        "cache_creation_input_tokens": sum(u["cache_creation_input_tokens"] for u in all_usage),
+        "cache_read_input_tokens": sum(u["cache_read_input_tokens"] for u in all_usage),
+    }
+    print(f"\nUSAGE (excludes the {BETWEEN_SCENARIOS_DELAY_S}s between-scenario throttle delay from the")
+    print(f"wall-clock figure below -- {len(scenarios) - 1} delays, {(len(scenarios) - 1) * BETWEEN_SCENARIOS_DELAY_S}s total, subtracted):")
+    print(f"  API calls: {len(all_usage)}")
+    print(f"  input_tokens (non-cache): {totals['input_tokens']}")
+    print(f"  cache_creation_input_tokens: {totals['cache_creation_input_tokens']}")
+    print(f"  cache_read_input_tokens: {totals['cache_read_input_tokens']}")
+    print(f"  output_tokens: {totals['output_tokens']}")
+    throttle_s = (len(scenarios) - 1) * BETWEEN_SCENARIOS_DELAY_S if len(scenarios) > 1 else 0
+    print(f"  wall time: {wall_elapsed:.1f}s total, {wall_elapsed - throttle_s:.1f}s excluding throttle delay")
 
 
 if __name__ == "__main__":

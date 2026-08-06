@@ -42,11 +42,22 @@ class Result:
     walkthrough_steps: list | None
     trace: list[dict] = field(default_factory=list)
     messages: list[dict] = field(default_factory=list)
+    usage: list[dict] = field(default_factory=list)
+
+
+def _usage_dict(u) -> dict:
+    return {
+        "input_tokens": u.input_tokens,
+        "output_tokens": u.output_tokens,
+        "cache_creation_input_tokens": getattr(u, "cache_creation_input_tokens", 0) or 0,
+        "cache_read_input_tokens": getattr(u, "cache_read_input_tokens", 0) or 0,
+    }
 
 
 async def respond(messages: list[dict], ax_fixture: dict | None = None) -> Result:
     msgs = list(messages)
     trace: list[dict] = []
+    usage: list[dict] = []
     walkthrough_steps: list | None = None
     lookup_attempts = 0
 
@@ -54,10 +65,10 @@ async def respond(messages: list[dict], ax_fixture: dict | None = None) -> Resul
     # model automatically rather than waiting on it to decide to call a tool for
     # it -- a decision point it's already been observed skipping under real
     # conditions (found live 2026-08-04, the monitor-button hallucination).
-    system = SYSTEM_PROMPT
+    system_text = SYSTEM_PROMPT
     if ax_fixture:
         state_lines = "\n".join(f"- {k}: {v}" for k, v in ax_fixture.items())
-        system += (
+        system_text += (
             "\n\n## Live state for this turn\n\n"
             "Read directly from the running Logic Pro project via the Accessibility "
             "API -- ground truth, not something the user said or you inferred. This "
@@ -65,6 +76,12 @@ async def respond(messages: list[dict], ax_fixture: dict | None = None) -> Resul
             "when they conflict.\n\n"
             f"{state_lines}"
         )
+    # Cached as its own block: identical across every iteration of this turn's
+    # loop (system+tools resent unchanged on each one -- measured 2026-08-05:
+    # 66 calls, 207,869 uncached input tokens across a 24-scenario battery).
+    # The safety-net call below appends its own instruction as a second,
+    # uncached block so it still hits this same cache entry.
+    system = [{"type": "text", "text": system_text, "cache_control": {"type": "ephemeral"}}]
 
     for _ in range(MAX_ITERATIONS):
         resp = await _client.messages.create(
@@ -74,12 +91,13 @@ async def respond(messages: list[dict], ax_fixture: dict | None = None) -> Resul
             tools=tools.TOOLS,
             messages=msgs,
         )
+        usage.append(_usage_dict(resp.usage))
         tool_uses = [b for b in resp.content if b.type == "tool_use"]
 
         if not tool_uses:
             text = "".join(b.text for b in resp.content if b.type == "text")
             msgs.append({"role": "assistant", "content": resp.content})
-            return Result(text=text, walkthrough_steps=walkthrough_steps, trace=trace, messages=msgs)
+            return Result(text=text, walkthrough_steps=walkthrough_steps, trace=trace, messages=msgs, usage=usage)
 
         msgs.append({"role": "assistant", "content": resp.content})
         tool_results = []
@@ -127,9 +145,13 @@ async def respond(messages: list[dict], ax_fixture: dict | None = None) -> Resul
     final = await _client.messages.create(
         model=MODEL,
         max_tokens=MAX_TOKENS,
-        system=system + "\n\nAnswer now with your best available information — no more tool calls.",
+        system=system + [{
+            "type": "text",
+            "text": "\n\nAnswer now with your best available information — no more tool calls.",
+        }],
         messages=msgs,
     )
+    usage.append(_usage_dict(final.usage))
     text = "".join(b.text for b in final.content if b.type == "text")
     msgs.append({"role": "assistant", "content": final.content})
-    return Result(text=text, walkthrough_steps=walkthrough_steps, trace=trace, messages=msgs)
+    return Result(text=text, walkthrough_steps=walkthrough_steps, trace=trace, messages=msgs, usage=usage)

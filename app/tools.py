@@ -105,6 +105,11 @@ GET_WALKTHROUGH_SCHEMA = {
         "required": ["solution"],
         "additionalProperties": False,
     },
+    # Cache breakpoint for the whole tools array -- both schemas are static
+    # across every call in a run, but get resent unchanged on every loop
+    # iteration and every turn otherwise (measured 2026-08-05: 66 calls,
+    # 207,869 uncached input tokens across a 24-scenario battery).
+    "cache_control": {"type": "ephemeral"},
 }
 
 TOOLS = [LOOKUP_CONCEPT_SCHEMA, GET_WALKTHROUGH_SCHEMA]
