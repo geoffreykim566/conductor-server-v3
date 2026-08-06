@@ -221,6 +221,20 @@ async def lookup_concept(problem: str) -> dict:
     }
 
 
+def _is_truthy(value) -> bool:
+    """Real (non-fixture) AX data may not always arrive as a JSON boolean --
+    accept common truthy shapes rather than silently bypassing the toggle
+    gate on them. Found via adversarial review, 2026-08-05: the original
+    strict `is True` check would pass right through a "true"/1/"yes" value."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in ("true", "1", "yes")
+    if isinstance(value, int):
+        return value == 1
+    return False
+
+
 async def get_walkthrough(solution: str, ax_fixture: dict | None = None) -> dict:
     row = await db.pool().fetchrow(
         "select path, extends_to, toggle_ax_key from solutions where name = $1", solution
@@ -228,7 +242,15 @@ async def get_walkthrough(solution: str, ax_fixture: dict | None = None) -> dict
     if not row:
         return {"attached": False, "reason": "solution not found"}
 
-    if row["toggle_ax_key"] and ax_fixture and ax_fixture.get(row["toggle_ax_key"]) is True:
+    # Refuses on the assumption the target is always "make it visible/on"
+    # (true of every toggle-type destination in the KB today). A force=true
+    # escape hatch for the opposite intent (turning something OFF) was tried
+    # and reverted 2026-08-05: in 3 of 4 reruns the model set force=true on
+    # the exact "I can't find it, where is it" query this guard exists to
+    # protect -- the same soft-instruction-doesn't-reliably-constrain-
+    # behavior failure this project keeps finding elsewhere. Left as a known,
+    # undocumented-fix limitation rather than a fix that made things worse.
+    if row["toggle_ax_key"] and ax_fixture and _is_truthy(ax_fixture.get(row["toggle_ax_key"])):
         return {
             "attached": False,
             "reason": (

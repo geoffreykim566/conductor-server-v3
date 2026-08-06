@@ -11,6 +11,13 @@ It does NOT grade response prose quality, tone, or whether a clarifying question
 phrased well -- that still needs a human reading the persisted transcript. A scenario
 with no 'expect' block, or fields left out of one, isn't graded on those axes.
 
+A scenario's top-level 'expect' is graded on the FINAL turn only. Multi-turn scenarios
+can additionally put an 'expect' block on any individual turn (graded on that turn's
+own trace) -- for behavior a scenario's note describes about an intermediate turn
+(e.g. "turn 1 should decline with no tool call") that would otherwise only be checked
+by a human reading the transcript, not actually asserted (found live 2026-08-05, via
+an adversarial review that caught several notes describing unasserted turn-1 behavior).
+
 Run inside the app container:
     docker compose exec app python -m app.run_graded_battery [scenario_name ...]
 """
@@ -93,13 +100,14 @@ async def run_scenario(scenario: dict) -> dict:
     messages: list[dict] = []
     trace: list[dict] = []
     scenario_usage: list[dict] = []
+    verdicts: list[dict] = []
     for i, turn in enumerate(scenario["turns"], 1):
         messages.append({"role": "user", "content": turn["text"]})
         ax_fixture = turn.get("ax_fixture")
 
         result = await respond(messages, ax_fixture=ax_fixture)
         messages = result.messages
-        trace = result.trace  # graded on the final turn's trace
+        trace = result.trace  # graded against the scenario's top-level 'expect' below
         scenario_usage.extend(result.usage)
 
         print(f"\n  --- turn {i}: {turn['text']!r} ---")
@@ -119,12 +127,23 @@ async def run_scenario(scenario: dict) -> dict:
         print(f"  walkthrough attached: {result.walkthrough_steps is not None}"
               + (f" -> {result.walkthrough_steps}" if result.walkthrough_steps else ""))
 
-    verdicts: list[dict] = []
+        if "expect" in turn:
+            turn_verdicts = _grade(turn["expect"], _actual_outcome(result.trace))
+            for v in turn_verdicts:
+                v["turn"] = i
+            verdicts.extend(turn_verdicts)
+            print(f"  GRADED (turn {i}):")
+            for v in turn_verdicts:
+                status = "PASS" if v["pass"] else "FAIL"
+                print(f"    [{status}] {v['field']}: expected={v['expected']!r} actual={v['actual']!r}")
+
     if "expect" in scenario:
-        actual = _actual_outcome(trace)
-        verdicts = _grade(scenario["expect"], actual)
-        print("\n  GRADED:")
-        for v in verdicts:
+        final_verdicts = _grade(scenario["expect"], _actual_outcome(trace))
+        for v in final_verdicts:
+            v["turn"] = "final"
+        verdicts.extend(final_verdicts)
+        print("\n  GRADED (final):")
+        for v in final_verdicts:
             status = "PASS" if v["pass"] else "FAIL"
             print(f"    [{status}] {v['field']}: expected={v['expected']!r} actual={v['actual']!r}")
 
