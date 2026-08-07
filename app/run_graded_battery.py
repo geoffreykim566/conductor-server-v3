@@ -169,11 +169,16 @@ async def run_scenario(scenario: dict) -> dict:
 
 async def run_battery_once(scenarios: list[dict], run_label: str = "") -> dict:
     """Runs the given scenarios once, printing full transcripts/grading exactly as
-    a single run always has, plus its own summary. Returns per-scenario pass/total
-    counts so main() can compare across repeated runs -- pass-rate variance across
+    a single run always has, plus its own summary. Returns a per-scenario signature
+    (each individual assertion's turn/field/pass, not just the aggregate pass/total
+    count) so main() can compare across repeated runs -- pass-rate variance across
     runs of identical code has been observed and hand-compared all session
     (43/41/41/43/42 across five runs, logged 2026-08-05); this is what makes that
-    comparison automatic instead of eyeballed."""
+    comparison automatic instead of eyeballed. Storing the full signature rather
+    than just (n_pass, n_total) matters for multi-assertion scenarios: two
+    different assertions failing on two different runs can produce the identical
+    count, which would hide that anything changed at all (found via Fable review,
+    2026-08-06)."""
     label = f" ({run_label})" if run_label else ""
     results = []
     wall_start = time.monotonic()
@@ -190,7 +195,7 @@ async def run_battery_once(scenarios: list[dict], run_label: str = "") -> dict:
     print(f"\n{'=' * 100}\nSUMMARY{label}")
     total_assertions = 0
     total_pass = 0
-    per_scenario: dict[str, tuple[int, int]] = {}
+    per_scenario: dict[str, tuple] = {}
     for r in results:
         if not r["verdicts"]:
             print(f"  {r['name']}: not graded (no 'expect' block)")
@@ -199,7 +204,13 @@ async def run_battery_once(scenarios: list[dict], run_label: str = "") -> dict:
         n_total = len(r["verdicts"])
         total_assertions += n_total
         total_pass += n_pass
-        per_scenario[r["name"]] = (n_pass, n_total)
+        # str(v["turn"]) -- "turn" is an int for per-turn asserts but the literal
+        # string "final" for the scenario's own expect block, and Python can't
+        # sort a mix of the two (found live, 2026-08-06, crashed the first real
+        # multi-assertion scenario this ran against).
+        per_scenario[r["name"]] = tuple(
+            sorted((str(v["turn"]), v["field"], v["pass"]) for v in r["verdicts"])
+        )
         flag = "" if n_pass == n_total else "  <-- has failing assertion(s)"
         print(f"  {r['name']}: {n_pass}/{n_total} assertions passed{flag}")
     print(f"\nTotal{label}: {total_pass}/{total_assertions} assertions passed across {len(results)} scenario(s).")
@@ -265,9 +276,17 @@ async def main() -> None:
             if len({s["per_scenario"].get(name) for s in run_summaries if name in s["per_scenario"]}) > 1
         ]
         if flaky:
-            print("  Flaky scenarios (result changed across runs):")
-            for name, outcomes in flaky:
-                print(f"    {name}: {outcomes}")
+            print("  Flaky scenarios (which specific assertion failed changed across runs):")
+            for name, signatures in flaky:
+                print(f"    {name}:")
+                for run_i, sig in enumerate(signatures, 1):
+                    if sig is None:
+                        print(f"      run {run_i}: not present in this run")
+                        continue
+                    n_pass = sum(1 for _, _, ok in sig if ok)
+                    failing = [f"turn={turn} {field}" for turn, field, ok in sig if not ok]
+                    detail = "all passed" if not failing else "failing: " + ", ".join(failing)
+                    print(f"      run {run_i}: {n_pass}/{len(sig)} -- {detail}")
         else:
             print("  No scenario's pass/fail changed across runs.")
 

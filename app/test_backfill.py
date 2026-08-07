@@ -132,7 +132,17 @@ async def test_ambiguous_multiple_destinations_does_not_backfill() -> None:
 async def test_tool_call_this_turn_does_not_backfill() -> None:
     """Even with re-ask language in the user's message, a turn where the model
     actually calls a tool (fresh work, not pure memory recall) should not also
-    backfill -- the zero-tool-calls gate must hold regardless of keyword match."""
+    backfill -- the zero-tool-calls gate must hold regardless of keyword match.
+
+    The response text below deliberately names turn 1's own destination
+    ("sample rate") in addition to turn 2's real one -- found via Fable review,
+    2026-08-06: an earlier version of this test used a response that never named
+    the old destination at all, so it passed even with the zero-tool-calls gate
+    deleted entirely (the disambiguation check found no name match and bailed
+    out for an unrelated reason, never actually exercising the gate this test
+    claims to cover). With the old destination's name present, deleting the gate
+    would make this test fail for real.
+    """
     turn1 = await _run_turn([{"role": "user", "content": "wheres sample rate"}], [
         SimpleNamespace(
             content=[_tool_use("get_walkthrough", {"solution": "sample rate"}, "call_1")],
@@ -147,7 +157,10 @@ async def test_tool_call_this_turn_does_not_backfill() -> None:
             content=[_tool_use("get_walkthrough", {"solution": "buffer size"}, "call_2")],
             usage=_usage(),
         ),
-        SimpleNamespace(content=[_text("Here's buffer size: Logic Pro > Settings > Audio.")], usage=_usage()),
+        SimpleNamespace(
+            content=[_text("Yes, sample rate applies too -- and here's buffer size: Logic Pro > Settings > Audio.")],
+            usage=_usage(),
+        ),
     ])
     backfilled_calls = [c for c in turn2.trace if c["output"].get("backfilled")]
     assert not backfilled_calls, f"a turn with a real tool call should never also backfill, got {turn2.trace}"

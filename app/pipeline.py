@@ -45,20 +45,22 @@ class Result:
     usage: list[dict] = field(default_factory=list)
 
 
-# Bare "again" deliberately excluded -- found via Fable review, 2026-08-06: it
-# collides with ordinary closing/acknowledgment phrasing that has nothing to do
-# with re-asking ("thanks again, that fixed it!"), and a turn's zero-tool-calls
-# gate alone doesn't rule out closing turns (that's the documented CORRECT
-# behavior for multiturn_fix_worked_no_reattach). Every other phrase here is
-# specific to actually wanting to see something again, not just a common word.
-# Matched with apostrophes stripped from both sides (see the strip below) --
-# found live that the battery's own "cant find it" phrasing never matched the
-# literal "can't find it" signal, so that signal had never actually been
-# exercised by anything tested against it.
+# Bare "again" and "forgot" deliberately excluded, and "cant find it" removed
+# after initially being added -- found via two rounds of Fable review,
+# 2026-08-06. "again" collides with ordinary closing phrasing ("thanks again,
+# that fixed it!"); "forgot" is the identical shape ("oh forgot to say -- that
+# fixed it, thanks!"); "cant find it" (added when apostrophes were first
+# stripped from both sides of the match, so "can't"/"cant" would both match)
+# turned out to appear in 7 different battery turns once actually swept
+# against the full battery, not just the one it was meant for -- a live
+# comment here once claimed "only this gap's scenario matches" before that
+# sweep was actually run; that was the exact circular-validation mistake this
+# feature has repeatedly made. Every phrase kept here is a specific, low-
+# frequency request to see something again, not a common word or filler.
 _REASK_SIGNALS = (
     "remind me", "reminder", "one more time", "show me that",
     "show that again", "where was", "where is that", "closed the window",
-    "forgot", "lost the window", "cant find it",
+    "lost the window",
 )
 
 
@@ -84,12 +86,15 @@ def _backfill_walkthrough(messages: list[dict], text: str) -> dict | None:
     what the user actually typed is a direct signal of intent instead of an
     inference from response-content overlap.
 
-    Checking this against the battery's own scenario texts (only this gap's
-    scenario matches) is a weak signal, not real validation -- it just proves the
-    gate doesn't misfire on the handful of conversations it was tuned against.
-    Real coverage of hostile phrasing (e.g. "thanks again, that fixed it" on a
-    closing turn) lives in test_backfill.py's unit tests instead, which don't
-    depend on guessing what a live model happens to say.
+    Checking this against the battery's own scenario texts is a weak signal, not
+    real validation -- it only proves the gate doesn't misfire on the handful of
+    conversations it was tuned against, not on real phrasing in general (this was
+    stated here once before without actually re-running the sweep after a signal
+    list change, and turned out to be false at the time -- re-verify by sweeping
+    the battery, don't just trust this comment, if this list changes again). Real
+    coverage of hostile phrasing (e.g. "thanks again, that fixed it" on a closing
+    turn) lives in test_backfill.py's unit tests instead, which don't depend on
+    guessing what a live model happens to say.
 
     Scans prior turns' message history (not this turn's own -- there's nothing to
     find there if this turn made no tool calls) for successful get_walkthrough
