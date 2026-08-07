@@ -45,10 +45,20 @@ class Result:
     usage: list[dict] = field(default_factory=list)
 
 
+# Bare "again" deliberately excluded -- found via Fable review, 2026-08-06: it
+# collides with ordinary closing/acknowledgment phrasing that has nothing to do
+# with re-asking ("thanks again, that fixed it!"), and a turn's zero-tool-calls
+# gate alone doesn't rule out closing turns (that's the documented CORRECT
+# behavior for multiturn_fix_worked_no_reattach). Every other phrase here is
+# specific to actually wanting to see something again, not just a common word.
+# Matched with apostrophes stripped from both sides (see the strip below) --
+# found live that the battery's own "cant find it" phrasing never matched the
+# literal "can't find it" signal, so that signal had never actually been
+# exercised by anything tested against it.
 _REASK_SIGNALS = (
-    "remind me", "reminder", "again", "one more time", "show me that",
+    "remind me", "reminder", "one more time", "show me that",
     "show that again", "where was", "where is that", "closed the window",
-    "forgot", "lost the window", "can't find it",
+    "forgot", "lost the window", "cant find it",
 )
 
 
@@ -72,8 +82,14 @@ def _backfill_walkthrough(messages: list[dict], text: str) -> dict | None:
     likely to recur regardless of intent. Requiring zero tool calls (this turn did
     no fresh work at all -- pure memory recall) plus explicit re-ask language in
     what the user actually typed is a direct signal of intent instead of an
-    inference from response-content overlap. Checked live against the full
-    battery: only this gap's own scenario's turn contains any of these phrases.
+    inference from response-content overlap.
+
+    Checking this against the battery's own scenario texts (only this gap's
+    scenario matches) is a weak signal, not real validation -- it just proves the
+    gate doesn't misfire on the handful of conversations it was tuned against.
+    Real coverage of hostile phrasing (e.g. "thanks again, that fixed it" on a
+    closing turn) lives in test_backfill.py's unit tests instead, which don't
+    depend on guessing what a live model happens to say.
 
     Scans prior turns' message history (not this turn's own -- there's nothing to
     find there if this turn made no tool calls) for successful get_walkthrough
@@ -87,7 +103,10 @@ def _backfill_walkthrough(messages: list[dict], text: str) -> dict | None:
     if not messages or messages[-1].get("role") != "user":
         return None
     user_text = messages[-1].get("content")
-    if not isinstance(user_text, str) or not any(sig in user_text.lower() for sig in _REASK_SIGNALS):
+    if not isinstance(user_text, str):
+        return None
+    normalized = user_text.lower().replace("'", "")
+    if not any(sig in normalized for sig in _REASK_SIGNALS):
         return None
 
     attached_by_destination: dict[str, list] = {}
@@ -233,18 +252,10 @@ async def respond(messages: list[dict], ax_fixture: dict | None = None) -> Resul
     usage.append(_usage_dict(final.usage))
     text = "".join(b.text for b in final.content if b.type == "text")
     msgs.append({"role": "assistant", "content": final.content})
-    if not trace:
-        backfilled = _backfill_walkthrough(messages, text)
-        if backfilled:
-            walkthrough_steps = backfilled["steps"]
-            trace.append({
-                "tool": "get_walkthrough",
-                "input": {"solution": None},
-                "output": {
-                    "attached": True,
-                    "destination": backfilled["destination"],
-                    "steps": backfilled["steps"],
-                    "backfilled": True,
-                },
-            })
+    # No backfill check here (unlike the early-return path above): reaching this
+    # point requires every one of MAX_ITERATIONS loop passes to have had at least
+    # one tool call, each of which unconditionally appends to trace -- so trace
+    # can never be empty here, and _backfill_walkthrough only ever fires on a
+    # turn with zero tool calls. A backfill check here was dead code (found via
+    # Fable review, 2026-08-06) and has been removed rather than left in place.
     return Result(text=text, walkthrough_steps=walkthrough_steps, trace=trace, messages=msgs, usage=usage)

@@ -46,6 +46,13 @@ def _actual_outcome(trace: list[dict]) -> dict:
     # prompt explicitly encourages) is a legitimate second step, not a retraction
     # of the first one, and shouldn't overwrite it here.
     match = lookup_calls[0]["output"].get("match") if lookup_calls else None
+    # Which bucket, not just what kind of match -- "match" alone can't tell a
+    # correct fresh lookup apart from one that drifted back to a stale prior-turn
+    # topic (both come back match="problem"). Found via Fable review, 2026-08-06:
+    # multiturn_topic_pivot exists specifically to test that turn 2 doesn't stay
+    # anchored to turn 1's diagnosis, but only asserted match="problem", which is
+    # true either way. Same first-call rationale as match above.
+    resolved_problem = lookup_calls[0]["output"].get("problem") if lookup_calls else None
 
     # Every destination actually reached this turn, not just the last call --
     # a model can legitimately call get_walkthrough more than once (e.g. once by
@@ -66,6 +73,7 @@ def _actual_outcome(trace: list[dict]) -> dict:
 
     return {
         "match": match,
+        "resolved_problem": resolved_problem,
         "attached_destinations": attached_destinations,
         "attached_solutions": attached_solutions,
         "no_tool_calls": len(trace) == 0,
@@ -159,14 +167,14 @@ async def run_scenario(scenario: dict) -> dict:
     return {"name": scenario["name"], "verdicts": verdicts, "usage": scenario_usage}
 
 
-async def main() -> None:
-    all_scenarios = json.loads(SCENARIOS_FILE.read_text())
-    requested = sys.argv[1:]
-    scenarios = [s for s in all_scenarios if s["name"] in requested] if requested else all_scenarios
-    if requested and len(scenarios) != len(requested):
-        missing = set(requested) - {s["name"] for s in scenarios}
-        print(f"WARNING: scenario(s) not found: {missing}", file=sys.stderr)
-
+async def run_battery_once(scenarios: list[dict], run_label: str = "") -> dict:
+    """Runs the given scenarios once, printing full transcripts/grading exactly as
+    a single run always has, plus its own summary. Returns per-scenario pass/total
+    counts so main() can compare across repeated runs -- pass-rate variance across
+    runs of identical code has been observed and hand-compared all session
+    (43/41/41/43/42 across five runs, logged 2026-08-05); this is what makes that
+    comparison automatic instead of eyeballed."""
+    label = f" ({run_label})" if run_label else ""
     results = []
     wall_start = time.monotonic()
     await db.connect()
@@ -179,9 +187,10 @@ async def main() -> None:
         await db.disconnect()
     wall_elapsed = time.monotonic() - wall_start
 
-    print(f"\n{'=' * 100}\nSUMMARY")
+    print(f"\n{'=' * 100}\nSUMMARY{label}")
     total_assertions = 0
     total_pass = 0
+    per_scenario: dict[str, tuple[int, int]] = {}
     for r in results:
         if not r["verdicts"]:
             print(f"  {r['name']}: not graded (no 'expect' block)")
@@ -190,9 +199,10 @@ async def main() -> None:
         n_total = len(r["verdicts"])
         total_assertions += n_total
         total_pass += n_pass
+        per_scenario[r["name"]] = (n_pass, n_total)
         flag = "" if n_pass == n_total else "  <-- has failing assertion(s)"
         print(f"  {r['name']}: {n_pass}/{n_total} assertions passed{flag}")
-    print(f"\nTotal: {total_pass}/{total_assertions} assertions passed across {len(results)} scenario(s).")
+    print(f"\nTotal{label}: {total_pass}/{total_assertions} assertions passed across {len(results)} scenario(s).")
 
     all_usage = [u for r in results for u in r["usage"]]
     totals = {
@@ -201,7 +211,7 @@ async def main() -> None:
         "cache_creation_input_tokens": sum(u["cache_creation_input_tokens"] for u in all_usage),
         "cache_read_input_tokens": sum(u["cache_read_input_tokens"] for u in all_usage),
     }
-    print(f"\nUSAGE (excludes the {BETWEEN_SCENARIOS_DELAY_S}s between-scenario throttle delay from the")
+    print(f"\nUSAGE{label} (excludes the {BETWEEN_SCENARIOS_DELAY_S}s between-scenario throttle delay from the")
     print(f"wall-clock figure below -- {len(scenarios) - 1} delays, {(len(scenarios) - 1) * BETWEEN_SCENARIOS_DELAY_S}s total, subtracted):")
     print(f"  API calls: {len(all_usage)}")
     print(f"  input_tokens (non-cache): {totals['input_tokens']}")
@@ -210,6 +220,56 @@ async def main() -> None:
     print(f"  output_tokens: {totals['output_tokens']}")
     throttle_s = (len(scenarios) - 1) * BETWEEN_SCENARIOS_DELAY_S if len(scenarios) > 1 else 0
     print(f"  wall time: {wall_elapsed:.1f}s total, {wall_elapsed - throttle_s:.1f}s excluding throttle delay")
+
+    return {"total_pass": total_pass, "total_assertions": total_assertions, "per_scenario": per_scenario}
+
+
+async def main() -> None:
+    all_scenarios = json.loads(SCENARIOS_FILE.read_text())
+    args = sys.argv[1:]
+    runs = 1
+    if "--runs" in args:
+        idx = args.index("--runs")
+        runs = int(args[idx + 1])
+        args = args[:idx] + args[idx + 2:]
+    requested = args
+    scenarios = [s for s in all_scenarios if s["name"] in requested] if requested else all_scenarios
+    if requested and len(scenarios) != len(requested):
+        missing = set(requested) - {s["name"] for s in scenarios}
+        print(f"WARNING: scenario(s) not found: {missing}", file=sys.stderr)
+
+    run_summaries = []
+    for run_i in range(1, runs + 1):
+        label = f"run {run_i}/{runs}" if runs > 1 else ""
+        run_summaries.append(await run_battery_once(scenarios, run_label=label))
+        if run_i < runs:
+            await asyncio.sleep(BETWEEN_SCENARIOS_DELAY_S)
+
+    if runs > 1:
+        print(f"\n{'=' * 100}\nMULTI-RUN SUMMARY ({runs} runs)")
+        totals_per_run = [f"{s['total_pass']}/{s['total_assertions']}" for s in run_summaries]
+        print(f"  Per-run totals: {', '.join(totals_per_run)}")
+        pass_counts = [s["total_pass"] for s in run_summaries]
+        print(
+            f"  Total assertions passed -- min: {min(pass_counts)}, max: {max(pass_counts)}, "
+            f"avg: {sum(pass_counts) / len(pass_counts):.1f} (out of "
+            f"{run_summaries[0]['total_assertions']} each)"
+        )
+        # The actual flakiness signal is WHICH scenario's outcome changed, not just
+        # the aggregate moving -- a fixed number of assertions passing across runs
+        # could still be a different scenario failing each time.
+        all_names = sorted({name for s in run_summaries for name in s["per_scenario"]})
+        flaky = [
+            (name, [s["per_scenario"].get(name) for s in run_summaries])
+            for name in all_names
+            if len({s["per_scenario"].get(name) for s in run_summaries if name in s["per_scenario"]}) > 1
+        ]
+        if flaky:
+            print("  Flaky scenarios (result changed across runs):")
+            for name, outcomes in flaky:
+                print(f"    {name}: {outcomes}")
+        else:
+            print("  No scenario's pass/fail changed across runs.")
 
 
 if __name__ == "__main__":

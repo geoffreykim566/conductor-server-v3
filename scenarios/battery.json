@@ -26,8 +26,8 @@
   {"name": "no_sound_direct", "note": "3-way ambiguous new bucket, no evidence given — committing to the weight-60 default or asking are both acceptable; leading with the weight-25 candidate with zero evidence (found live 2026-08-04) is not, and isn't in the accepted set below",
    "expect": {"match": "problem", "walkthrough_destination": ["audio settings", null], "walkthrough_solution": ["no sound output", null]},
    "turns": [{"text": "i cant hear anything, no sound at all"}]},
-  {"name": "no_sound_context_other_apps", "note": "distinguisher: other apps also silent -> should point to Core Audio specifically",
-   "expect": {"match": "problem", "walkthrough_destination": "audio settings"},
+  {"name": "no_sound_context_other_apps", "note": "distinguisher: other apps also silent -> should point to Core Audio specifically. Same shared-destination collision as no_sound_direct (found via Fable review, 2026-08-06): 'Core Audio goes silent mid-session' and 'no sound output' both extends_to 'audio settings', so walkthrough_destination alone can't tell a correctly-followed distinguisher from an ignored one -- walkthrough_solution catches that.",
+   "expect": {"match": "problem", "walkthrough_destination": "audio settings", "walkthrough_solution": "Core Audio goes silent mid-session"},
    "turns": [{"text": "no sound at all in Logic, and Spotify just went silent too at the same time"}]},
   {"name": "crackling_indirect", "note": "cross-bucket bucket: both solutions shared with other problems",
    "expect": {"match": "problem"},
@@ -59,7 +59,7 @@
   {"name": "adversarial_gap_monitor_button", "note": "was a genuine gap (2026-08-04), now has real content — should resolve for real, not decline or hallucinate",
    "expect": {"match": "single", "walkthrough_destination": "input monitoring toggle"},
    "turns": [{"text": "wheres the monitor button on a track, i cant find it anywhere"}]},
-  {"name": "monitor_button_already_on", "note": "pushed AX state says Input Monitoring is already visible — should say so and point at the track header, not walk through toggling it (which would turn it OFF). Was a known gap (2026-08-05, see v3-log.md) until the toggle_ax_key guard was built; now passes.",
+  {"name": "monitor_button_already_on", "note": "pushed AX state says Input Monitoring is already visible — should say so and point at the track header, not walk through toggling it (which would turn it OFF). Was a known gap (2026-08-05, see v3-log.md) until the toggle_ax_key guard was built; now passes. CODE-GUARANTEED (flagged via Fable review, 2026-08-06): the toggle_ax_key gate in tools.py deterministically refuses the attach whenever the fixture key is truthy, so walkthrough_destination:null passes regardless of what the model does -- this is a regression test for that code path, not a test of model judgment. The 'should say so' prose behavior is real but ungraded.",
    "expect": {"match": "single", "walkthrough_destination": null},
    "turns": [{"text": "wheres the monitor button on a track, i cant find it anywhere", "ax_fixture": {"input_monitoring_button_visible": true}}]},
   {"name": "monitor_button_already_off", "note": "pushed AX state says Input Monitoring is off — should walk through enabling it via Option+T",
@@ -71,6 +71,10 @@
   {"name": "ax_override_critical_test", "note": "the critical thesis test — stated+AX evidence should demote sample-rate-mismatch (seed_weight 100) and lead with Smart Tempo instead. Smart Tempo has no path, so a correct override means NO walkthrough attaches (attaching one would mean it recommended the ruled-out sample-rate-mismatch instead)",
    "expect": {"match": "problem", "walkthrough_destination": null},
    "turns": [{"text": "my song sounds slowed after importing an audio file. i already checked and the project is 44.1kHz, and the file is also 44.1kHz, so they match.", "ax_fixture": {"project_sample_rate": "44.1 kHz"}}]},
+
+  {"name": "ax_contradicts_user_claim", "note": "mirror image of ax_override_critical_test — every existing AX-fixture scenario pushes state that AGREES with what the user says (found via Fable review, 2026-08-06: never actually tested a real disagreement). Here the user is WRONG: they claim the project and file both read 44.1kHz, but the pushed AX data shows the project is actually at 48kHz -- a real mismatch the user hasn't noticed. Correct behavior: trust the real data over the user's mistaken claim and attach sample rate mismatch, not defer to Smart Tempo the way the agreeing-evidence version correctly does. This is the actual test of whether AX 'outranks stated claims... when they conflict' (prompt.py's own words) rather than just a case where trusting either one gives the same answer.",
+   "expect": {"match": "problem", "walkthrough_destination": "sample rate"},
+   "turns": [{"text": "my song sounds slowed after importing an audio file. i already checked and the project is 44.1kHz, and the file is also 44.1kHz, so they match.", "ax_fixture": {"project_sample_rate": "48 kHz"}}]},
 
   {"name": "multiturn_fallback_system_overload_confirmed", "note": "commit-to-one continuity, live-verified 2026-08-05 before being codified here — turn 1 attaches CPU overload and mentions the Apple Silicon path only in prose (per the commit-to-one prompt rule); turn 2 reports that fix failed and reveals the M3 distinguisher, and should attach the fallback by name without re-calling lookup_concept. Turn-1 attach is now actually asserted, not just narrated -- an adversarial review (2026-08-05) found a real battery run where turn 1 attached nothing yet the scenario still passed, since only the final turn was graded at the time. Turn 1's text is identical to system_overload_generic's own opening line, which is already documented as flaky (3/7 recent runs); left strict on purpose (matching that sibling scenario's strictness) rather than loosened -- a turn-1 failure here is expected to be the same known instability, not a new one, and loosening it would grade the identical input two different ways across scenarios.",
    "expect": {"walkthrough_destination": "processing threads"},
@@ -93,8 +97,8 @@
      {"text": "that fixed it, thanks!"}
    ]},
 
-  {"name": "multiturn_topic_pivot", "note": "turn 2 explicitly abandons the turn-1 topic for an unrelated one — tests that history doesn't anchor the model to the old diagnosis once the user has moved on.",
-   "expect": {"match": "problem"},
+  {"name": "multiturn_topic_pivot", "note": "turn 2 explicitly abandons the turn-1 topic for an unrelated one — tests that history doesn't anchor the model to the old diagnosis once the user has moved on. match alone can't catch anchoring (a drifted-back lookup also returns match=problem) -- resolved_problem checks it actually landed on the mic-not-picking-up bucket, not a stale slowed-down one (found via Fable review, 2026-08-06).",
+   "expect": {"match": "problem", "resolved_problem": "recording is silent / mic not picking up"},
    "turns": [
      {"text": "why does my song sound slowed down"},
      {"text": "actually never mind that, different issue — my mic isnt picking up any sound when i try to record"}
@@ -107,7 +111,7 @@
      {"text": "oh wait, i see it now, it was already there, i just didnt notice"}
    ]},
 
-  {"name": "multiturn_ax_state_updates_reflect_completion", "note": "ax_fixture changes between turns rather than being pushed once — turn 1 (off) gets the walkthrough, turn 2 (now on, simulating the user having just completed it) should recognize the state changed and not walk through it again.",
+  {"name": "multiturn_ax_state_updates_reflect_completion", "note": "ax_fixture changes between turns rather than being pushed once — turn 1 (off) gets the walkthrough, turn 2 (now on, simulating the user having just completed it) should recognize the state changed and not walk through it again. CODE-GUARANTEED on turn 2 (flagged via Fable review, 2026-08-06): the toggle_ax_key gate deterministically refuses once the fixture key is truthy, so turn 2's null-destination outcome doesn't depend on model judgment. Turn 1's walkthrough-attach is a genuine model-behavior check.",
    "expect": {"walkthrough_destination": null},
    "turns": [
      {"text": "wheres the monitor button on a track, i cant find it anywhere", "ax_fixture": {"input_monitoring_button_visible": false}},
@@ -149,14 +153,14 @@
      {"text": "ok not that then -- how do i fix crackling that gets worse the more tracks and plugins i add"}
    ]},
 
-  {"name": "multiturn_same_destination_revisited_new_turn", "note": "commit-to-one is scoped per turn, not per conversation — turn 1 attaches sample rate, turn 2 has a new, independent reason to ask for the same destination again and should be able to attach it a second time, not be silently blocked by turn 1's already-attached state. FIXED 2026-08-06 (see v3-log.md): pipeline.py's _backfill_walkthrough reattaches from message history when a turn makes zero tool calls and its response text names exactly one prior destination -- covers the 'answers correctly from memory without calling get_walkthrough' case without needing another prompt instruction (this project's prompt-only attempts at similar behaviors have repeatedly not held).",
+  {"name": "multiturn_same_destination_revisited_new_turn", "note": "commit-to-one is scoped per turn, not per conversation — turn 1 attaches sample rate, turn 2 has a new, independent reason to ask for the same destination again and should be able to attach it a second time, not be silently blocked by turn 1's already-attached state. FIXED 2026-08-06 (see v3-log.md): pipeline.py's _backfill_walkthrough reattaches from message history when a turn makes zero tool calls AND the user's own message contains explicit re-ask language (e.g. 'remind me', 'closed the window') -- the response-text-only version of this gate false-positived live and was replaced (commit 47b0861) before this note was updated the first time.",
    "expect": {"walkthrough_destination": "sample rate"},
    "turns": [
      {"text": "wheres sample rate"},
      {"text": "sorry, can you remind me where that setting was again, i closed the window"}
    ]},
 
-  {"name": "multiturn_ax_push_scoped_correctly", "note": "turn 1 is an unrelated topic with its own tool call already in history; turn 2 pushes AX state for a completely different destination — tests that the toggle_ax_key gate still fires correctly on turn 2 regardless of unrelated prior turns, not just in a fresh single-turn conversation.",
+  {"name": "multiturn_ax_push_scoped_correctly", "note": "turn 1 is an unrelated topic with its own tool call already in history; turn 2 pushes AX state for a completely different destination — tests that the toggle_ax_key gate still fires correctly on turn 2 regardless of unrelated prior turns, not just in a fresh single-turn conversation. CODE-GUARANTEED on turn 2 (flagged via Fable review, 2026-08-06): same deterministic gate as multiturn_ax_state_updates_reflect_completion -- real value here is confirming the gate isn't accidentally scoped wrong by prior-turn history, not testing model judgment.",
    "expect": {"walkthrough_destination": null},
    "turns": [
      {"text": "wheres the buffer size setting"},
