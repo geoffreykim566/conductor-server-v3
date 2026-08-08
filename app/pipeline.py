@@ -9,12 +9,15 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
+from typing import Awaitable, Callable
 
 from anthropic import AsyncAnthropic
 
 from app import tools
 from app.config import CENTRAL_ANTHROPIC_KEY, MAX_TOKENS, MODEL
 from app.prompt import SYSTEM_PROMPT
+
+OnChunk = Callable[[str], Awaitable[None]]
 
 MAX_ITERATIONS = 6
 
@@ -134,6 +137,33 @@ def _backfill_walkthrough(messages: list[dict], text: str) -> dict | None:
     return {"destination": matches[0], "steps": attached_by_destination[matches[0]]}
 
 
+def _serialize_content(content: list) -> list[dict]:
+    """SDK response content blocks -> plain request-shape dicts.
+
+    resp.content items are response objects (TextBlock, ToolUseBlock, ...)
+    carrying response-only fields (e.g. TextBlock.parsed_output) that the
+    request-side schema doesn't accept. Appending them raw into msgs works
+    fine *within* a single respond() call (never re-serialized before the
+    next .create()), but Result.messages leaves the process as JSON for the
+    client to round-trip as the next turn's history -- at that point the
+    extra field is a literal dict key, and the API rejects it outright
+    ("Extra inputs are not permitted") on the following request. Found live
+    2026-08-08: turn 1 (fresh) succeeds, turn 2 ("show me that again",
+    replaying turn 1's text block from history) 400s. Normalizing here,
+    once, at the source keeps msgs safe for both same-turn reuse and
+    cross-request replay.
+    """
+    out = []
+    for b in content:
+        if b.type == "text":
+            out.append({"type": "text", "text": b.text})
+        elif b.type == "tool_use":
+            out.append({"type": "tool_use", "id": b.id, "name": b.name, "input": b.input})
+        else:
+            out.append(b.model_dump())
+    return out
+
+
 def _usage_dict(u) -> dict:
     return {
         "input_tokens": u.input_tokens,
@@ -143,7 +173,33 @@ def _usage_dict(u) -> dict:
     }
 
 
-async def respond(messages: list[dict], ax_fixture: dict | None = None) -> Result:
+async def _call_model(system: list[dict], tools_param: list[dict] | None, msgs: list[dict], on_chunk: OnChunk | None):
+    """One messages.create call, or the streamed equivalent when on_chunk is given.
+
+    Streaming path forwards every text delta from every iteration (not just the
+    final answer) — a tool-calling turn's own text_stream only ever carries its
+    text blocks, never tool_use input, so a turn that also calls a tool doesn't
+    accidentally leak partial JSON to the client. When on_chunk is None (every
+    caller except api.py — the battery runner, drive_turn, and the mocked unit
+    tests) this still calls _client.messages.create directly, unchanged, so
+    existing mocks (which patch that exact method) keep working.
+    """
+    kwargs = dict(model=MODEL, max_tokens=MAX_TOKENS, system=system, messages=msgs)
+    if tools_param is not None:
+        kwargs["tools"] = tools_param
+    if on_chunk is None:
+        return await _client.messages.create(**kwargs)
+    async with _client.messages.stream(**kwargs) as stream:
+        async for text in stream.text_stream:
+            await on_chunk(text)
+        return await stream.get_final_message()
+
+
+async def respond(
+    messages: list[dict],
+    ax_fixture: dict | None = None,
+    on_chunk: OnChunk | None = None,
+) -> Result:
     msgs = list(messages)
     trace: list[dict] = []
     usage: list[dict] = []
@@ -173,19 +229,13 @@ async def respond(messages: list[dict], ax_fixture: dict | None = None) -> Resul
     system = [{"type": "text", "text": system_text, "cache_control": {"type": "ephemeral"}}]
 
     for _ in range(MAX_ITERATIONS):
-        resp = await _client.messages.create(
-            model=MODEL,
-            max_tokens=MAX_TOKENS,
-            system=system,
-            tools=tools.TOOLS,
-            messages=msgs,
-        )
+        resp = await _call_model(system, tools.TOOLS, msgs, on_chunk)
         usage.append(_usage_dict(resp.usage))
         tool_uses = [b for b in resp.content if b.type == "tool_use"]
 
         if not tool_uses:
             text = "".join(b.text for b in resp.content if b.type == "text")
-            msgs.append({"role": "assistant", "content": resp.content})
+            msgs.append({"role": "assistant", "content": _serialize_content(resp.content)})
             if not trace:
                 backfilled = _backfill_walkthrough(messages, text)
                 if backfilled:
@@ -202,7 +252,7 @@ async def respond(messages: list[dict], ax_fixture: dict | None = None) -> Resul
                     })
             return Result(text=text, walkthrough_steps=walkthrough_steps, trace=trace, messages=msgs, usage=usage)
 
-        msgs.append({"role": "assistant", "content": resp.content})
+        msgs.append({"role": "assistant", "content": _serialize_content(resp.content)})
         tool_results = []
         for tu in tool_uses:
             if tu.name == "lookup_concept":
@@ -245,18 +295,18 @@ async def respond(messages: list[dict], ax_fixture: dict | None = None) -> Resul
     # Safety net: never return a truly empty response, regardless of why the
     # loop didn't converge on its own. Force one final tools-off call so the
     # model must synthesize whatever it already learned into a real answer.
-    final = await _client.messages.create(
-        model=MODEL,
-        max_tokens=MAX_TOKENS,
-        system=system + [{
+    final = await _call_model(
+        system + [{
             "type": "text",
             "text": "\n\nAnswer now with your best available information — no more tool calls.",
         }],
-        messages=msgs,
+        None,
+        msgs,
+        on_chunk,
     )
     usage.append(_usage_dict(final.usage))
     text = "".join(b.text for b in final.content if b.type == "text")
-    msgs.append({"role": "assistant", "content": final.content})
+    msgs.append({"role": "assistant", "content": _serialize_content(final.content)})
     # No backfill check here (unlike the early-return path above): reaching this
     # point requires every one of MAX_ITERATIONS loop passes to have had at least
     # one tool call, each of which unconditionally appends to trace -- so trace
