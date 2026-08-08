@@ -26,10 +26,13 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    # No exposed port, no default command — client-less pipeline, driven via
-    # `docker compose exec app python -m app.run_scenarios` (or similar).
-    # Container just needs to stay up so exec has something to attach to.
-    command: ["sleep", "infinity"]
+    ports:
+      - "127.0.0.1:8000:8000"
+    # Serves the /v1/chat, /v1/register HTTP layer (app/api.py) for
+    # client-v3 to talk to. The old scenario-runner scripts (run_scenarios,
+    # run_graded_battery, drive_turn) still work via `docker compose exec`
+    # regardless of what the container's own foreground command is.
+    command: ["uvicorn", "app.api:app", "--host", "0.0.0.0", "--port", "8000"]
 
 volumes:
   pgdata:
