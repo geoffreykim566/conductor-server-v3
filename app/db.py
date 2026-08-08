@@ -89,6 +89,17 @@ async def insert_event(*, user_id: uuid.UUID, tokens_in: int, tokens_out: int) -
     return row["id"]
 
 
+async def spend_last_24h_usd() -> float:
+    """Trailing-24h spend across all users, from the derived event_costs view."""
+    return float(await pool().fetchval(
+        """
+        select coalesce(sum(usd_cost), 0)
+        from event_costs
+        where created_at > now() - interval '24 hours'
+        """
+    ))
+
+
 async def set_rating(event_id: uuid.UUID, user_id: uuid.UUID, rating: int) -> bool:
     """rating is 1 (up), -1 (down), or 0 (undo). Returns False if no such event
     belongs to this user."""

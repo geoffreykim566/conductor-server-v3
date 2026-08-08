@@ -9,6 +9,10 @@ CENTRAL_ANTHROPIC_KEY = os.environ.get("CENTRAL_ANTHROPIC_KEY", "")
 CONDUCTOR_ID_SECRET = os.environ.get("CONDUCTOR_ID_SECRET", "")
 RATE_LIMIT = os.environ.get("RATE_LIMIT", "10/minute")
 REGISTER_RATE_LIMIT = os.environ.get("REGISTER_RATE_LIMIT", "5/day")
+
+# Global circuit breaker: once trailing-24h spend (event_costs) crosses this,
+# /v1/chat refuses new requests with 503 until spend rolls out of the window.
+DAILY_BUDGET_USD = float(os.environ.get("DAILY_BUDGET_USD", "10"))
 DATABASE_URL = os.environ.get(
     "DATABASE_URL", "postgresql://conductor:conductor@localhost:5432/conductor"
 )

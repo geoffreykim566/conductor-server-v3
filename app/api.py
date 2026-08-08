@@ -2,10 +2,10 @@
 
 Real per-user free-tier counting, ratings, streaming, HMAC-signed conductor
 ids (see signing.py/deps.py), history shape validation (ChatRequest below),
-an oversized-body guard, a disabled /docs, and IP-based rate limiting (see
-ratelimit.py) are wired now. Deliberately still deferred (see the Fable
-scope-out run 2026-08-08 for a plan on these): a daily-cost circuit breaker
-and admin/analytics routes. Not production-hardened yet.
+an oversized-body guard, a disabled /docs, IP-based rate limiting (see
+ratelimit.py), and a daily-cost circuit breaker (see budget.py) are wired
+now. Deliberately still deferred (see the Fable scope-out run 2026-08-08 for
+a plan on these): admin/analytics routes. Not production-hardened yet.
 
 Conversation continuity is opaque round-tripping, not a server-side
 session store — chosen because pipeline.respond() is explicitly designed
@@ -34,7 +34,7 @@ from pydantic import BaseModel, Field, field_validator
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
-from app import db, signing
+from app import budget, db, signing
 from app.config import MAX_HISTORY_MESSAGES, RATE_LIMIT, REGISTER_RATE_LIMIT
 from app.deps import current_user
 from app.pipeline import respond
@@ -248,6 +248,13 @@ async def set_rating(r: RatingIn, user: asyncpg.Record = Depends(current_user)):
 @app.post("/v1/chat")
 @limiter.limit(RATE_LIMIT)
 async def chat(request: Request, req: ChatRequest, user: asyncpg.Record = Depends(current_user)):
+    # Budget check before claim: a breaker-refused request must not burn a
+    # free message either (same ordering as v1's routes/chat.py).
+    if await budget.over_daily_budget():
+        raise HTTPException(
+            status_code=503,
+            detail={"error": "free_tier_paused", "message": "Free tier is busy — try again later."},
+        )
     # Claimed before any model call — a request that never gets a real answer
     # still cost a real API call if claimed after, so claim first and fail
     # closed on the cap rather than risk free messages that don't decrement.
