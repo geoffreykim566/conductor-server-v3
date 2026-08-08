@@ -20,3 +20,10 @@ VOYAGE_MODEL = "voyage-3.5"  # 1024-dim; index and query must stay symmetric
 # (raised 0.5 -> 0.65, see kb-log.md 2026-07-28), kept here for continuity, not
 # re-derived from scratch for this tiny seed set.
 RELEVANCE_FLOOR = float(os.environ.get("RELEVANCE_FLOOR", "0.65"))
+
+FREE_LIMIT = int(os.environ.get("FREE_LIMIT", "50"))
+
+# Message-count cap on round-tripped history, the v3 equivalent of the old
+# client-side _MAX_CONTEXT_MESSAGES trim -- unbounded history was a known gap
+# once /v1/chat started round-tripping it opaquely (see api.py).
+MAX_HISTORY_MESSAGES = int(os.environ.get("MAX_HISTORY_MESSAGES", "60"))

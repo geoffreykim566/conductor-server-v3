@@ -1,15 +1,12 @@
-"""Postgres access — the only module that runs SQL connection setup.
-
-Trimmed from the real server's db.py — no users/events/free-tier/rating
-functions, since this schema doesn't have those tables at all.
-"""
+"""Postgres access — the only module that runs SQL connection setup."""
 import asyncio
 import json
+import uuid
 
 import asyncpg
 import pgvector.asyncpg
 
-from app.config import DATABASE_URL
+from app.config import DATABASE_URL, FREE_LIMIT
 
 _pool: asyncpg.Pool | None = None
 
@@ -47,3 +44,79 @@ async def disconnect() -> None:
 def pool() -> asyncpg.Pool:
     assert _pool is not None, "DB pool not initialised"
     return _pool
+
+
+async def get_or_create_user(conductor_id: uuid.UUID) -> asyncpg.Record:
+    """Upsert the user by id, bump last_seen, return the full row.
+
+    No signature verification yet (see api.py's deps) — conductor_id is
+    trusted as whatever the client sent.
+    """
+    return await pool().fetchrow(
+        """
+        insert into users (id, free_limit)
+        values ($1, $2)
+        on conflict (id) do update set last_seen_at = now()
+        returning *
+        """,
+        conductor_id,
+        FREE_LIMIT,
+    )
+
+
+async def claim_free_message(user_id: uuid.UUID) -> asyncpg.Record | None:
+    """Atomically consume one free-tier message; None once the cap is spent."""
+    return await pool().fetchrow(
+        """
+        update users set free_used = free_used + 1
+        where id = $1 and free_used < free_limit
+        returning *
+        """,
+        user_id,
+    )
+
+
+async def insert_event(*, user_id: uuid.UUID, tokens_in: int, tokens_out: int) -> uuid.UUID:
+    row = await pool().fetchrow(
+        """
+        insert into events (user_id, tokens_in, tokens_out)
+        values ($1, $2, $3)
+        returning id
+        """,
+        user_id, tokens_in, tokens_out,
+    )
+    return row["id"]
+
+
+async def set_rating(event_id: uuid.UUID, user_id: uuid.UUID, rating: int) -> bool:
+    """rating is 1 (up), -1 (down), or 0 (undo). Returns False if no such event
+    belongs to this user."""
+    result = await pool().execute(
+        """
+        update events
+           set rating   = nullif($1, 0),
+               rated_at = case when $1 = 0 then null else now() end
+         where id = $2 and user_id = $3
+        """,
+        rating, event_id, user_id,
+    )
+    return result != "UPDATE 0"
+
+
+async def update_profile(user_id: uuid.UUID, experience: str | None, role: str | None) -> None:
+    await pool().execute(
+        """
+        update users set
+            experience = coalesce($2, experience),
+            role       = coalesce($3, role)
+        where id = $1
+        """,
+        user_id, experience, role,
+    )
+
+
+async def mark_uninstalled(user_id: uuid.UUID) -> None:
+    await pool().execute(
+        "update users set uninstalled_at = now() where id = $1 and uninstalled_at is null",
+        user_id,
+    )
