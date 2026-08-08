@@ -1,11 +1,11 @@
 """HTTP/SSE layer for client-v3.
 
 Real per-user free-tier counting, ratings, streaming, HMAC-signed conductor
-ids (see signing.py/deps.py), and history shape validation (ChatRequest
-below) are wired now. Deliberately still deferred (see the Fable scope-out
-run 2026-08-08 for a plan on these): IP-based rate limiting on /v1/register
-and /v1/chat, a daily-cost circuit breaker, an oversized-body guard, and
-admin/analytics routes. Not production-hardened yet.
+ids (see signing.py/deps.py), history shape validation (ChatRequest below),
+an oversized-body guard, and a disabled /docs are wired now. Deliberately
+still deferred (see the Fable scope-out run 2026-08-08 for a plan on these):
+IP-based rate limiting on /v1/register and /v1/chat, a daily-cost circuit
+breaker, and admin/analytics routes. Not production-hardened yet.
 
 Conversation continuity is opaque round-tripping, not a server-side
 session store — chosen because pipeline.respond() is explicitly designed
@@ -28,8 +28,8 @@ import uuid
 from contextlib import asynccontextmanager
 
 import asyncpg
-from fastapi import Depends, FastAPI, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 
 from app import db, signing
@@ -47,7 +47,27 @@ async def lifespan(app: FastAPI):
         await db.disconnect()
 
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
+
+# Traefik/uvicorn read the whole body before FastAPI's pydantic validation
+# runs, so an oversized-body cap has to live ahead of that, in a middleware
+# (same shape as v1's server/app/main.py). Cap is far smaller than v1's 45MB:
+# v3's traffic is text-only (no image blocks anywhere in this pipeline), and
+# even a maxed-out history (300 messages, ChatRequest's own per-field caps)
+# tops out in the low single-digit MB.
+_MAX_BODY_BYTES = 2 * 1024 * 1024
+
+
+@app.middleware("http")
+async def reject_oversized_bodies(request: Request, call_next):
+    length = request.headers.get("content-length")
+    if length is not None:
+        try:
+            if int(length) > _MAX_BODY_BYTES:
+                return JSONResponse({"detail": "request_too_large"}, status_code=413)
+        except ValueError:
+            return JSONResponse({"detail": "invalid_content_length"}, status_code=400)
+    return await call_next(request)
 
 
 # The client is not a trust boundary: `history` is round-tripped opaquely
