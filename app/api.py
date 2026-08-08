@@ -1,11 +1,11 @@
 """HTTP/SSE layer for client-v3.
 
-Real per-user free-tier counting, ratings, and streaming are wired now.
-Deliberately still deferred (see the Fable scope-out run 2026-08-08 for a
-plan on these): HMAC signing of conductor_id (X-Conductor-Id is trusted
-as-sent, parsed as a bare uuid — see deps.py), IP-based rate limiting on
-/v1/register and /v1/chat, a daily-cost circuit breaker, an oversized-body
-guard, and admin/analytics routes. Not production-hardened yet.
+Real per-user free-tier counting, ratings, streaming, HMAC-signed conductor
+ids (see signing.py/deps.py), and history shape validation (ChatRequest
+below) are wired now. Deliberately still deferred (see the Fable scope-out
+run 2026-08-08 for a plan on these): IP-based rate limiting on /v1/register
+and /v1/chat, a daily-cost circuit breaker, an oversized-body guard, and
+admin/analytics routes. Not production-hardened yet.
 
 Conversation continuity is opaque round-tripping, not a server-side
 session store — chosen because pipeline.respond() is explicitly designed
@@ -30,9 +30,9 @@ from contextlib import asynccontextmanager
 import asyncpg
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
-from app import db
+from app import db, signing
 from app.config import MAX_HISTORY_MESSAGES
 from app.deps import current_user
 from app.pipeline import respond
@@ -50,11 +50,94 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
+# The client is not a trust boundary: `history` is round-tripped opaquely
+# (see module docstring) and replayed straight into messages.create(), so a
+# tampered payload could smuggle fields the API would honor (e.g. inflating
+# cost) or malformed shapes that 400 mid-turn. Whitelist exactly the shapes
+# pipeline.py's _serialize_content actually produces — plain-string user
+# turns, assistant text/tool_use blocks, user tool_result blocks — unlike
+# v1's whitelist (server/app/routes/chat.py), which never had to deal with
+# tool_use/tool_result at all.
+_MAX_HISTORY_LEN = 300  # sanity ceiling ahead of _trim_history's real trim to MAX_HISTORY_MESSAGES
+_MAX_MESSAGE_CHARS = 4_000
+_MAX_TEXT_CHARS = 20_000  # generous vs real walkthrough/tool-result JSON sizes
+_MAX_TOOL_INPUT_CHARS = 4_000
+_MAX_BLOCKS_PER_MSG = 10
+_ALLOWED_ROLES = {"user", "assistant"}
+_ALLOWED_MSG_KEYS = {"role", "content"}
+_ALLOWED_TEXT_BLOCK_KEYS = {"type", "text"}
+_ALLOWED_TOOL_USE_KEYS = {"type", "id", "name", "input"}
+_ALLOWED_TOOL_RESULT_KEYS = {"type", "tool_use_id", "content"}
+
+
 class ChatRequest(BaseModel):
-    message: str
+    message: str = Field(..., max_length=_MAX_MESSAGE_CHARS)
     # Opaque — exactly what a prior /v1/chat call's "done" event sent as
     # "history". None (or omitted) starts a fresh conversation.
     history: list[dict] | None = None
+
+    @field_validator("history")
+    @classmethod
+    def _validate_history(cls, msgs: list[dict] | None) -> list[dict] | None:
+        if msgs is None:
+            return msgs
+        if len(msgs) > _MAX_HISTORY_LEN:
+            raise ValueError(f"too many history messages (max {_MAX_HISTORY_LEN})")
+        for msg in msgs:
+            if not isinstance(msg, dict) or set(msg) - _ALLOWED_MSG_KEYS:
+                raise ValueError("unexpected keys in message")
+            role = msg.get("role")
+            if role not in _ALLOWED_ROLES:
+                raise ValueError("invalid role")
+            content = msg.get("content")
+            if isinstance(content, str):
+                if role != "user":
+                    raise ValueError("only user turns may have plain-string content")
+                if len(content) > _MAX_TEXT_CHARS:
+                    raise ValueError("message text too long")
+                continue
+            if not isinstance(content, list):
+                raise ValueError("invalid content")
+            if len(content) > _MAX_BLOCKS_PER_MSG:
+                raise ValueError(f"too many content blocks (max {_MAX_BLOCKS_PER_MSG})")
+            for block in content:
+                if not isinstance(block, dict):
+                    raise ValueError("invalid content block")
+                btype = block.get("type")
+                if role == "assistant":
+                    if btype == "text":
+                        if set(block) - _ALLOWED_TEXT_BLOCK_KEYS:
+                            raise ValueError("unexpected keys in text block")
+                        if not isinstance(block.get("text", ""), str):
+                            raise ValueError("invalid text block")
+                        if len(block.get("text", "")) > _MAX_TEXT_CHARS:
+                            raise ValueError("message text too long")
+                    elif btype == "tool_use":
+                        if set(block) - _ALLOWED_TOOL_USE_KEYS:
+                            raise ValueError("unexpected keys in tool_use block")
+                        if not isinstance(block.get("id"), str) or not isinstance(block.get("name"), str):
+                            raise ValueError("invalid tool_use block")
+                        if len(json.dumps(block.get("input", {}))) > _MAX_TOOL_INPUT_CHARS:
+                            raise ValueError("tool_use input too large")
+                    else:
+                        raise ValueError(f"unsupported assistant block type: {btype!r}")
+                else:  # user
+                    if btype != "tool_result":
+                        raise ValueError(f"unsupported user block type: {btype!r}")
+                    if set(block) - _ALLOWED_TOOL_RESULT_KEYS:
+                        raise ValueError("unexpected keys in tool_result block")
+                    if not isinstance(block.get("tool_use_id"), str):
+                        raise ValueError("invalid tool_result block")
+                    # _serialize_content always emits a json.dumps() string here
+                    # (pipeline.py), never a nested block list -- a list would let
+                    # a smuggled image/cache_control block ride inside tool_result,
+                    # past the block-level checks above that only look at content's
+                    # own top-level type.
+                    if not isinstance(block.get("content", ""), str):
+                        raise ValueError("invalid tool_result content")
+                    if len(block.get("content", "")) > _MAX_TEXT_CHARS:
+                        raise ValueError("tool_result content too long")
+        return msgs
 
 
 def _json_default(o):
@@ -87,8 +170,14 @@ def _trim_history(messages: list[dict]) -> list[dict]:
 @app.post("/v1/register")
 async def register():
     cid = uuid.uuid4()
+    try:
+        # Sign before inserting: a deploy without the secret must refuse
+        # registration, not mint identities nothing will ever verify.
+        token = signing.sign(cid)
+    except RuntimeError:
+        raise HTTPException(status_code=503, detail="registration_unavailable")
     await db.get_or_create_user(cid)
-    return {"conductor_id": str(cid)}
+    return {"conductor_id": token}
 
 
 @app.get("/v1/me")

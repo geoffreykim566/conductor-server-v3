@@ -1,12 +1,12 @@
 """v3 configuration. Secrets come from the environment, never the repo.
 
-Trimmed from the real server's config.py — no free-tier/budget/rate-limit
-settings, no HTTP-facing config at all, since this pipeline is client-less
-(direct calls, no FastAPI route) for now.
+Trimmed from the real server's config.py — no budget/rate-limit settings yet
+(see api.py's module docstring for what's still deferred).
 """
 import os
 
 CENTRAL_ANTHROPIC_KEY = os.environ.get("CENTRAL_ANTHROPIC_KEY", "")
+CONDUCTOR_ID_SECRET = os.environ.get("CONDUCTOR_ID_SECRET", "")
 DATABASE_URL = os.environ.get(
     "DATABASE_URL", "postgresql://conductor:conductor@localhost:5432/conductor"
 )

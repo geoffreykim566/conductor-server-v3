@@ -49,8 +49,9 @@ def pool() -> asyncpg.Pool:
 async def get_or_create_user(conductor_id: uuid.UUID) -> asyncpg.Record:
     """Upsert the user by id, bump last_seen, return the full row.
 
-    No signature verification yet (see api.py's deps) — conductor_id is
-    trusted as whatever the client sent.
+    conductor_id is already verified by the time it reaches here (see
+    deps.py's current_user, which checks the HMAC signature first) — the
+    upsert just lets a row lost to a DB reset self-heal.
     """
     return await pool().fetchrow(
         """
