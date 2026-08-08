@@ -7,6 +7,8 @@ import os
 
 CENTRAL_ANTHROPIC_KEY = os.environ.get("CENTRAL_ANTHROPIC_KEY", "")
 CONDUCTOR_ID_SECRET = os.environ.get("CONDUCTOR_ID_SECRET", "")
+RATE_LIMIT = os.environ.get("RATE_LIMIT", "10/minute")
+REGISTER_RATE_LIMIT = os.environ.get("REGISTER_RATE_LIMIT", "5/day")
 DATABASE_URL = os.environ.get(
     "DATABASE_URL", "postgresql://conductor:conductor@localhost:5432/conductor"
 )

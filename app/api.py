@@ -2,10 +2,10 @@
 
 Real per-user free-tier counting, ratings, streaming, HMAC-signed conductor
 ids (see signing.py/deps.py), history shape validation (ChatRequest below),
-an oversized-body guard, and a disabled /docs are wired now. Deliberately
-still deferred (see the Fable scope-out run 2026-08-08 for a plan on these):
-IP-based rate limiting on /v1/register and /v1/chat, a daily-cost circuit
-breaker, and admin/analytics routes. Not production-hardened yet.
+an oversized-body guard, a disabled /docs, and IP-based rate limiting (see
+ratelimit.py) are wired now. Deliberately still deferred (see the Fable
+scope-out run 2026-08-08 for a plan on these): a daily-cost circuit breaker
+and admin/analytics routes. Not production-hardened yet.
 
 Conversation continuity is opaque round-tripping, not a server-side
 session store — chosen because pipeline.respond() is explicitly designed
@@ -31,11 +31,14 @@ import asyncpg
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field, field_validator
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from app import db, signing
-from app.config import MAX_HISTORY_MESSAGES
+from app.config import MAX_HISTORY_MESSAGES, RATE_LIMIT, REGISTER_RATE_LIMIT
 from app.deps import current_user
 from app.pipeline import respond
+from app.ratelimit import limiter
 
 
 @asynccontextmanager
@@ -48,6 +51,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Traefik/uvicorn read the whole body before FastAPI's pydantic validation
 # runs, so an oversized-body cap has to live ahead of that, in a middleware
@@ -188,7 +193,8 @@ def _trim_history(messages: list[dict]) -> list[dict]:
 
 
 @app.post("/v1/register")
-async def register():
+@limiter.limit(REGISTER_RATE_LIMIT)
+async def register(request: Request):
     cid = uuid.uuid4()
     try:
         # Sign before inserting: a deploy without the secret must refuse
@@ -240,7 +246,8 @@ async def set_rating(r: RatingIn, user: asyncpg.Record = Depends(current_user)):
 
 
 @app.post("/v1/chat")
-async def chat(req: ChatRequest, user: asyncpg.Record = Depends(current_user)):
+@limiter.limit(RATE_LIMIT)
+async def chat(request: Request, req: ChatRequest, user: asyncpg.Record = Depends(current_user)):
     # Claimed before any model call — a request that never gets a real answer
     # still cost a real API call if claimed after, so claim first and fail
     # closed on the cap rather than risk free messages that don't decrement.
