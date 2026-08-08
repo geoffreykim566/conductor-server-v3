@@ -9,13 +9,19 @@ without them. No auth verification, no rate limits, no per-user state:
 unsigned uuid. Not production-hardened — that's explicitly out of scope
 for wiring up a first real end-to-end test.
 
-Conversation history is flattened to plain {role, content: str} pairs
-(images dropped, any structured content reduced to its text). This means
-the model-driven backfill/multi-turn behaviors verified in the battery
-(which persist real tool_use/tool_result blocks between turns) do NOT
-carry over to live client traffic yet — accepted gap, not an oversight,
-tracked in v3-log.md as a follow-up design item (server-side session
-store vs. client round-tripping opaque message blocks).
+Conversation continuity is opaque round-tripping, not a server-side
+session store — chosen because pipeline.respond() is explicitly designed
+stateless ("history is the only state," see pipeline.py's own docstring),
+and a server-side store would contradict that. The client sends back
+exactly the `history` a prior `/v1/chat` call returned (the full raw
+message list respond() produced, including tool_use/tool_result blocks)
+plus the new user turn; nothing is kept here between requests. This is
+what makes the battery's verified multi-turn behaviors (backfill,
+fallback continuity) apply to live traffic too, not just the harness.
+
+No history length/cost cap yet (the old client-side _MAX_CONTEXT_MESSAGES
+trim doesn't have a v3 equivalent) — acceptable for dev testing, a real
+gap before this could take real traffic.
 
 pipeline.respond() is non-streaming (a multi-call tool-use loop), so this
 only ever emits one "chunk" with the full text followed by "done" — real
@@ -46,30 +52,20 @@ app = FastAPI(lifespan=lifespan)
 
 
 class ChatRequest(BaseModel):
-    messages: list[dict]
+    message: str
+    # Opaque — exactly what a prior /v1/chat call's "done" event sent as
+    # "history". None (or omitted) starts a fresh conversation.
+    history: list[dict] | None = None
+
+
+def _json_default(o):
+    if hasattr(o, "model_dump"):
+        return o.model_dump()
+    raise TypeError(f"not serializable: {type(o)}")
 
 
 def _sse(obj: dict) -> str:
-    return f"data: {json.dumps(obj)}\n\n"
-
-
-def _text_of(content) -> str:
-    """Flatten a v1-shaped message content field (str, or a list of text/image
-    blocks) down to its plain text. Images are dropped — server-v3 has no
-    vision path."""
-    if isinstance(content, str):
-        return content
-    if isinstance(content, list):
-        return "\n".join(
-            b.get("text", "")
-            for b in content
-            if isinstance(b, dict) and b.get("type") == "text"
-        )
-    return ""
-
-
-def _to_plain_messages(raw: list[dict]) -> list[dict]:
-    return [{"role": m.get("role"), "content": _text_of(m.get("content"))} for m in raw]
+    return f"data: {json.dumps(obj, default=_json_default)}\n\n"
 
 
 @app.post("/v1/register")
@@ -81,7 +77,7 @@ async def register():
 async def chat(req: ChatRequest):
     async def stream():
         try:
-            messages = _to_plain_messages(req.messages)
+            messages = list(req.history or []) + [{"role": "user", "content": req.message}]
             result = await respond(messages)
             yield _sse({"type": "chunk", "text": result.text})
             yield _sse({
@@ -95,6 +91,7 @@ async def chat(req: ChatRequest):
                 "element": "",
                 "search_term": "",
                 "walkthrough_steps": result.walkthrough_steps or [],
+                "history": result.messages,
             })
         except Exception as e:
             yield _sse({"type": "error", "message": f"{type(e).__name__}: {e}"})
