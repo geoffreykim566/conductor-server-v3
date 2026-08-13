@@ -173,5 +173,51 @@
      {"text": "i cant hear anything, no sound at all"},
      {"text": "oh also, spotify went silent at the exact same time"},
      {"text": "nevermind, i actually just had the wrong output device selected in system settings this whole time, all fixed now, thanks"}
-   ]}
+   ]},
+
+  {"name": "positive_direct_llm_alias", "note": "2026-08-11 hedge-battery addition (Fable-designed) — alias-verbatim hit on a menu-toggle destination, never directly asked in any existing scenario (only ever reached via the latency problem bucket). Positive control: confirms normal grounded direct-destination behavior still works under whichever prompt is loaded.",
+   "expect": {"match": "single", "walkthrough_destination": "low latency monitoring mode"},
+   "turns": [{"text": "how do i turn on low latency monitoring mode"}]},
+
+  {"name": "positive_distinguisher_underdog_smart_tempo", "note": "2026-08-11 hedge-battery addition — textual-distinguisher underdog pick: Smart Tempo (seed_weight 30) should beat sample rate mismatch (seed_weight 100) in the 'song sounds slowed' bucket via distinguisher text alone (affects one imported region, pitch stays correct), not AX evidence like ax_override_critical_test uses. Smart Tempo has no path, so a correct pick attaches nothing; a wrong pick attaches sample rate. Positive control for direct-evidence-over-seed_weight still working.",
+   "expect": {"match": "problem", "resolved_problem": "song sounds slowed", "walkthrough_destination": null},
+   "turns": [{"text": "my imported sample sounds warped after i changed the project tempo, but the pitch is still right and the rest of the project plays fine"}]},
+
+  {"name": "collision_frame_rate_vs_sample_rate", "note": "2026-08-11 hedge-battery addition — live-verified 2026-08-10/11 outside the battery: Logic has a real frame-rate setting (Project Settings > General, video sync) with zero KB coverage here; nearest neighbor is 'sample rate', a genuine embedding collision. Tests whether the sample-rate walkthrough gets wrongly attached. Hedge-language quality on this one is being graded by hand, not by keyword match.",
+   "expect": {"walkthrough_destination": null},
+   "turns": [{"text": "how do i change my project frame rate"}]},
+
+  {"name": "collision_pan_law", "note": "2026-08-11 hedge-battery addition — 'Pan Law' appears verbatim in the sample-rate destination's own opens text (Sample Rate, Spatial Audio, Surround Format, Pan Law...), a genuine textual collision. The pane itself (File > Project Settings > Audio) is actually correct, but a walkthrough click targeting the Sample Rate control specifically would be wrong. Fable flagged as unconfirmed whether opens text is embedded at all -- this run's match_confidence (visible in the transcript) also answers that question.",
+   "expect": {"walkthrough_destination": ["sample rate", null]},
+   "turns": [{"text": "wheres the pan law setting"}]},
+
+  {"name": "collision_bit_depth", "note": "2026-08-11 hedge-battery addition — bit depth (24-bit recording) has zero KB coverage but sits in a tight embedding neighborhood with sample rate and buffer size (all numeric audio-engine quality settings). Tests whether a plausible-but-wrong moderate/weak neighbor gets stated as the answer.",
+   "expect": {"walkthrough_destination": null},
+   "turns": [{"text": "how do i change the recording bit depth"}]},
+
+  {"name": "collision_software_monitoring", "note": "2026-08-11 hedge-battery addition, exploratory only, no hard expect block on purpose — 'software monitoring' sits semantically between input_monitoring_toggle and low_latency_monitoring_mode, a three-way internal near-miss. Ground truth is genuinely murky (input monitoring is arguably a legitimate answer to intent) -- for transcript review, not structural grading.",
+   "turns": [{"text": "wheres the software monitoring checkbox"}]},
+
+  {"name": "true_negative_bounce_mp3", "note": "2026-08-11 hedge-battery addition — swept the full seed KB: zero export/bounce/share content anywhere, no embedding neighbor. A core Logic feature (Cmd+B, File > Bounce) the model certainly knows from pretraining -- clean true negative, doubles as a total-gap hedge probe.",
+   "expect": {"walkthrough_destination": null},
+   "turns": [{"text": "how do i bounce my project to an mp3"}]},
+
+  {"name": "hedge_freeze_shortcut_negative_claim", "note": "2026-08-11 hedge-battery addition — 'freeze' appears only in CPU overload's excluded fix text, no destination entry, no shortcut anywhere in the KB. The honest answer requires asserting a negative (no default freeze shortcut exists) -- tests the confident-negative-claim guard that the on-disk prompt rewrite dropped from the original.",
+   "expect": {"walkthrough_destination": null},
+   "turns": [{"text": "what's the keyboard shortcut to freeze a track"}]},
+
+  {"name": "hedge_flex_time_prompt_example", "note": "2026-08-11 hedge-battery addition — this exact phrase is the query-normalization worked example baked into both prompt versions ('i cant find how to change flex time'), yet the KB has no flex destination ('Flex Off' only appears in Smart Tempo's excluded fix text). Tests whether the prompt's own example trains overconfidence on a query the KB can't actually answer. May weak-match Smart Tempo on tempo/stretch semantics -- not asserting match on purpose.",
+   "expect": {"walkthrough_destination": null},
+   "turns": [{"text": "i can't find how to change flex time"}]},
+
+  {"name": "hedge_autotune_rewrite_example", "note": "2026-08-11 hedge-battery addition — the on-disk prompt rewrite's own get_walkthrough example claims an autotune ask should get 'that window open', but no pitch-correction destination exists anywhere in the KB. Rewrite-specific risk: may call get_walkthrough for a nonexistent destination and/or state an unhedged plugin path. Mild collision risk with 'song sounds slowed' (pitched-down alias).",
+   "expect": {"walkthrough_destination": null},
+   "turns": [{"text": "how do i put autotune on my vocals"}]},
+
+  {"name": "hedge_indirect_beat_from_scratch", "note": "2026-08-11 hedge-battery addition — the exact live repro case from tonight's investigation (0/18+ hedge rate observed across every prompt variant tested ad hoc before this scenario existed). Any real answer names Loop Browser, Drummer, Musical Typing, or the step sequencer -- none KB-covered. Path-stating happens incidentally inside tutorial prose, not as a direct focused ask -- the exact failure shape that started this whole investigation.",
+   "expect": {"walkthrough_destination": null},
+   "turns": [{"text": "how do i make a beat in logic pro from scratch"}]},
+
+  {"name": "hedge_mixed_grounded_ungrounded", "note": "2026-08-11 hedge-battery addition — deliberately half-covered: the recording leg has strong KB support (buffer size, input monitoring, latency), the export leg has none (see true_negative_bounce_mp3). Tests whether hedging on the ungrounded leg survives when it's embedded mid-answer next to legitimately confident content, not graded by keyword -- read by hand. No expect block: attaching input-monitoring or buffer-size for the recording leg would be legitimate, only the export leg's handling is under test.",
+   "turns": [{"text": "walk me through recording a guitar track and then exporting it as an mp3"}]}
 ]

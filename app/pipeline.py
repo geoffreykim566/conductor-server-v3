@@ -137,6 +137,89 @@ def _backfill_walkthrough(messages: list[dict], text: str) -> dict | None:
     return {"destination": matches[0], "steps": attached_by_destination[matches[0]]}
 
 
+_HEDGE_PREFIX = (
+    "Note: I couldn't verify this against confirmed Logic Pro documentation, so treat "
+    "the following as general guidance rather than an exact path.\n\n"
+)
+
+
+def _needs_hedge(trace: list[dict], walkthrough_steps: list | None) -> bool:
+    """Deterministic backstop -- prompt-only hedge instructions held ~40-50% of the time
+    across live testing, 0% on broad/indirect questions specifically (2026-08-11).
+    Fires when this turn made a real attempt (a tool call) but never reached strong
+    grounding. Does NOT fire on zero tool calls -- can't distinguish a plain
+    conversational close from the separate, not-yet-fixed tool-skip gap."""
+    if walkthrough_steps is not None:
+        return False
+    if not trace:
+        return False
+    return not any(
+        c["tool"] == "lookup_concept" and c["output"].get("match_confidence") == "strong"
+        for c in trace
+    )
+
+
+def _is_grounded(trace: list[dict], walkthrough_steps: list | None) -> bool:
+    """True once this turn can no longer end up needing a hedge, regardless of what
+    happens later -- a walkthrough attach or a strong lookup hit, both permanent
+    once trace/walkthrough_steps get set (trace only grows; commit-to-one means
+    walkthrough_steps is set at most once). Used to decide, per iteration, whether
+    that iteration's text is safe to stream live or needs buffering (see
+    _call_model's on_chunk callers in respond()) -- distinct from _needs_hedge,
+    which answers "does the turn need a hedge *right now*" and treats an
+    empty/inconclusive trace as no (silently, not permanently) safe."""
+    if walkthrough_steps is not None:
+        return True
+    return any(
+        c["tool"] == "lookup_concept" and c["output"].get("match_confidence") == "strong"
+        for c in trace
+    )
+
+
+class _ChunkBuffer:
+    """Collects streamed text instead of forwarding it live, for the stretch of a
+    turn where grounding isn't yet decided -- see the streaming-hedge gap logged
+    2026-08-11/12: a real client sees raw model text the instant it's generated,
+    before the turn's grounding outcome (and therefore whether to hedge) is known.
+    Held chunks are released via flush() once that's decided, hedge-prefixed first
+    if needed, so the hedge always precedes the text it's warning about instead of
+    arriving after the client already rendered it live."""
+
+    def __init__(self) -> None:
+        self.chunks: list[str] = []
+
+    async def collect(self, text: str) -> None:
+        self.chunks.append(text)
+
+    async def flush(self, on_chunk: OnChunk) -> None:
+        for chunk in self.chunks:
+            await on_chunk(chunk)
+
+
+async def _finalize_answer(
+    trace: list[dict],
+    walkthrough_steps: list | None,
+    text: str,
+    buffer: "_ChunkBuffer | None",
+    on_chunk: OnChunk | None,
+) -> str:
+    """Called once this turn's final answer text is fully known (either the
+    no-more-tool-calls return or the MAX_ITERATIONS safety net). Applies the
+    hedge to the returned text as before, and -- new -- if that final iteration's
+    stream was buffered (grounding wasn't yet decided when it started), releases
+    it now: hedge chunk first if needed, then the buffered text, so a streaming
+    client sees the same hedge-before-answer ordering non-streaming callers get
+    from Result.text alone."""
+    hedge = _needs_hedge(trace, walkthrough_steps)
+    if hedge:
+        text = _HEDGE_PREFIX + text
+    if buffer is not None:
+        if hedge:
+            await on_chunk(_HEDGE_PREFIX)
+        await buffer.flush(on_chunk)
+    return text
+
+
 def _serialize_content(content: list) -> list[dict]:
     """SDK response content blocks -> plain request-shape dicts.
 
@@ -229,7 +312,17 @@ async def respond(
     system = [{"type": "text", "text": system_text, "cache_control": {"type": "ephemeral"}}]
 
     for _ in range(MAX_ITERATIONS):
-        resp = await _call_model(system, tools.TOOLS, msgs, on_chunk)
+        # Grounding not yet decided -> this iteration might turn out to be the
+        # final answer, so buffer it instead of streaming live (see
+        # _ChunkBuffer). Once grounded, it can never become un-grounded again
+        # this turn, so later iterations stream straight through unaffected.
+        buffer = None
+        iter_on_chunk = on_chunk
+        if on_chunk is not None and not _is_grounded(trace, walkthrough_steps):
+            buffer = _ChunkBuffer()
+            iter_on_chunk = buffer.collect
+
+        resp = await _call_model(system, tools.TOOLS, msgs, iter_on_chunk)
         usage.append(_usage_dict(resp.usage))
         tool_uses = [b for b in resp.content if b.type == "tool_use"]
 
@@ -250,7 +343,14 @@ async def respond(
                             "backfilled": True,
                         },
                     })
+            text = await _finalize_answer(trace, walkthrough_steps, text, buffer, on_chunk)
             return Result(text=text, walkthrough_steps=walkthrough_steps, trace=trace, messages=msgs, usage=usage)
+
+        # Not the final answer -- this iteration's text (if any) carries no hedge
+        # risk on its own, so release any buffered chunks immediately rather than
+        # holding them until the turn ends.
+        if buffer is not None:
+            await buffer.flush(on_chunk)
 
         msgs.append({"role": "assistant", "content": _serialize_content(resp.content)})
         tool_results = []
@@ -295,6 +395,11 @@ async def respond(
     # Safety net: never return a truly empty response, regardless of why the
     # loop didn't converge on its own. Force one final tools-off call so the
     # model must synthesize whatever it already learned into a real answer.
+    buffer = None
+    final_on_chunk = on_chunk
+    if on_chunk is not None and not _is_grounded(trace, walkthrough_steps):
+        buffer = _ChunkBuffer()
+        final_on_chunk = buffer.collect
     final = await _call_model(
         system + [{
             "type": "text",
@@ -302,7 +407,7 @@ async def respond(
         }],
         None,
         msgs,
-        on_chunk,
+        final_on_chunk,
     )
     usage.append(_usage_dict(final.usage))
     text = "".join(b.text for b in final.content if b.type == "text")
@@ -313,4 +418,5 @@ async def respond(
     # can never be empty here, and _backfill_walkthrough only ever fires on a
     # turn with zero tool calls. A backfill check here was dead code (found via
     # Fable review, 2026-08-06) and has been removed rather than left in place.
+    text = await _finalize_answer(trace, walkthrough_steps, text, buffer, on_chunk)
     return Result(text=text, walkthrough_steps=walkthrough_steps, trace=trace, messages=msgs, usage=usage)
