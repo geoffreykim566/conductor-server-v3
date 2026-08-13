@@ -66,6 +66,57 @@ _REASK_SIGNALS = (
     "lost the window",
 )
 
+# Plain acknowledgments/closers -- carved out of the iteration-0 forced
+# lookup_concept call (see _needs_first_lookup below) so a "thanks!" turn
+# doesn't force the model to invent a fake problem query just to satisfy a
+# tool call it has nothing real to make. Exact substring match, same
+# deliberately simple approach as _REASK_SIGNALS above -- hand-curated rather
+# than pulled from an existing list (checked: Rasa's built-in "thankyou"
+# intent is voice-transcript ASR training data full of filler noise like "uh
+# thank you good bye", not a clean fit for exact matching). A typo'd close
+# ("tahnks") just eats one wasted lookup call, not worth fuzzy-matching for.
+_CLOSING_SIGNALS = (
+    "thanks", "thank you", "thx", "ty",
+    "got it", "sounds good", "cool", "perfect", "great", "awesome",
+    "ok", "okay", "no more questions", "that's all", "im good", "i'm good",
+    "bye", "goodbye", "see ya",
+)
+
+
+def _last_user_message_matches(messages: list[dict], signals: tuple[str, ...]) -> bool:
+    """True if the most recent message is a user turn whose text contains any of
+    the given signal phrases (case/apostrophe-insensitive substring match)."""
+    if not messages or messages[-1].get("role") != "user":
+        return False
+    user_text = messages[-1].get("content")
+    if not isinstance(user_text, str):
+        return False
+    normalized = user_text.lower().replace("'", "")
+    return any(sig in normalized for sig in signals)
+
+
+def _needs_first_lookup(messages: list[dict]) -> bool:
+    """Tool-skip gap fix: without this, the model is free to answer a real
+    question with zero lookup_concept calls, and _needs_hedge() deliberately
+    stays silent on an empty trace (can't tell that apart from a normal
+    closing turn) -- so those answers ship with full confidence and no KB
+    grounding at all (found live 2026-08-09, the "how do i make a beat"
+    query). Fix is to force lookup_concept on the turn's first iteration
+    instead of leaving it to the model's judgment -- same "code, not a prompt
+    request" lesson as _needs_hedge itself.
+
+    Carved out for two different reasons, not one:
+    - _REASK_SIGNALS: forcing a fresh lookup here would starve
+      _backfill_walkthrough, which only fires on a turn with zero tool calls.
+    - _CLOSING_SIGNALS: nothing real to look up on a plain "thanks"/"ok" turn;
+      forcing one just makes the model invent a query to satisfy the tool.
+    """
+    if _last_user_message_matches(messages, _REASK_SIGNALS):
+        return False
+    if _last_user_message_matches(messages, _CLOSING_SIGNALS):
+        return False
+    return True
+
 
 def _backfill_walkthrough(messages: list[dict], text: str) -> dict | None:
     """Commit-to-one is scoped per turn, so a turn that attaches nothing normally
@@ -108,13 +159,7 @@ def _backfill_walkthrough(messages: list[dict], text: str) -> dict | None:
     possibly several, not deciding *whether* to backfill at all); zero or multiple
     matches are left alone rather than guessed.
     """
-    if not messages or messages[-1].get("role") != "user":
-        return None
-    user_text = messages[-1].get("content")
-    if not isinstance(user_text, str):
-        return None
-    normalized = user_text.lower().replace("'", "")
-    if not any(sig in normalized for sig in _REASK_SIGNALS):
+    if not _last_user_message_matches(messages, _REASK_SIGNALS):
         return None
 
     attached_by_destination: dict[str, list] = {}
@@ -256,7 +301,13 @@ def _usage_dict(u) -> dict:
     }
 
 
-async def _call_model(system: list[dict], tools_param: list[dict] | None, msgs: list[dict], on_chunk: OnChunk | None):
+async def _call_model(
+    system: list[dict],
+    tools_param: list[dict] | None,
+    msgs: list[dict],
+    on_chunk: OnChunk | None,
+    tool_choice: dict | None = None,
+):
     """One messages.create call, or the streamed equivalent when on_chunk is given.
 
     Streaming path forwards every text delta from every iteration (not just the
@@ -266,10 +317,17 @@ async def _call_model(system: list[dict], tools_param: list[dict] | None, msgs: 
     caller except api.py — the battery runner, drive_turn, and the mocked unit
     tests) this still calls _client.messages.create directly, unchanged, so
     existing mocks (which patch that exact method) keep working.
+
+    tool_choice forces a specific tool instead of leaving the model free to
+    answer with no tool call at all -- used for the iteration-0 forced
+    lookup_concept call (see _needs_first_lookup). Only meaningful alongside
+    tools_param; unset on every other call site.
     """
     kwargs = dict(model=MODEL, max_tokens=MAX_TOKENS, system=system, messages=msgs)
     if tools_param is not None:
         kwargs["tools"] = tools_param
+    if tool_choice is not None:
+        kwargs["tool_choice"] = tool_choice
     if on_chunk is None:
         return await _client.messages.create(**kwargs)
     async with _client.messages.stream(**kwargs) as stream:
@@ -311,7 +369,14 @@ async def respond(
     # uncached block so it still hits this same cache entry.
     system = [{"type": "text", "text": system_text, "cache_control": {"type": "ephemeral"}}]
 
-    for _ in range(MAX_ITERATIONS):
+    # Tool-skip gap fix: force lookup_concept on this turn's first iteration
+    # (see _needs_first_lookup) instead of leaving "call a tool at all" up to
+    # the model's judgment. Decided once, up front, against the original
+    # `messages` param -- same turn-defining message _backfill_walkthrough
+    # itself checks.
+    force_first_lookup = _needs_first_lookup(messages)
+
+    for i in range(MAX_ITERATIONS):
         # Grounding not yet decided -> this iteration might turn out to be the
         # final answer, so buffer it instead of streaming live (see
         # _ChunkBuffer). Once grounded, it can never become un-grounded again
@@ -322,7 +387,10 @@ async def respond(
             buffer = _ChunkBuffer()
             iter_on_chunk = buffer.collect
 
-        resp = await _call_model(system, tools.TOOLS, msgs, iter_on_chunk)
+        tool_choice = None
+        if i == 0 and force_first_lookup:
+            tool_choice = {"type": "tool", "name": "lookup_concept"}
+        resp = await _call_model(system, tools.TOOLS, msgs, iter_on_chunk, tool_choice)
         usage.append(_usage_dict(resp.usage))
         tool_uses = [b for b in resp.content if b.type == "tool_use"]
 
