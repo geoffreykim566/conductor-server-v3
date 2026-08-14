@@ -1,0 +1,2376 @@
+[
+  {
+    "group": "mechanism_named",
+    "query": "sample rate mismatch",
+    "expect_problem": null,
+    "resolved_problem": "song sounds slowed",
+    "match": "problem",
+    "match_confidence": "strong",
+    "routing_path": "solution_top_then_parent",
+    "top2_margin": 0.069,
+    "top8": [
+      {
+        "name": "sample rate mismatch",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.3122
+      },
+      {
+        "name": "sample rate",
+        "src": "solution",
+        "sol_kind": "destination",
+        "distance": 0.3813
+      },
+      {
+        "name": "song sounds slowed",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.4911
+      },
+      {
+        "name": "recording latency and monitoring delay",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.509
+      },
+      {
+        "name": "high latency while monitoring",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5128
+      },
+      {
+        "name": "buffer size",
+        "src": "solution",
+        "sol_kind": "destination",
+        "distance": 0.5187
+      },
+      {
+        "name": "Smart Tempo stretching imported audio",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5234
+      },
+      {
+        "name": "crackling during playback",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5241
+      }
+    ],
+    "solutions_returned": [
+      "sample rate mismatch",
+      "Smart Tempo stretching imported audio"
+    ]
+  },
+  {
+    "group": "mechanism_named",
+    "query": "Smart Tempo stretching imported audio",
+    "expect_problem": null,
+    "resolved_problem": "song sounds slowed",
+    "match": "problem",
+    "match_confidence": "strong",
+    "routing_path": "solution_top_then_parent",
+    "top2_margin": 0.2464,
+    "top8": [
+      {
+        "name": "Smart Tempo stretching imported audio",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.2692
+      },
+      {
+        "name": "song sounds slowed",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5157
+      },
+      {
+        "name": "sample rate",
+        "src": "solution",
+        "sol_kind": "destination",
+        "distance": 0.5207
+      },
+      {
+        "name": "sample rate mismatch",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5314
+      },
+      {
+        "name": "high latency while monitoring",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5834
+      },
+      {
+        "name": "audio settings",
+        "src": "solution",
+        "sol_kind": "destination",
+        "distance": 0.586
+      },
+      {
+        "name": "buffer size",
+        "src": "solution",
+        "sol_kind": "destination",
+        "distance": 0.5878
+      },
+      {
+        "name": "deep bass",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5982
+      }
+    ],
+    "solutions_returned": [
+      "sample rate mismatch",
+      "Smart Tempo stretching imported audio"
+    ]
+  },
+  {
+    "group": "mechanism_named",
+    "query": "muddy bass",
+    "expect_problem": null,
+    "resolved_problem": "mix sounds muddy",
+    "match": "problem",
+    "match_confidence": "strong",
+    "routing_path": "solution_top_then_parent",
+    "top2_margin": 0.0951,
+    "top8": [
+      {
+        "name": "muddy bass",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.3436
+      },
+      {
+        "name": "muddy vocals",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.4386
+      },
+      {
+        "name": "mix sounds muddy",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.4511
+      },
+      {
+        "name": "deep bass",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.4783
+      },
+      {
+        "name": "kick and bass clash",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.4794
+      },
+      {
+        "name": "song sounds thin or hollow",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5281
+      },
+      {
+        "name": "mix collapses in mono",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5369
+      },
+      {
+        "name": "sample rate mismatch",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5568
+      }
+    ],
+    "solutions_returned": [
+      "muddy bass",
+      "muddy vocals",
+      "kick and bass clash"
+    ]
+  },
+  {
+    "group": "mechanism_named",
+    "query": "muddy vocals",
+    "expect_problem": null,
+    "resolved_problem": "mix sounds muddy",
+    "match": "problem",
+    "match_confidence": "strong",
+    "routing_path": "solution_top_then_parent",
+    "top2_margin": 0.0806,
+    "top8": [
+      {
+        "name": "muddy vocals",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.3078
+      },
+      {
+        "name": "muddy bass",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.3884
+      },
+      {
+        "name": "mix sounds muddy",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.4047
+      },
+      {
+        "name": "song sounds thin or hollow",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.4687
+      },
+      {
+        "name": "deep bass",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.4944
+      },
+      {
+        "name": "mix collapses in mono",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.4973
+      },
+      {
+        "name": "sample rate mismatch",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5125
+      },
+      {
+        "name": "high latency while monitoring",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5154
+      }
+    ],
+    "solutions_returned": [
+      "muddy bass",
+      "muddy vocals",
+      "kick and bass clash"
+    ]
+  },
+  {
+    "group": "mechanism_named",
+    "query": "kick and bass clash",
+    "expect_problem": null,
+    "resolved_problem": "mix sounds muddy",
+    "match": "problem",
+    "match_confidence": "strong",
+    "routing_path": "solution_top_then_parent",
+    "top2_margin": 0.2125,
+    "top8": [
+      {
+        "name": "kick and bass clash",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.3167
+      },
+      {
+        "name": "muddy bass",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5292
+      },
+      {
+        "name": "sample rate mismatch",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5493
+      },
+      {
+        "name": "deep bass",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5531
+      },
+      {
+        "name": "mix collapses in mono",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5661
+      },
+      {
+        "name": "mix sounds muddy",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5677
+      },
+      {
+        "name": "song sounds slowed",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5944
+      },
+      {
+        "name": "song sounds thin or hollow",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5956
+      }
+    ],
+    "solutions_returned": [
+      "muddy bass",
+      "muddy vocals",
+      "kick and bass clash"
+    ]
+  },
+  {
+    "group": "mechanism_named",
+    "query": "deep bass",
+    "expect_problem": null,
+    "resolved_problem": "song sounds thin or hollow",
+    "match": "problem",
+    "match_confidence": "strong",
+    "routing_path": "solution_top_then_parent",
+    "top2_margin": 0.0494,
+    "top8": [
+      {
+        "name": "deep bass",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.3148
+      },
+      {
+        "name": "muddy bass",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.3642
+      },
+      {
+        "name": "kick and bass clash",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.4207
+      },
+      {
+        "name": "muddy vocals",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.4649
+      },
+      {
+        "name": "mix sounds muddy",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.4957
+      },
+      {
+        "name": "wide mix",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.4977
+      },
+      {
+        "name": "mix collapses in mono",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5007
+      },
+      {
+        "name": "song sounds thin or hollow",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5021
+      }
+    ],
+    "solutions_returned": [
+      "deep bass",
+      "wide mix",
+      "mix collapses in mono"
+    ]
+  },
+  {
+    "group": "mechanism_named",
+    "query": "wide mix",
+    "expect_problem": null,
+    "resolved_problem": "song sounds thin or hollow",
+    "match": "problem",
+    "match_confidence": "strong",
+    "routing_path": "solution_top_then_parent",
+    "top2_margin": 0.1517,
+    "top8": [
+      {
+        "name": "wide mix",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.3266
+      },
+      {
+        "name": "mix collapses in mono",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.4784
+      },
+      {
+        "name": "mix sounds muddy",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5531
+      },
+      {
+        "name": "muddy bass",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5755
+      },
+      {
+        "name": "song sounds thin or hollow",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5769
+      },
+      {
+        "name": "sample rate mismatch",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5871
+      },
+      {
+        "name": "kick and bass clash",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5892
+      },
+      {
+        "name": "deep bass",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5897
+      }
+    ],
+    "solutions_returned": [
+      "deep bass",
+      "wide mix",
+      "mix collapses in mono"
+    ]
+  },
+  {
+    "group": "mechanism_named",
+    "query": "mix collapses in mono",
+    "expect_problem": null,
+    "resolved_problem": "song sounds thin or hollow",
+    "match": "problem",
+    "match_confidence": "strong",
+    "routing_path": "solution_top_then_parent",
+    "top2_margin": 0.2185,
+    "top8": [
+      {
+        "name": "mix collapses in mono",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.3465
+      },
+      {
+        "name": "mix sounds muddy",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.565
+      },
+      {
+        "name": "song sounds thin or hollow",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.578
+      },
+      {
+        "name": "wide mix",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.6026
+      },
+      {
+        "name": "sample rate mismatch",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.6392
+      },
+      {
+        "name": "kick and bass clash",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.6453
+      },
+      {
+        "name": "Core Audio goes silent mid-session",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.6464
+      },
+      {
+        "name": "muddy bass",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.6553
+      }
+    ],
+    "solutions_returned": [
+      "deep bass",
+      "wide mix",
+      "mix collapses in mono"
+    ]
+  },
+  {
+    "group": "mechanism_named",
+    "query": "no sound output",
+    "expect_problem": null,
+    "resolved_problem": "no sound / silent output",
+    "match": "problem",
+    "match_confidence": "strong",
+    "routing_path": "solution_top_then_parent",
+    "top2_margin": 0.1141,
+    "top8": [
+      {
+        "name": "no sound output",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.2271
+      },
+      {
+        "name": "no sound / silent output",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.3412
+      },
+      {
+        "name": "Core Audio goes silent mid-session",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.3867
+      },
+      {
+        "name": "deep bass",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.4424
+      },
+      {
+        "name": "muddy bass",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.4442
+      },
+      {
+        "name": "muddy vocals",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.4459
+      },
+      {
+        "name": "sample rate mismatch",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.4581
+      },
+      {
+        "name": "song sounds thin or hollow",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.4645
+      }
+    ],
+    "solutions_returned": [
+      "no sound output",
+      "Core Audio goes silent mid-session",
+      "audio interface not recognized in Logic"
+    ]
+  },
+  {
+    "group": "mechanism_named",
+    "query": "Core Audio goes silent mid-session",
+    "expect_problem": null,
+    "resolved_problem": "no sound / silent output",
+    "match": "problem",
+    "match_confidence": "strong",
+    "routing_path": "solution_top_then_parent",
+    "top2_margin": 0.2109,
+    "top8": [
+      {
+        "name": "Core Audio goes silent mid-session",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.3332
+      },
+      {
+        "name": "no sound / silent output",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5441
+      },
+      {
+        "name": "audio settings",
+        "src": "solution",
+        "sol_kind": "destination",
+        "distance": 0.5713
+      },
+      {
+        "name": "recording is silent / mic not picking up",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5779
+      },
+      {
+        "name": "audio interface not recognized in Logic",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5819
+      },
+      {
+        "name": "no sound output",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5925
+      },
+      {
+        "name": "sample rate mismatch",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.593
+      },
+      {
+        "name": "crackling during playback",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5967
+      }
+    ],
+    "solutions_returned": [
+      "no sound output",
+      "Core Audio goes silent mid-session",
+      "audio interface not recognized in Logic"
+    ]
+  },
+  {
+    "group": "mechanism_named",
+    "query": "audio interface not recognized in Logic",
+    "expect_problem": null,
+    "resolved_problem": "recording is silent / mic not picking up",
+    "match": "problem",
+    "match_confidence": "strong",
+    "routing_path": "solution_top_then_parent",
+    "top2_margin": 0.1557,
+    "top8": [
+      {
+        "name": "audio interface not recognized in Logic",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.3051
+      },
+      {
+        "name": "audio settings",
+        "src": "solution",
+        "sol_kind": "destination",
+        "distance": 0.4607
+      },
+      {
+        "name": "high latency while monitoring",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.4878
+      },
+      {
+        "name": "recording is silent / mic not picking up",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.4879
+      },
+      {
+        "name": "Core Audio goes silent mid-session",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5088
+      },
+      {
+        "name": "no sound / silent output",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5169
+      },
+      {
+        "name": "sample rate mismatch",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5228
+      },
+      {
+        "name": "crackling during playback",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5414
+      }
+    ],
+    "solutions_returned": [
+      "microphone permissions",
+      "audio interface not recognized in Logic"
+    ]
+  },
+  {
+    "group": "mechanism_named",
+    "query": "microphone permissions",
+    "expect_problem": null,
+    "resolved_problem": "recording is silent / mic not picking up",
+    "match": "problem",
+    "match_confidence": "strong",
+    "routing_path": "solution_top_then_parent",
+    "top2_margin": 0.1697,
+    "top8": [
+      {
+        "name": "microphone permissions",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.247
+      },
+      {
+        "name": "recording is silent / mic not picking up",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.4167
+      },
+      {
+        "name": "audio settings",
+        "src": "solution",
+        "sol_kind": "destination",
+        "distance": 0.4264
+      },
+      {
+        "name": "Core Audio goes silent mid-session",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.4441
+      },
+      {
+        "name": "no sound output",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.4514
+      },
+      {
+        "name": "sample rate mismatch",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.4563
+      },
+      {
+        "name": "sample rate",
+        "src": "solution",
+        "sol_kind": "destination",
+        "distance": 0.4613
+      },
+      {
+        "name": "recording latency and monitoring delay",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.4655
+      }
+    ],
+    "solutions_returned": [
+      "microphone permissions",
+      "audio interface not recognized in Logic"
+    ]
+  },
+  {
+    "group": "mechanism_named",
+    "query": "recording latency and monitoring delay",
+    "expect_problem": null,
+    "resolved_problem": "high latency while monitoring",
+    "match": "problem",
+    "match_confidence": "strong",
+    "routing_path": "solution_top_then_parent",
+    "top2_margin": 0.0697,
+    "top8": [
+      {
+        "name": "recording latency and monitoring delay",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.3792
+      },
+      {
+        "name": "high latency while monitoring",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.4489
+      },
+      {
+        "name": "low latency monitoring mode",
+        "src": "solution",
+        "sol_kind": "destination",
+        "distance": 0.4713
+      },
+      {
+        "name": "recording is silent / mic not picking up",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5807
+      },
+      {
+        "name": "input monitoring toggle",
+        "src": "solution",
+        "sol_kind": "destination",
+        "distance": 0.5809
+      },
+      {
+        "name": "sample rate",
+        "src": "solution",
+        "sol_kind": "destination",
+        "distance": 0.5963
+      },
+      {
+        "name": "sample rate mismatch",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5994
+      },
+      {
+        "name": "buffer size",
+        "src": "solution",
+        "sol_kind": "destination",
+        "distance": 0.6242
+      }
+    ],
+    "solutions_returned": [
+      "recording latency and monitoring delay"
+    ]
+  },
+  {
+    "group": "mechanism_named",
+    "query": "CPU overload",
+    "expect_problem": null,
+    "resolved_problem": "crackling during playback",
+    "match": "problem",
+    "match_confidence": "strong",
+    "routing_path": "solution_top_then_parent",
+    "top2_margin": 0.0106,
+    "top8": [
+      {
+        "name": "CPU overload",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.3568
+      },
+      {
+        "name": "system overload / CPU message",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.3674
+      },
+      {
+        "name": "system overload on Apple Silicon Mac",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.414
+      },
+      {
+        "name": "processing threads",
+        "src": "solution",
+        "sol_kind": "destination",
+        "distance": 0.4819
+      },
+      {
+        "name": "Core Audio goes silent mid-session",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5484
+      },
+      {
+        "name": "recording latency and monitoring delay",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5486
+      },
+      {
+        "name": "sample rate mismatch",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5547
+      },
+      {
+        "name": "low latency monitoring mode",
+        "src": "solution",
+        "sol_kind": "destination",
+        "distance": 0.5654
+      }
+    ],
+    "solutions_returned": [
+      "CPU overload",
+      "sample rate mismatch"
+    ]
+  },
+  {
+    "group": "mechanism_named",
+    "query": "system overload on Apple Silicon Mac",
+    "expect_problem": null,
+    "resolved_problem": "system overload / CPU message",
+    "match": "problem",
+    "match_confidence": "strong",
+    "routing_path": "solution_top_then_parent",
+    "top2_margin": 0.1246,
+    "top8": [
+      {
+        "name": "system overload on Apple Silicon Mac",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.3284
+      },
+      {
+        "name": "system overload / CPU message",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.453
+      },
+      {
+        "name": "CPU overload",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.4762
+      },
+      {
+        "name": "Core Audio goes silent mid-session",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5682
+      },
+      {
+        "name": "processing threads",
+        "src": "solution",
+        "sol_kind": "destination",
+        "distance": 0.6107
+      },
+      {
+        "name": "audio interface not recognized in Logic",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.6126
+      },
+      {
+        "name": "high latency while monitoring",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.6141
+      },
+      {
+        "name": "recording latency and monitoring delay",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.6276
+      }
+    ],
+    "solutions_returned": [
+      "CPU overload",
+      "system overload on Apple Silicon Mac"
+    ]
+  },
+  {
+    "group": "novel_symptom_phrasing",
+    "query": "the whole track sounds like it's playing on the wrong turntable speed",
+    "expect_problem": null,
+    "resolved_problem": "song sounds slowed",
+    "match": "problem",
+    "match_confidence": "strong",
+    "routing_path": "problem_top",
+    "top2_margin": 0.1399,
+    "top8": [
+      {
+        "name": "song sounds slowed",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.3706
+      },
+      {
+        "name": "mix sounds muddy",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5105
+      },
+      {
+        "name": "sample rate mismatch",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5121
+      },
+      {
+        "name": "crackling during playback",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5403
+      },
+      {
+        "name": "sample rate",
+        "src": "solution",
+        "sol_kind": "destination",
+        "distance": 0.5415
+      },
+      {
+        "name": "song sounds thin or hollow",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5478
+      },
+      {
+        "name": "Smart Tempo stretching imported audio",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5572
+      },
+      {
+        "name": "kick and bass clash",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5696
+      }
+    ],
+    "solutions_returned": [
+      "sample rate mismatch",
+      "Smart Tempo stretching imported audio"
+    ]
+  },
+  {
+    "group": "novel_symptom_phrasing",
+    "query": "cant tell whats going on in the low end, its all blended together",
+    "expect_problem": null,
+    "resolved_problem": "mix sounds muddy",
+    "match": "problem",
+    "match_confidence": "moderate \u2014 treat with more skepticism, consider asking or trying a different phrasing",
+    "routing_path": "problem_top",
+    "top2_margin": 0.0542,
+    "top8": [
+      {
+        "name": "mix sounds muddy",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.4907
+      },
+      {
+        "name": "song sounds thin or hollow",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.545
+      },
+      {
+        "name": "muddy bass",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5789
+      },
+      {
+        "name": "mix collapses in mono",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5901
+      },
+      {
+        "name": "muddy vocals",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.6001
+      },
+      {
+        "name": "sample rate mismatch",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.6034
+      },
+      {
+        "name": "deep bass",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.6144
+      },
+      {
+        "name": "crackling during playback",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.6285
+      }
+    ],
+    "solutions_returned": [
+      "muddy bass",
+      "muddy vocals",
+      "kick and bass clash"
+    ]
+  },
+  {
+    "group": "novel_symptom_phrasing",
+    "query": "sounds paper thin coming out of my earbuds",
+    "expect_problem": null,
+    "resolved_problem": "song sounds thin or hollow",
+    "match": "problem",
+    "match_confidence": "moderate \u2014 treat with more skepticism, consider asking or trying a different phrasing",
+    "routing_path": "problem_top",
+    "top2_margin": 0.0867,
+    "top8": [
+      {
+        "name": "song sounds thin or hollow",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.4472
+      },
+      {
+        "name": "muddy vocals",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5339
+      },
+      {
+        "name": "muddy bass",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5446
+      },
+      {
+        "name": "mix sounds muddy",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5508
+      },
+      {
+        "name": "deep bass",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5643
+      },
+      {
+        "name": "no sound output",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5659
+      },
+      {
+        "name": "sample rate mismatch",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5881
+      },
+      {
+        "name": "Core Audio goes silent mid-session",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5885
+      }
+    ],
+    "solutions_returned": [
+      "deep bass",
+      "wide mix",
+      "mix collapses in mono"
+    ]
+  },
+  {
+    "group": "novel_symptom_phrasing",
+    "query": "dead silent, not a peep",
+    "expect_problem": null,
+    "resolved_problem": "no sound / silent output",
+    "match": "problem",
+    "match_confidence": "moderate \u2014 treat with more skepticism, consider asking or trying a different phrasing",
+    "routing_path": "solution_top_then_parent",
+    "top2_margin": 0.0128,
+    "top8": [
+      {
+        "name": "no sound output",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.4816
+      },
+      {
+        "name": "no sound / silent output",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.4943
+      },
+      {
+        "name": "Core Audio goes silent mid-session",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5149
+      },
+      {
+        "name": "deep bass",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5643
+      },
+      {
+        "name": "muddy vocals",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5645
+      },
+      {
+        "name": "muddy bass",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5795
+      },
+      {
+        "name": "mix collapses in mono",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.585
+      },
+      {
+        "name": "recording is silent / mic not picking up",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.6009
+      }
+    ],
+    "solutions_returned": [
+      "no sound output",
+      "Core Audio goes silent mid-session",
+      "audio interface not recognized in Logic"
+    ]
+  },
+  {
+    "group": "novel_symptom_phrasing",
+    "query": "recorded a whole take and theres nothing there",
+    "expect_problem": null,
+    "resolved_problem": "recording is silent / mic not picking up",
+    "match": "problem",
+    "match_confidence": "moderate \u2014 treat with more skepticism, consider asking or trying a different phrasing",
+    "routing_path": "problem_top",
+    "top2_margin": 0.0329,
+    "top8": [
+      {
+        "name": "recording is silent / mic not picking up",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.502
+      },
+      {
+        "name": "no sound / silent output",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5349
+      },
+      {
+        "name": "Core Audio goes silent mid-session",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5449
+      },
+      {
+        "name": "sample rate mismatch",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.548
+      },
+      {
+        "name": "song sounds thin or hollow",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5531
+      },
+      {
+        "name": "crackling during playback",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5631
+      },
+      {
+        "name": "audio interface not recognized in Logic",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5662
+      },
+      {
+        "name": "muddy vocals",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5666
+      }
+    ],
+    "solutions_returned": [
+      "microphone permissions",
+      "audio interface not recognized in Logic"
+    ]
+  },
+  {
+    "group": "novel_symptom_phrasing",
+    "query": "theres this annoying gap between when i sing and when i hear it",
+    "expect_problem": null,
+    "resolved_problem": "high latency while monitoring",
+    "match": "problem",
+    "match_confidence": "moderate \u2014 treat with more skepticism, consider asking or trying a different phrasing",
+    "routing_path": "problem_top",
+    "top2_margin": 0.0559,
+    "top8": [
+      {
+        "name": "high latency while monitoring",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.4399
+      },
+      {
+        "name": "song sounds thin or hollow",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.4957
+      },
+      {
+        "name": "sample rate mismatch",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5385
+      },
+      {
+        "name": "song sounds slowed",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5386
+      },
+      {
+        "name": "crackling during playback",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5555
+      },
+      {
+        "name": "muddy vocals",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5599
+      },
+      {
+        "name": "recording is silent / mic not picking up",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5613
+      },
+      {
+        "name": "sample rate",
+        "src": "solution",
+        "sol_kind": "destination",
+        "distance": 0.565
+      }
+    ],
+    "solutions_returned": [
+      "recording latency and monitoring delay"
+    ]
+  },
+  {
+    "group": "novel_symptom_phrasing",
+    "query": "logic just choked and threw an error",
+    "expect_problem": null,
+    "resolved_problem": "system overload / CPU message",
+    "match": "problem",
+    "match_confidence": "moderate \u2014 treat with more skepticism, consider asking or trying a different phrasing",
+    "routing_path": "problem_top",
+    "top2_margin": 0.045,
+    "top8": [
+      {
+        "name": "system overload / CPU message",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5597
+      },
+      {
+        "name": "audio interface not recognized in Logic",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.6047
+      },
+      {
+        "name": "system overload on Apple Silicon Mac",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.6139
+      },
+      {
+        "name": "CPU overload",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.6206
+      },
+      {
+        "name": "crackling during playback",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.6251
+      },
+      {
+        "name": "mix collapses in mono",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.6366
+      },
+      {
+        "name": "no sound / silent output",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.6433
+      },
+      {
+        "name": "sample rate mismatch",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.6475
+      }
+    ],
+    "solutions_returned": [
+      "CPU overload",
+      "system overload on Apple Silicon Mac"
+    ]
+  },
+  {
+    "group": "novel_symptom_phrasing",
+    "query": "my drums sound crunchy and broken up",
+    "expect_problem": null,
+    "resolved_problem": "mix sounds muddy",
+    "match": "problem",
+    "match_confidence": "moderate \u2014 treat with more skepticism, consider asking or trying a different phrasing",
+    "routing_path": "problem_top",
+    "top2_margin": 0.0162,
+    "top8": [
+      {
+        "name": "mix sounds muddy",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.532
+      },
+      {
+        "name": "song sounds thin or hollow",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5482
+      },
+      {
+        "name": "muddy bass",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5536
+      },
+      {
+        "name": "crackling during playback",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5716
+      },
+      {
+        "name": "kick and bass clash",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5798
+      },
+      {
+        "name": "muddy vocals",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5874
+      },
+      {
+        "name": "song sounds slowed",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5875
+      },
+      {
+        "name": "mix collapses in mono",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.609
+      }
+    ],
+    "solutions_returned": [
+      "muddy bass",
+      "muddy vocals",
+      "kick and bass clash"
+    ]
+  },
+  {
+    "group": "novel_symptom_phrasing",
+    "query": "vocals sound washed out and hard to make out",
+    "expect_problem": null,
+    "resolved_problem": "mix sounds muddy",
+    "match": "problem",
+    "match_confidence": "moderate \u2014 treat with more skepticism, consider asking or trying a different phrasing",
+    "routing_path": "solution_top_then_parent",
+    "top2_margin": 0.0419,
+    "top8": [
+      {
+        "name": "muddy vocals",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.4204
+      },
+      {
+        "name": "song sounds thin or hollow",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.4623
+      },
+      {
+        "name": "mix sounds muddy",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.4641
+      },
+      {
+        "name": "muddy bass",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5115
+      },
+      {
+        "name": "song sounds slowed",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5492
+      },
+      {
+        "name": "high latency while monitoring",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5535
+      },
+      {
+        "name": "sample rate mismatch",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5557
+      },
+      {
+        "name": "recording is silent / mic not picking up",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5694
+      }
+    ],
+    "solutions_returned": [
+      "muddy bass",
+      "muddy vocals",
+      "kick and bass clash"
+    ]
+  },
+  {
+    "group": "novel_symptom_phrasing",
+    "query": "song feels like it has no width, everything is centered",
+    "expect_problem": null,
+    "resolved_problem": "song sounds thin or hollow",
+    "match": "problem",
+    "match_confidence": "moderate \u2014 treat with more skepticism, consider asking or trying a different phrasing",
+    "routing_path": "problem_top",
+    "top2_margin": 0.0713,
+    "top8": [
+      {
+        "name": "song sounds thin or hollow",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5207
+      },
+      {
+        "name": "song sounds slowed",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5919
+      },
+      {
+        "name": "mix sounds muddy",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.6647
+      },
+      {
+        "name": "sample rate mismatch",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.6715
+      },
+      {
+        "name": "high latency while monitoring",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.6764
+      },
+      {
+        "name": "mix collapses in mono",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.6785
+      },
+      {
+        "name": "wide mix",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.6823
+      },
+      {
+        "name": "muddy vocals",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.6842
+      }
+    ],
+    "solutions_returned": [
+      "deep bass",
+      "wide mix",
+      "mix collapses in mono"
+    ]
+  },
+  {
+    "group": "wheres_x_near_diagnosis_vocab",
+    "query": "wheres buffer size",
+    "expect_problem": null,
+    "resolved_problem": "buffer size",
+    "match": "single",
+    "match_confidence": "moderate \u2014 treat with more skepticism, consider asking or trying a different phrasing",
+    "routing_path": "single",
+    "top2_margin": 0.1132,
+    "top8": [
+      {
+        "name": "buffer size",
+        "src": "solution",
+        "sol_kind": "destination",
+        "distance": 0.4869
+      },
+      {
+        "name": "wide mix",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.6001
+      },
+      {
+        "name": "sample rate mismatch",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.6427
+      },
+      {
+        "name": "low latency monitoring mode",
+        "src": "solution",
+        "sol_kind": "destination",
+        "distance": 0.6544
+      },
+      {
+        "name": "recording latency and monitoring delay",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.6604
+      },
+      {
+        "name": "processing threads",
+        "src": "solution",
+        "sol_kind": "destination",
+        "distance": 0.6627
+      },
+      {
+        "name": "sample rate",
+        "src": "solution",
+        "sol_kind": "destination",
+        "distance": 0.6669
+      },
+      {
+        "name": "input monitoring toggle",
+        "src": "solution",
+        "sol_kind": "destination",
+        "distance": 0.6733
+      }
+    ],
+    "solutions_returned": [
+      "buffer size"
+    ]
+  },
+  {
+    "group": "wheres_x_near_diagnosis_vocab",
+    "query": "wheres sample rate",
+    "expect_problem": null,
+    "resolved_problem": "sample rate",
+    "match": "single",
+    "match_confidence": "moderate \u2014 treat with more skepticism, consider asking or trying a different phrasing",
+    "routing_path": "single",
+    "top2_margin": 0.0748,
+    "top8": [
+      {
+        "name": "sample rate",
+        "src": "solution",
+        "sol_kind": "destination",
+        "distance": 0.4037
+      },
+      {
+        "name": "sample rate mismatch",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.4785
+      },
+      {
+        "name": "buffer size",
+        "src": "solution",
+        "sol_kind": "destination",
+        "distance": 0.4926
+      },
+      {
+        "name": "audio settings",
+        "src": "solution",
+        "sol_kind": "destination",
+        "distance": 0.5307
+      },
+      {
+        "name": "Smart Tempo stretching imported audio",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5357
+      },
+      {
+        "name": "deep bass",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5528
+      },
+      {
+        "name": "song sounds slowed",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5562
+      },
+      {
+        "name": "muddy bass",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5571
+      }
+    ],
+    "solutions_returned": [
+      "sample rate"
+    ]
+  },
+  {
+    "group": "wheres_x_near_diagnosis_vocab",
+    "query": "wheres processing threads",
+    "expect_problem": null,
+    "resolved_problem": "processing threads",
+    "match": "single",
+    "match_confidence": "moderate \u2014 treat with more skepticism, consider asking or trying a different phrasing",
+    "routing_path": "single",
+    "top2_margin": 0.1231,
+    "top8": [
+      {
+        "name": "processing threads",
+        "src": "solution",
+        "sol_kind": "destination",
+        "distance": 0.4707
+      },
+      {
+        "name": "CPU overload",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5938
+      },
+      {
+        "name": "recording latency and monitoring delay",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.6205
+      },
+      {
+        "name": "system overload / CPU message",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.6242
+      },
+      {
+        "name": "Core Audio goes silent mid-session",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.6251
+      },
+      {
+        "name": "system overload on Apple Silicon Mac",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.6267
+      },
+      {
+        "name": "input monitoring toggle",
+        "src": "solution",
+        "sol_kind": "destination",
+        "distance": 0.6317
+      },
+      {
+        "name": "low latency monitoring mode",
+        "src": "solution",
+        "sol_kind": "destination",
+        "distance": 0.6557
+      }
+    ],
+    "solutions_returned": [
+      "processing threads"
+    ]
+  },
+  {
+    "group": "wheres_x_near_diagnosis_vocab",
+    "query": "wheres low latency monitoring mode",
+    "expect_problem": null,
+    "resolved_problem": "low latency monitoring mode",
+    "match": "single",
+    "match_confidence": "strong",
+    "routing_path": "single",
+    "top2_margin": 0.1447,
+    "top8": [
+      {
+        "name": "low latency monitoring mode",
+        "src": "solution",
+        "sol_kind": "destination",
+        "distance": 0.3774
+      },
+      {
+        "name": "recording latency and monitoring delay",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5221
+      },
+      {
+        "name": "high latency while monitoring",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5566
+      },
+      {
+        "name": "input monitoring toggle",
+        "src": "solution",
+        "sol_kind": "destination",
+        "distance": 0.5642
+      },
+      {
+        "name": "Core Audio goes silent mid-session",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.6616
+      },
+      {
+        "name": "processing threads",
+        "src": "solution",
+        "sol_kind": "destination",
+        "distance": 0.6708
+      },
+      {
+        "name": "buffer size",
+        "src": "solution",
+        "sol_kind": "destination",
+        "distance": 0.6716
+      },
+      {
+        "name": "sample rate",
+        "src": "solution",
+        "sol_kind": "destination",
+        "distance": 0.675
+      }
+    ],
+    "solutions_returned": [
+      "low latency monitoring mode"
+    ]
+  },
+  {
+    "group": "wheres_x_near_diagnosis_vocab",
+    "query": "wheres input monitoring toggle",
+    "expect_problem": null,
+    "resolved_problem": "input monitoring toggle",
+    "match": "single",
+    "match_confidence": "moderate \u2014 treat with more skepticism, consider asking or trying a different phrasing",
+    "routing_path": "single",
+    "top2_margin": 0.1515,
+    "top8": [
+      {
+        "name": "input monitoring toggle",
+        "src": "solution",
+        "sol_kind": "destination",
+        "distance": 0.405
+      },
+      {
+        "name": "low latency monitoring mode",
+        "src": "solution",
+        "sol_kind": "destination",
+        "distance": 0.5565
+      },
+      {
+        "name": "recording latency and monitoring delay",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.6076
+      },
+      {
+        "name": "high latency while monitoring",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.6289
+      },
+      {
+        "name": "microphone permissions",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.656
+      },
+      {
+        "name": "audio settings",
+        "src": "solution",
+        "sol_kind": "destination",
+        "distance": 0.6599
+      },
+      {
+        "name": "recording is silent / mic not picking up",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.6621
+      },
+      {
+        "name": "Core Audio goes silent mid-session",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.6683
+      }
+    ],
+    "solutions_returned": [
+      "input monitoring toggle"
+    ]
+  },
+  {
+    "group": "wheres_x_near_diagnosis_vocab",
+    "query": "wheres audio settings",
+    "expect_problem": null,
+    "resolved_problem": "audio settings",
+    "match": "single",
+    "match_confidence": "strong",
+    "routing_path": "single",
+    "top2_margin": 0.0994,
+    "top8": [
+      {
+        "name": "audio settings",
+        "src": "solution",
+        "sol_kind": "destination",
+        "distance": 0.3403
+      },
+      {
+        "name": "buffer size",
+        "src": "solution",
+        "sol_kind": "destination",
+        "distance": 0.4397
+      },
+      {
+        "name": "sample rate",
+        "src": "solution",
+        "sol_kind": "destination",
+        "distance": 0.4448
+      },
+      {
+        "name": "no sound output",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.4872
+      },
+      {
+        "name": "no sound / silent output",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.4933
+      },
+      {
+        "name": "Core Audio goes silent mid-session",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5009
+      },
+      {
+        "name": "microphone permissions",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5053
+      },
+      {
+        "name": "crackling during playback",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5069
+      }
+    ],
+    "solutions_returned": [
+      "audio settings"
+    ]
+  },
+  {
+    "group": "multi_parent_routing",
+    "query": "everything is pitched down and playing slow",
+    "expect_problem": "song sounds slowed",
+    "resolved_problem": "song sounds slowed",
+    "match": "problem",
+    "match_confidence": "moderate \u2014 treat with more skepticism, consider asking or trying a different phrasing",
+    "routing_path": "problem_top",
+    "top2_margin": 0.0532,
+    "top8": [
+      {
+        "name": "song sounds slowed",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.4163
+      },
+      {
+        "name": "Smart Tempo stretching imported audio",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.4695
+      },
+      {
+        "name": "muddy bass",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.47
+      },
+      {
+        "name": "deep bass",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.4701
+      },
+      {
+        "name": "muddy vocals",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.4894
+      },
+      {
+        "name": "sample rate",
+        "src": "solution",
+        "sol_kind": "destination",
+        "distance": 0.494
+      },
+      {
+        "name": "kick and bass clash",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5057
+      },
+      {
+        "name": "no sound output",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5083
+      }
+    ],
+    "solutions_returned": [
+      "sample rate mismatch",
+      "Smart Tempo stretching imported audio"
+    ]
+  },
+  {
+    "group": "multi_parent_routing",
+    "query": "getting weird crackling pops during playback, happens no matter the project size",
+    "expect_problem": "crackling during playback",
+    "resolved_problem": "crackling during playback",
+    "match": "problem",
+    "match_confidence": "moderate \u2014 treat with more skepticism, consider asking or trying a different phrasing",
+    "routing_path": "problem_top",
+    "top2_margin": 0.1047,
+    "top8": [
+      {
+        "name": "crackling during playback",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.4141
+      },
+      {
+        "name": "sample rate",
+        "src": "solution",
+        "sol_kind": "destination",
+        "distance": 0.5188
+      },
+      {
+        "name": "song sounds slowed",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5288
+      },
+      {
+        "name": "song sounds thin or hollow",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5528
+      },
+      {
+        "name": "sample rate mismatch",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5625
+      },
+      {
+        "name": "high latency while monitoring",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5703
+      },
+      {
+        "name": "recording is silent / mic not picking up",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5726
+      },
+      {
+        "name": "no sound / silent output",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5777
+      }
+    ],
+    "solutions_returned": [
+      "CPU overload",
+      "sample rate mismatch"
+    ]
+  },
+  {
+    "group": "multi_parent_routing",
+    "query": "logic isnt seeing my audio interface at all, no sound anywhere",
+    "expect_problem": "no sound / silent output",
+    "resolved_problem": "recording is silent / mic not picking up",
+    "match": "problem",
+    "match_confidence": "strong",
+    "routing_path": "solution_top_then_parent",
+    "top2_margin": 0.0801,
+    "top8": [
+      {
+        "name": "audio interface not recognized in Logic",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.3768
+      },
+      {
+        "name": "no sound / silent output",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.4569
+      },
+      {
+        "name": "recording is silent / mic not picking up",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.4621
+      },
+      {
+        "name": "high latency while monitoring",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5053
+      },
+      {
+        "name": "audio settings",
+        "src": "solution",
+        "sol_kind": "destination",
+        "distance": 0.5083
+      },
+      {
+        "name": "Core Audio goes silent mid-session",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5303
+      },
+      {
+        "name": "crackling during playback",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5311
+      },
+      {
+        "name": "sample rate mismatch",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5809
+      }
+    ],
+    "solutions_returned": [
+      "microphone permissions",
+      "audio interface not recognized in Logic"
+    ]
+  },
+  {
+    "group": "multi_parent_routing",
+    "query": "my interface isnt showing up so i cant record my vocals",
+    "expect_problem": "recording is silent / mic not picking up",
+    "resolved_problem": "recording is silent / mic not picking up",
+    "match": "problem",
+    "match_confidence": "strong",
+    "routing_path": "solution_top_then_parent",
+    "top2_margin": 0.0475,
+    "top8": [
+      {
+        "name": "audio interface not recognized in Logic",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.3934
+      },
+      {
+        "name": "recording is silent / mic not picking up",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.4409
+      },
+      {
+        "name": "high latency while monitoring",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.4865
+      },
+      {
+        "name": "no sound / silent output",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5201
+      },
+      {
+        "name": "audio settings",
+        "src": "solution",
+        "sol_kind": "destination",
+        "distance": 0.5309
+      },
+      {
+        "name": "Core Audio goes silent mid-session",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.531
+      },
+      {
+        "name": "crackling during playback",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5497
+      },
+      {
+        "name": "sample rate mismatch",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5501
+      }
+    ],
+    "solutions_returned": [
+      "microphone permissions",
+      "audio interface not recognized in Logic"
+    ]
+  },
+  {
+    "group": "multi_parent_routing",
+    "query": "audio breaking up as my project gets bigger, cpu must be maxed",
+    "expect_problem": "crackling during playback",
+    "resolved_problem": "system overload / CPU message",
+    "match": "problem",
+    "match_confidence": "moderate \u2014 treat with more skepticism, consider asking or trying a different phrasing",
+    "routing_path": "problem_top",
+    "top2_margin": 0.0268,
+    "top8": [
+      {
+        "name": "system overload / CPU message",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.4958
+      },
+      {
+        "name": "sample rate",
+        "src": "solution",
+        "sol_kind": "destination",
+        "distance": 0.5226
+      },
+      {
+        "name": "crackling during playback",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5429
+      },
+      {
+        "name": "song sounds slowed",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5437
+      },
+      {
+        "name": "high latency while monitoring",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5554
+      },
+      {
+        "name": "Core Audio goes silent mid-session",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5656
+      },
+      {
+        "name": "song sounds thin or hollow",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5667
+      },
+      {
+        "name": "mix sounds muddy",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.5727
+      }
+    ],
+    "solutions_returned": [
+      "CPU overload",
+      "system overload on Apple Silicon Mac"
+    ]
+  },
+  {
+    "group": "multi_parent_routing",
+    "query": "getting the system overload popup message constantly",
+    "expect_problem": "system overload / CPU message",
+    "resolved_problem": "system overload / CPU message",
+    "match": "problem",
+    "match_confidence": "moderate \u2014 treat with more skepticism, consider asking or trying a different phrasing",
+    "routing_path": "problem_top",
+    "top2_margin": 0.1058,
+    "top8": [
+      {
+        "name": "system overload / CPU message",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.4256
+      },
+      {
+        "name": "system overload on Apple Silicon Mac",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5314
+      },
+      {
+        "name": "CPU overload",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.5387
+      },
+      {
+        "name": "crackling during playback",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.6519
+      },
+      {
+        "name": "sample rate mismatch",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.6578
+      },
+      {
+        "name": "audio interface not recognized in Logic",
+        "src": "solution",
+        "sol_kind": "diagnosis",
+        "distance": 0.6624
+      },
+      {
+        "name": "input monitoring toggle",
+        "src": "solution",
+        "sol_kind": "destination",
+        "distance": 0.666
+      },
+      {
+        "name": "high latency while monitoring",
+        "src": "problem",
+        "sol_kind": null,
+        "distance": 0.6689
+      }
+    ],
+    "solutions_returned": [
+      "CPU overload",
+      "system overload on Apple Silicon Mac"
+    ]
+  }
+]

@@ -16,32 +16,33 @@ SEED_FILE = Path(__file__).parent.parent / "seed" / "problems.json"
 
 
 def _solution_embed_text(sol: dict) -> str:
-    """Two embedding modes, deliberately different — mixing them caused a real bug
-    (found live 2026-07-30): a "destination" solution's tight name+aliases doesn't
-    bleed into unrelated diagnoses, but a "diagnosis" solution's rich symptom/cause
-    text does need to match varied symptom phrasing, and letting settings ride
-    along in that rich text caused false collisions ("wheres buffer size" matching
-    an unrelated latency diagnosis whose cause text happened to mention "buffer").
+    """B2 (v3-log.md): settled after live A/B0 measurement, not just design
+    argument. B0 (diagnosis solutions embedded not at all) was tried and
+    measurably regressed: every mechanism-named query ("deep bass", "wide
+    mix", "audio interface not recognized in Logic") lost its only anchor in
+    the vector space and drifted onto a semantically-adjacent problem's
+    vocabulary instead -- e.g. "song sounds thin or hollow" and "mix sounds
+    muddy" share enough low-end vocabulary in their aliases that solutions
+    named for the former resolved into the latter's bucket, sometimes not
+    even present in the solutions returned. Rich prose embedding (the
+    original dual-mode design) was ALSO checked directly against the data and
+    found not to be earning its keep -- novel symptom phrasings matched via
+    problem aliases either way, prose never caught anything aliases didn't
+    already catch, while causing the real collision bug found live
+    2026-07-30 ("wheres buffer size" matching an unrelated latency diagnosis
+    whose cause text happened to mention "buffer").
 
-    "destination": name + curated aliases only — no diagnostic prose, so a plain
-    "wheres X" query can't collide with an unrelated diagnosis that merely mentions
-    X in passing.
-    "diagnosis" (default): name + symptom/cause/zone — needs to match varied
-    real-world phrasing of a symptom, not just a name.
+    So: every solution gets its own embedding, but "destination" gets name +
+    curated aliases (unique, tight, unlikely to appear elsewhere), and
+    "diagnosis" gets name only -- no prose, no aliases -- restoring each
+    diagnosis solution's own precise anchor without reintroducing prose-driven
+    collision risk.
     """
-    parts = [sol["name"]]
     if sol.get("kind") == "destination":
+        parts = [sol["name"]]
         parts.extend(sol.get("aliases") or [])
         return ". ".join(parts)
-
-    c = sol.get("content", {})
-    for key in ("symptom", "cause", "zone"):
-        if c.get(key):
-            parts.append(c[key])
-    for key in ("remove_when", "add_when"):
-        if c.get(key):
-            parts.append(c[key])
-    return ". ".join(parts)
+    return sol["name"]
 
 
 def _problem_embed_text(prob: dict) -> str:
