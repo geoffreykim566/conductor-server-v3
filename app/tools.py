@@ -39,6 +39,17 @@ def _confidence_label(distance: float) -> str:
     return "weak — likely not actually relevant; don't treat this as a real match"
 
 
+def _confidence_short(distance: float) -> str:
+    """Plain strong/moderate/weak label for query_log — _confidence_label's
+    return value is the model-facing advisory sentence, not a clean value to
+    group/filter on."""
+    if distance <= _STRONG_MATCH:
+        return "strong"
+    if distance <= _MODERATE_MATCH:
+        return "moderate"
+    return "weak"
+
+
 async def _embed_with_retry(texts: list[str], input_type: str) -> list[list[float]]:
     """Voyage rate-limits on bursty test runs — retry/backoff rather than letting
     one transient 429 kill an entire scenario battery run. embed.py now also
@@ -152,11 +163,19 @@ async def lookup_concept(problem: str) -> dict:
         """,
         vec,
     )
+    top_results = [
+        {"kind": r["kind"], "name": r["name"], "distance": float(r["distance"])}
+        for r in rows
+    ]
     if not rows:
+        await db.insert_query_log(query=problem, confidence="none", top_results=[])
         return {"match": "none"}
 
     top = rows[0]
     confidence = _confidence_label(top["distance"])
+    await db.insert_query_log(
+        query=problem, confidence=_confidence_short(top["distance"]), top_results=top_results
+    )
 
     problem_id = problem_name = problem_note = None
     if top["kind"] == "problem":

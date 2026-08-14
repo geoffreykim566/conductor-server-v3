@@ -132,3 +132,13 @@ async def mark_uninstalled(user_id: uuid.UUID) -> None:
         "update users set uninstalled_at = now() where id = $1 and uninstalled_at is null",
         user_id,
     )
+
+
+async def insert_query_log(*, query: str, confidence: str, top_results: list[dict]) -> None:
+    await pool().execute(
+        """
+        insert into query_log (query, confidence, top_results)
+        values ($1, $2, $3)
+        """,
+        query, confidence, top_results,
+    )
