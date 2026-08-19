@@ -36,7 +36,7 @@ SCENARIOS_FILE = Path(__file__).parent.parent / "scenarios" / "battery.json"
 BETWEEN_SCENARIOS_DELAY_S = 8
 
 
-def _actual_outcome(trace: list[dict]) -> dict:
+def _actual_outcome(trace: list[dict], response_text: str = "") -> dict:
     lookup_calls = [c for c in trace if c["tool"] == "lookup_concept"]
     walkthrough_calls = [c for c in trace if c["tool"] == "get_walkthrough"]
 
@@ -77,6 +77,7 @@ def _actual_outcome(trace: list[dict]) -> dict:
         "attached_destinations": attached_destinations,
         "attached_solutions": attached_solutions,
         "no_tool_calls": len(trace) == 0,
+        "response_text": response_text,
     }
 
 
@@ -94,6 +95,12 @@ def _membership_pass(expected, attached: list[str]) -> bool:
 
 
 def _grade(expect: dict, actual: dict) -> list[dict]:
+    """response_contains/response_not_contains grade the final response TEXT, not the
+    trace -- added 2026-08-18 (Fable review) after two real bugs shipped through
+    scenarios with no expect block at all: a fabricated UI detail riding alongside a
+    correctly-attached walkthrough, and a response that silently dropped half of a
+    two-part question. Case-insensitive substring match, not semantic -- brittle to
+    paraphrasing, but strictly better than the zero coverage these two had before."""
     verdicts = []
     for key, expected in expect.items():
         if key == "walkthrough_destination":
@@ -102,6 +109,19 @@ def _grade(expect: dict, actual: dict) -> list[dict]:
         elif key == "walkthrough_solution":
             got = actual["attached_solutions"]
             ok = _membership_pass(expected, got)
+        elif key in ("response_contains", "response_not_contains", "response_contains_any"):
+            text = (actual.get("response_text") or "").lower()
+            hits = [term for term in expected if term.lower() in text]
+            if key == "response_contains":
+                missing = [term for term in expected if term not in hits]
+                ok = not missing
+                got = "all present" if ok else f"missing: {missing}"
+            elif key == "response_contains_any":
+                ok = bool(hits)
+                got = f"found: {hits}" if hits else "none present"
+            else:
+                ok = not hits
+                got = "none present" if ok else f"found: {hits}"
         else:
             got = actual.get(key)
             ok = got == expected
@@ -116,6 +136,7 @@ async def run_scenario(scenario: dict) -> dict:
 
     messages: list[dict] = []
     trace: list[dict] = []
+    response_text: str = ""
     scenario_usage: list[dict] = []
     verdicts: list[dict] = []
     for i, turn in enumerate(scenario["turns"], 1):
@@ -125,6 +146,7 @@ async def run_scenario(scenario: dict) -> dict:
         result = await respond(messages, ax_fixture=ax_fixture)
         messages = result.messages
         trace = result.trace  # graded against the scenario's top-level 'expect' below
+        response_text = result.text  # ditto, for response_contains/response_not_contains
         scenario_usage.extend(result.usage)
 
         print(f"\n  --- turn {i}: {turn['text']!r} ---")
@@ -145,7 +167,7 @@ async def run_scenario(scenario: dict) -> dict:
               + (f" -> {result.walkthrough_steps}" if result.walkthrough_steps else ""))
 
         if "expect" in turn:
-            turn_verdicts = _grade(turn["expect"], _actual_outcome(result.trace))
+            turn_verdicts = _grade(turn["expect"], _actual_outcome(result.trace, result.text))
             for v in turn_verdicts:
                 v["turn"] = i
             verdicts.extend(turn_verdicts)
@@ -155,7 +177,7 @@ async def run_scenario(scenario: dict) -> dict:
                 print(f"    [{status}] {v['field']}: expected={v['expected']!r} actual={v['actual']!r}")
 
     if "expect" in scenario:
-        final_verdicts = _grade(scenario["expect"], _actual_outcome(trace))
+        final_verdicts = _grade(scenario["expect"], _actual_outcome(trace, response_text))
         for v in final_verdicts:
             v["turn"] = "final"
         verdicts.extend(final_verdicts)
