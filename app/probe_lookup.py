@@ -83,7 +83,7 @@ async def main() -> None:
             query = probe["query"]
             [vec] = await _embed_with_retry([query], input_type="query")
             raw = await _raw_top8(vec)
-            result = await lookup_concept(query)
+            result = await lookup_concept(query, _vec=vec)
 
             margin = None
             if len(raw) >= 2:

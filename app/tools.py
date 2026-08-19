@@ -143,8 +143,13 @@ def _content_summary(name: str, content: dict) -> str:
     return "\n".join(lines)
 
 
-async def lookup_concept(problem: str) -> dict:
-    [vec] = await _embed_with_retry([problem], input_type="query")
+async def lookup_concept(problem: str, _vec: list[float] | None = None) -> dict:
+    # _vec lets a caller that already embedded this exact text (probe_lookup.py's
+    # raw-top8 pass) skip a second, redundant Voyage call for the same query --
+    # found live 2026-08-18, probe runs were double-embedding every query and
+    # hitting far more 429s than the battery ever does for the same query count.
+    # Never passed by the real pipeline (model tool calls always start from raw text).
+    vec = _vec if _vec is not None else (await _embed_with_retry([problem], input_type="query"))[0]
     rows = await db.pool().fetch(
         """
         select * from (
