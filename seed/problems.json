@@ -11,6 +11,7 @@
       },
       "path": null,
       "extends_to": "sample rate",
+      "value_ax_key": "project_sample_rate",
       "kind": "diagnosis",
       "aliases": []
     },

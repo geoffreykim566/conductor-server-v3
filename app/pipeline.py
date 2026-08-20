@@ -204,6 +204,43 @@ def _needs_hedge(trace: list[dict], walkthrough_steps: list | None) -> bool:
     )
 
 
+def _solution_to_problem(trace: list[dict]) -> dict[str, str | None]:
+    """Maps each solution name surfaced by this turn's lookup_concept calls to
+    the problem bucket it was returned under, so a refused second get_walkthrough
+    can tell whether it's an alternative candidate for the SAME problem (a
+    fallback) or a solution from a DIFFERENT problem entirely (a separate,
+    unrelated request) -- see hedge_mixed_grounded_ungrounded below."""
+    mapping: dict[str, str | None] = {}
+    for c in trace:
+        if c["tool"] != "lookup_concept":
+            continue
+        problem = c["output"].get("problem")
+        for sol in c["output"].get("solutions") or []:
+            mapping.setdefault(sol["name"], problem)
+    return mapping
+
+
+_FALLBACK_REFUSAL = (
+    "a walkthrough was already attached this turn -- only one attaches per "
+    "turn. Mention a fallback candidate in prose instead, and only attach it "
+    "if the user comes back and says the first one didn't work."
+)
+
+# hedge_mixed_grounded_ungrounded (v3-log.md 2026-08-18, reproduced 3/3): when
+# the refused solution is from a DIFFERENT problem bucket than the one that
+# already attached, it isn't a fallback candidate for that attach -- it's an
+# unrelated second request sharing the same turn. The generic fallback
+# refusal above was found to make the model frame it as "next thing to try,"
+# which consistently crowded out narrating the walkthrough that actually won.
+_UNRELATED_REFUSAL = (
+    "a walkthrough was already attached this turn for a DIFFERENT, unrelated "
+    "request -- only one attaches per turn, but this is not a fallback for "
+    "that attach. Cover this solution's own steps directly in your prose "
+    "instead of attaching it. Also make sure your response still fully "
+    "narrates the walkthrough that DID attach -- don't let this one crowd it out."
+)
+
+
 def _is_grounded(trace: list[dict], walkthrough_steps: list | None) -> bool:
     """True once this turn can no longer end up needing a hedge, regardless of what
     happens later -- a walkthrough attach or a strong lookup hit, both permanent
@@ -345,7 +382,19 @@ async def respond(
     trace: list[dict] = []
     usage: list[dict] = []
     walkthrough_steps: list | None = None
+    attached_solution: str | None = None
     lookup_attempts = 0
+    # Text the model writes alongside a tool call (not just the final,
+    # tool-free iteration) is a real part of the answer, not scratch
+    # thinking -- found live 2026-08-20 (hedge_mixed_grounded_ungrounded):
+    # the model wrote the full, correct recording narration in the same
+    # iteration as a get_walkthrough call, then wrote fresh export-only text
+    # in the next (final) iteration, and only that last iteration's text was
+    # ever returned -- the recording narration was silently discarded despite
+    # the model having said it. Accumulating every iteration's text (in
+    # order) instead of only the terminal one's fixes this at the root,
+    # rather than papering over it with a post-hoc content check.
+    text_parts: list[str] = []
 
     # Pushed, not pulled: live state (when known for this turn) is handed to the
     # model automatically rather than waiting on it to decide to call a tool for
@@ -393,9 +442,12 @@ async def respond(
         resp = await _call_model(system, tools.TOOLS, msgs, iter_on_chunk, tool_choice)
         usage.append(_usage_dict(resp.usage))
         tool_uses = [b for b in resp.content if b.type == "tool_use"]
+        iter_text = "".join(b.text for b in resp.content if b.type == "text")
+        if iter_text:
+            text_parts.append(iter_text)
 
         if not tool_uses:
-            text = "".join(b.text for b in resp.content if b.type == "text")
+            text = "\n\n".join(text_parts)
             msgs.append({"role": "assistant", "content": _serialize_content(resp.content)})
             if not trace:
                 backfilled = _backfill_walkthrough(messages, text)
@@ -439,13 +491,18 @@ async def respond(
                 # reaches the user (found live 2026-08-05 -- multiple attaches
                 # in one turn meant the *last* one silently won, contradicting
                 # whichever candidate the response text actually led with).
+                # Which refusal wording applies depends on whether this is an
+                # alternative candidate for the SAME problem as the winner (a
+                # real fallback) or a solution from a DIFFERENT problem (an
+                # unrelated second request) -- see _solution_to_problem.
+                sol_to_problem = _solution_to_problem(trace)
+                same_bucket = (
+                    sol_to_problem.get(tu.input.get("solution"))
+                    == sol_to_problem.get(attached_solution)
+                )
                 result = {
                     "attached": False,
-                    "reason": (
-                        "a walkthrough was already attached this turn -- only one attaches per "
-                        "turn. Mention a fallback candidate in prose instead, and only attach it "
-                        "if the user comes back and says the first one didn't work."
-                    ),
+                    "reason": _FALLBACK_REFUSAL if same_bucket else _UNRELATED_REFUSAL,
                 }
             else:
                 executor = _EXECUTORS.get(tu.name)
@@ -453,6 +510,7 @@ async def respond(
             trace.append({"tool": tu.name, "input": tu.input, "output": result})
             if tu.name == "get_walkthrough" and result.get("attached"):
                 walkthrough_steps = result.get("steps")
+                attached_solution = tu.input.get("solution")
             tool_results.append({
                 "type": "tool_result",
                 "tool_use_id": tu.id,
@@ -478,7 +536,10 @@ async def respond(
         final_on_chunk,
     )
     usage.append(_usage_dict(final.usage))
-    text = "".join(b.text for b in final.content if b.type == "text")
+    final_text = "".join(b.text for b in final.content if b.type == "text")
+    if final_text:
+        text_parts.append(final_text)
+    text = "\n\n".join(text_parts)
     msgs.append({"role": "assistant", "content": _serialize_content(final.content)})
     # No backfill check here (unlike the early-return path above): reaching this
     # point requires every one of MAX_ITERATIONS loop passes to have had at least

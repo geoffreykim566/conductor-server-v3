@@ -265,7 +265,8 @@ def _is_truthy(value) -> bool:
 
 async def get_walkthrough(solution: str, ax_fixture: dict | None = None) -> dict:
     row = await db.pool().fetchrow(
-        "select path, extends_to, toggle_ax_key from solutions where name = $1", solution
+        "select path, extends_to, toggle_ax_key, value_ax_key from solutions where name = $1",
+        solution,
     )
     if not row:
         return {"attached": False, "reason": "solution not found"}
@@ -285,6 +286,25 @@ async def get_walkthrough(solution: str, ax_fixture: dict | None = None) -> dict
                 f"already in the target state ({row['toggle_ax_key']} is already true this "
                 "turn) -- attaching would toggle it away, not reveal it; tell the user it's "
                 "already there instead of walking through how to enable it"
+            ),
+        }
+
+    # value_ax_key: unlike a toggle, there's no fixed target value -- the key's
+    # mere presence in ax_fixture means this turn already has ground truth for
+    # it, so a walkthrough whose job is "go look this value up" is redundant
+    # regardless of what the value actually is. Found live 2026-08-18
+    # (multiturn_evidence_arrives_later_turn): the model correctly used the
+    # solution's own later fix steps in prose but still attached a walkthrough
+    # for the exact value the turn already had confirmed.
+    if row["value_ax_key"] and ax_fixture and row["value_ax_key"] in ax_fixture:
+        return {
+            "attached": False,
+            "reason": (
+                f"the current value is already known this turn ({row['value_ax_key']} = "
+                f"{ax_fixture[row['value_ax_key']]}) -- don't attach a walkthrough for "
+                "checking/changing it. Tell the user directly that this value is already "
+                "confirmed, and if the solution's own content describes a further step "
+                "beyond this value, cover that step in prose instead."
             ),
         }
 
