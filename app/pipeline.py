@@ -198,16 +198,26 @@ def _attach_is_strong(trace: list[dict], attached_solution: str | None) -> bool:
     whether *anything* attached, never at what confidence. A backfilled attach
     (2026-08-05 same-destination-revisit fix) has no lookup call this turn to check
     against -- treated as strong, since it's reattaching an earlier turn's
-    already-resolved destination, not a fresh guess."""
+    already-resolved destination, not a fresh guess.
+
+    Checks EVERY lookup_concept call that surfaced this solution, not just the
+    first -- found live 2026-08-21 (ax_contradicts_user_claim): the model's first
+    query landed moderate, a second, more specific query for the same solution
+    landed strong, and the walkthrough correctly attached off the strong hit, but
+    an earlier version of this function returned on the first (moderate) mention
+    and hedged a response that was actually fully grounded."""
     if attached_solution is None:
         return True
-    for c in trace:
-        if c["tool"] != "lookup_concept":
-            continue
-        for sol in c["output"].get("solutions") or []:
-            if sol.get("name") == attached_solution:
-                return c["output"].get("match_confidence") == "strong"
-    return True
+    confidences = [
+        c["output"].get("match_confidence")
+        for c in trace
+        if c["tool"] == "lookup_concept"
+        for sol in c["output"].get("solutions") or []
+        if sol.get("name") == attached_solution
+    ]
+    if not confidences:
+        return True
+    return "strong" in confidences
 
 
 def _strong_grounded_lookup_exists(trace: list[dict]) -> bool:
