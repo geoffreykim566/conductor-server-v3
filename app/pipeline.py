@@ -188,20 +188,68 @@ _HEDGE_PREFIX = (
 )
 
 
-def _needs_hedge(trace: list[dict], walkthrough_steps: list | None) -> bool:
+def _attach_is_strong(trace: list[dict], attached_solution: str | None) -> bool:
+    """True if the get_walkthrough attach that set walkthrough_steps was itself
+    backed by a strong-confidence lookup_concept match for that exact solution --
+    confidence in a DESTINATION existing is not the same as confidence in the MATCH
+    that picked it. Found live 2026-08-20/21 (collision_software_monitoring): a
+    moderate-confidence match ("audio settings") attached a real, path-bearing
+    destination and shipped fully unhedged, because the old check only asked
+    whether *anything* attached, never at what confidence. A backfilled attach
+    (2026-08-05 same-destination-revisit fix) has no lookup call this turn to check
+    against -- treated as strong, since it's reattaching an earlier turn's
+    already-resolved destination, not a fresh guess."""
+    if attached_solution is None:
+        return True
+    for c in trace:
+        if c["tool"] != "lookup_concept":
+            continue
+        for sol in c["output"].get("solutions") or []:
+            if sol.get("name") == attached_solution:
+                return c["output"].get("match_confidence") == "strong"
+    return True
+
+
+def _strong_grounded_lookup_exists(trace: list[dict]) -> bool:
+    """True if some lookup_concept call this turn hit strong confidence AND
+    surfaced at least one solution with real fix content (has_path). A correct,
+    strong-confidence DIAGNOSIS whose every candidate solution has has_path=False
+    is not grounding for a FIX -- there's nothing there to be confident about
+    beyond the label itself. Found live 2026-08-20/21 (multiturn_clarify_then_
+    resolve_thin_hollow): 'song sounds thin or hollow' matched at strong
+    confidence, but every one of its solutions is diagnosis-only -- the model then
+    fabricated an entire fix procedure from outside the KB, unhedged, because the
+    old check only asked whether *some* lookup hit strong, never whether that
+    match actually carried anything to be confident about."""
+    return any(
+        c["tool"] == "lookup_concept"
+        and c["output"].get("match_confidence") == "strong"
+        and any(s.get("has_path") for s in c["output"].get("solutions") or [])
+        for c in trace
+    )
+
+
+def _needs_hedge(
+    trace: list[dict], walkthrough_steps: list | None, attached_solution: str | None = None
+) -> bool:
     """Deterministic backstop -- prompt-only hedge instructions held ~40-50% of the time
     across live testing, 0% on broad/indirect questions specifically (2026-08-11).
     Fires when this turn made a real attempt (a tool call) but never reached strong
     grounding. Does NOT fire on zero tool calls -- can't distinguish a plain
-    conversational close from the separate, not-yet-fixed tool-skip gap."""
+    conversational close from the separate, not-yet-fixed tool-skip gap.
+
+    Known remaining gap, not fixed here: a strong, path-bearing match still only
+    certifies the DESTINATION, not every specific claim layered on top of it in
+    prose (e.g. what a control does, where it sits, what values a dropdown offers
+    beyond what the tool result actually said) -- found live 2026-08-20/21
+    (monitor_button_already_on, multiturn_evidence_arrives_later_turn). Catching
+    that needs claim-level grounding, not a trace-level check; left to the
+    widened prompt-level grounding rule instead."""
     if walkthrough_steps is not None:
-        return False
+        return not _attach_is_strong(trace, attached_solution)
     if not trace:
         return False
-    return not any(
-        c["tool"] == "lookup_concept" and c["output"].get("match_confidence") == "strong"
-        for c in trace
-    )
+    return not _strong_grounded_lookup_exists(trace)
 
 
 def _solution_to_problem(trace: list[dict]) -> dict[str, str | None]:
@@ -241,7 +289,9 @@ _UNRELATED_REFUSAL = (
 )
 
 
-def _is_grounded(trace: list[dict], walkthrough_steps: list | None) -> bool:
+def _is_grounded(
+    trace: list[dict], walkthrough_steps: list | None, attached_solution: str | None = None
+) -> bool:
     """True once this turn can no longer end up needing a hedge, regardless of what
     happens later -- a walkthrough attach or a strong lookup hit, both permanent
     once trace/walkthrough_steps get set (trace only grows; commit-to-one means
@@ -251,11 +301,8 @@ def _is_grounded(trace: list[dict], walkthrough_steps: list | None) -> bool:
     which answers "does the turn need a hedge *right now*" and treats an
     empty/inconclusive trace as no (silently, not permanently) safe."""
     if walkthrough_steps is not None:
-        return True
-    return any(
-        c["tool"] == "lookup_concept" and c["output"].get("match_confidence") == "strong"
-        for c in trace
-    )
+        return _attach_is_strong(trace, attached_solution)
+    return _strong_grounded_lookup_exists(trace)
 
 
 class _ChunkBuffer:
@@ -284,6 +331,7 @@ async def _finalize_answer(
     text: str,
     buffer: "_ChunkBuffer | None",
     on_chunk: OnChunk | None,
+    attached_solution: str | None = None,
 ) -> str:
     """Called once this turn's final answer text is fully known (either the
     no-more-tool-calls return or the MAX_ITERATIONS safety net). Applies the
@@ -292,7 +340,7 @@ async def _finalize_answer(
     it now: hedge chunk first if needed, then the buffered text, so a streaming
     client sees the same hedge-before-answer ordering non-streaming callers get
     from Result.text alone."""
-    hedge = _needs_hedge(trace, walkthrough_steps)
+    hedge = _needs_hedge(trace, walkthrough_steps, attached_solution)
     if hedge:
         text = _HEDGE_PREFIX + text
     if buffer is not None:
@@ -432,7 +480,7 @@ async def respond(
         # this turn, so later iterations stream straight through unaffected.
         buffer = None
         iter_on_chunk = on_chunk
-        if on_chunk is not None and not _is_grounded(trace, walkthrough_steps):
+        if on_chunk is not None and not _is_grounded(trace, walkthrough_steps, attached_solution):
             buffer = _ChunkBuffer()
             iter_on_chunk = buffer.collect
 
@@ -463,7 +511,7 @@ async def respond(
                             "backfilled": True,
                         },
                     })
-            text = await _finalize_answer(trace, walkthrough_steps, text, buffer, on_chunk)
+            text = await _finalize_answer(trace, walkthrough_steps, text, buffer, on_chunk, attached_solution)
             return Result(text=text, walkthrough_steps=walkthrough_steps, trace=trace, messages=msgs, usage=usage)
 
         # Not the final answer -- this iteration's text (if any) carries no hedge
@@ -523,7 +571,7 @@ async def respond(
     # model must synthesize whatever it already learned into a real answer.
     buffer = None
     final_on_chunk = on_chunk
-    if on_chunk is not None and not _is_grounded(trace, walkthrough_steps):
+    if on_chunk is not None and not _is_grounded(trace, walkthrough_steps, attached_solution):
         buffer = _ChunkBuffer()
         final_on_chunk = buffer.collect
     final = await _call_model(
@@ -547,5 +595,5 @@ async def respond(
     # can never be empty here, and _backfill_walkthrough only ever fires on a
     # turn with zero tool calls. A backfill check here was dead code (found via
     # Fable review, 2026-08-06) and has been removed rather than left in place.
-    text = await _finalize_answer(trace, walkthrough_steps, text, buffer, on_chunk)
+    text = await _finalize_answer(trace, walkthrough_steps, text, buffer, on_chunk, attached_solution)
     return Result(text=text, walkthrough_steps=walkthrough_steps, trace=trace, messages=msgs, usage=usage)
