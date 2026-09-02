@@ -14,8 +14,8 @@ from typing import Awaitable, Callable
 from anthropic import AsyncAnthropic
 
 from app import tools
-from app.config import CENTRAL_ANTHROPIC_KEY, MAX_TOKENS, MODEL
-from app.prompt import SYSTEM_PROMPT
+from app.config import CENTRAL_ANTHROPIC_KEY, MAX_TOKENS, MODEL, WRITER_MODEL
+from app.prompt import SYSTEM_PROMPT, WRITER_SYSTEM_PROMPT
 
 OnChunk = Callable[[str], Awaitable[None]]
 
@@ -299,65 +299,93 @@ _UNRELATED_REFUSAL = (
 )
 
 
-def _is_grounded(
-    trace: list[dict], walkthrough_steps: list | None, attached_solution: str | None = None
-) -> bool:
-    """True once this turn can no longer end up needing a hedge, regardless of what
-    happens later -- a walkthrough attach or a strong lookup hit, both permanent
-    once trace/walkthrough_steps get set (trace only grows; commit-to-one means
-    walkthrough_steps is set at most once). Used to decide, per iteration, whether
-    that iteration's text is safe to stream live or needs buffering (see
-    _call_model's on_chunk callers in respond()) -- distinct from _needs_hedge,
-    which answers "does the turn need a hedge *right now*" and treats an
-    empty/inconclusive trace as no (silently, not permanently) safe."""
-    if walkthrough_steps is not None:
-        return _attach_is_strong(trace, attached_solution)
-    return _strong_grounded_lookup_exists(trace)
+def _plain_history(messages: list[dict]) -> list[dict]:
+    """Full decider transcript -> plain user/assistant text turns only, for the
+    writer call (see _write_response). The writer never sees tool_use/tool_result
+    blocks -- those are exactly the vocabulary this split exists to keep out of its
+    context (v3-log.md 2026-08-22/24). Drops a turn entirely if it carries no text
+    (a pure tool-call assistant turn, or a pure tool-result user turn) rather than
+    passing an empty message the API would reject."""
+    plain = []
+    for msg in messages:
+        content = msg.get("content")
+        if isinstance(content, str):
+            if content:
+                plain.append({"role": msg["role"], "content": content})
+            continue
+        if isinstance(content, list):
+            text = "".join(
+                b.get("text", "") for b in content
+                if isinstance(b, dict) and b.get("type") == "text"
+            )
+            if text:
+                plain.append({"role": msg["role"], "content": text})
+    return plain
 
 
-class _ChunkBuffer:
-    """Collects streamed text instead of forwarding it live, for the stretch of a
-    turn where grounding isn't yet decided -- see the streaming-hedge gap logged
-    2026-08-11/12: a real client sees raw model text the instant it's generated,
-    before the turn's grounding outcome (and therefore whether to hedge) is known.
-    Held chunks are released via flush() once that's decided, hedge-prefixed first
-    if needed, so the hedge always precedes the text it's warning about instead of
-    arriving after the client already rendered it live."""
-
-    def __init__(self) -> None:
-        self.chunks: list[str] = []
-
-    async def collect(self, text: str) -> None:
-        self.chunks.append(text)
-
-    async def flush(self, on_chunk: OnChunk) -> None:
-        for chunk in self.chunks:
-            await on_chunk(chunk)
+async def _write_response(
+    facts: str,
+    prior_messages: list[dict],
+    on_chunk: OnChunk | None,
+) -> tuple[str, dict]:
+    """The 'writer' call -- rephrases the decider's already-decided, already-
+    correct synthesis into plain-language prose with none of the decider's tool
+    vocabulary, prototyped standalone 2026-08-22/24 (0/9 jargon leaks across 3
+    case shapes). Deliberately a different, cheaper model (WRITER_MODEL) and a
+    minimal prompt that never mentions tools/results/confidence at all -- the
+    decider (Sonnet) keeps sole ownership of *deciding* (tool loop, evidence
+    weighing, the hedge/attach guards above); this call only ever *phrases* what
+    was already decided, via the facts block below, never reasons over raw trace
+    data itself.
+    """
+    system_text = (
+        WRITER_SYSTEM_PROMPT + "\n\n## What to say this turn\n\n" + facts
+    )
+    system = [{"type": "text", "text": system_text}]
+    history = _plain_history(prior_messages)
+    resp = await _call_model(system, None, history, on_chunk, model=WRITER_MODEL)
+    text = "".join(b.text for b in resp.content if b.type == "text")
+    return text, _usage_dict(resp.usage)
 
 
 async def _finalize_answer(
     trace: list[dict],
     walkthrough_steps: list | None,
     text: str,
-    buffer: "_ChunkBuffer | None",
+    prior_messages: list[dict],
     on_chunk: OnChunk | None,
+    usage: list[dict],
     attached_solution: str | None = None,
 ) -> str:
-    """Called once this turn's final answer text is fully known (either the
-    no-more-tool-calls return or the MAX_ITERATIONS safety net). Applies the
-    hedge to the returned text as before, and -- new -- if that final iteration's
-    stream was buffered (grounding wasn't yet decided when it started), releases
-    it now: hedge chunk first if needed, then the buffered text, so a streaming
-    client sees the same hedge-before-answer ordering non-streaming callers get
-    from Result.text alone."""
+    """Called once this turn's decider text is fully known (either the
+    no-more-tool-calls return or the MAX_ITERATIONS safety net). Hedge decision
+    stays exactly as before -- deterministic, code-enforced -- and, critically,
+    _HEDGE_PREFIX stays a literal, guaranteed prefix on what's actually
+    returned/streamed, exactly like pre-writer-split behavior; it is NOT just
+    handed to the writer as one of the facts to phrase. Found live wiring this
+    in: baking the prefix into the writer's input facts let the writer's own
+    "don't add caveats" instruction (WRITER_SYSTEM_PROMPT, borrowed from the
+    Format section) silently drop it -- hedge_indirect_beat_from_scratch came
+    back fully confident, zero hedge language, the exact regression the
+    2026-08-11/12 deterministic backstop exists to prevent. The writer still
+    gets told plainly when a turn has no verified answer (so its own prose
+    doesn't contradict the prefix that follows it), but the prefix itself never
+    depends on the writer honoring that."""
     hedge = _needs_hedge(trace, walkthrough_steps, attached_solution)
+    facts = text
     if hedge:
-        text = _HEDGE_PREFIX + text
-    if buffer is not None:
-        if hedge:
+        facts = (
+            "No verified, confirmed answer was established for this turn -- no "
+            "confident, specific menu path, setting, or fix was found. Say plainly "
+            "that you don't have a verified answer for this; if you offer anything "
+            "further, frame it clearly as unconfirmed general guidance, not a "
+            "confirmed fix.\n\n" + text
+        )
+        if on_chunk is not None:
             await on_chunk(_HEDGE_PREFIX)
-        await buffer.flush(on_chunk)
-    return text
+    resp_text, writer_usage = await _write_response(facts, prior_messages, on_chunk)
+    usage.append(writer_usage)
+    return (_HEDGE_PREFIX + resp_text) if hedge else resp_text
 
 
 def _serialize_content(content: list) -> list[dict]:
@@ -402,6 +430,7 @@ async def _call_model(
     msgs: list[dict],
     on_chunk: OnChunk | None,
     tool_choice: dict | None = None,
+    model: str = MODEL,
 ):
     """One messages.create call, or the streamed equivalent when on_chunk is given.
 
@@ -417,8 +446,11 @@ async def _call_model(
     answer with no tool call at all -- used for the iteration-0 forced
     lookup_concept call (see _needs_first_lookup). Only meaningful alongside
     tools_param; unset on every other call site.
+
+    model defaults to the decider's MODEL; the writer call (_write_response)
+    passes WRITER_MODEL instead -- the one place this loop's model varies.
     """
-    kwargs = dict(model=MODEL, max_tokens=MAX_TOKENS, system=system, messages=msgs)
+    kwargs = dict(model=model, max_tokens=MAX_TOKENS, system=system, messages=msgs)
     if tools_param is not None:
         kwargs["tools"] = tools_param
     if tool_choice is not None:
@@ -484,20 +516,14 @@ async def respond(
     force_first_lookup = _needs_first_lookup(messages)
 
     for i in range(MAX_ITERATIONS):
-        # Grounding not yet decided -> this iteration might turn out to be the
-        # final answer, so buffer it instead of streaming live (see
-        # _ChunkBuffer). Once grounded, it can never become un-grounded again
-        # this turn, so later iterations stream straight through unaffected.
-        buffer = None
-        iter_on_chunk = on_chunk
-        if on_chunk is not None and not _is_grounded(trace, walkthrough_steps, attached_solution):
-            buffer = _ChunkBuffer()
-            iter_on_chunk = buffer.collect
-
+        # The decider's own text never reaches the client directly anymore --
+        # only the writer call (see _finalize_answer) streams -- so every
+        # decider call runs non-streaming regardless of whether this respond()
+        # call was itself given an on_chunk.
         tool_choice = None
         if i == 0 and force_first_lookup:
             tool_choice = {"type": "tool", "name": "lookup_concept"}
-        resp = await _call_model(system, tools.TOOLS, msgs, iter_on_chunk, tool_choice)
+        resp = await _call_model(system, tools.TOOLS, msgs, None, tool_choice)
         usage.append(_usage_dict(resp.usage))
         tool_uses = [b for b in resp.content if b.type == "tool_use"]
         iter_text = "".join(b.text for b in resp.content if b.type == "text")
@@ -521,14 +547,10 @@ async def respond(
                             "backfilled": True,
                         },
                     })
-            text = await _finalize_answer(trace, walkthrough_steps, text, buffer, on_chunk, attached_solution)
+            text = await _finalize_answer(
+                trace, walkthrough_steps, text, messages, on_chunk, usage, attached_solution
+            )
             return Result(text=text, walkthrough_steps=walkthrough_steps, trace=trace, messages=msgs, usage=usage)
-
-        # Not the final answer -- this iteration's text (if any) carries no hedge
-        # risk on its own, so release any buffered chunks immediately rather than
-        # holding them until the turn ends.
-        if buffer is not None:
-            await buffer.flush(on_chunk)
 
         msgs.append({"role": "assistant", "content": _serialize_content(resp.content)})
         tool_results = []
@@ -579,11 +601,8 @@ async def respond(
     # Safety net: never return a truly empty response, regardless of why the
     # loop didn't converge on its own. Force one final tools-off call so the
     # model must synthesize whatever it already learned into a real answer.
-    buffer = None
-    final_on_chunk = on_chunk
-    if on_chunk is not None and not _is_grounded(trace, walkthrough_steps, attached_solution):
-        buffer = _ChunkBuffer()
-        final_on_chunk = buffer.collect
+    # Non-streaming, same reasoning as every decider call above -- only the
+    # writer call streams.
     final = await _call_model(
         system + [{
             "type": "text",
@@ -591,7 +610,7 @@ async def respond(
         }],
         None,
         msgs,
-        final_on_chunk,
+        None,
     )
     usage.append(_usage_dict(final.usage))
     final_text = "".join(b.text for b in final.content if b.type == "text")
@@ -605,5 +624,7 @@ async def respond(
     # can never be empty here, and _backfill_walkthrough only ever fires on a
     # turn with zero tool calls. A backfill check here was dead code (found via
     # Fable review, 2026-08-06) and has been removed rather than left in place.
-    text = await _finalize_answer(trace, walkthrough_steps, text, buffer, on_chunk, attached_solution)
+    text = await _finalize_answer(
+        trace, walkthrough_steps, text, messages, on_chunk, usage, attached_solution
+    )
     return Result(text=text, walkthrough_steps=walkthrough_steps, trace=trace, messages=msgs, usage=usage)

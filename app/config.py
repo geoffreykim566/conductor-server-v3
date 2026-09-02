@@ -19,6 +19,12 @@ DATABASE_URL = os.environ.get(
 MODEL = "claude-sonnet-4-6"
 MAX_TOKENS = 3072
 
+# The "writer" call (see pipeline.py::_write_response) rephrases the decider's
+# already-decided facts into user-facing prose with zero tool vocabulary --
+# deliberately a separate, cheaper model, since it only phrases, never weighs
+# evidence (see v3-log.md 2026-08-22/24).
+WRITER_MODEL = "claude-haiku-4-5-20251001"
+
 VOYAGE_API_KEY = os.environ.get("VOYAGE_API_KEY", "")
 VOYAGE_MODEL = "voyage-3.5"  # 1024-dim; index and query must stay symmetric
 
