@@ -33,9 +33,19 @@ LOOKUP_ATTEMPT_LIMIT = 4
 
 _client = AsyncAnthropic(api_key=CENTRAL_ANTHROPIC_KEY)
 
+async def _ack_clarifying_question() -> dict:
+    """No-op executor for tools.ASK_CLARIFYING_QUESTION_SCHEMA -- the tool call
+    itself is the entire point (a hard, code-checkable signal that this turn
+    makes no claim), nothing to actually do. Still needs a real tool_result
+    round-trip like any other tool call, or the next turn's history replay
+    would 400 (see _serialize_content's docstring on the same requirement)."""
+    return {"acknowledged": True}
+
+
 _EXECUTORS = {
     "lookup_concept": lambda inp, fixture: tools.lookup_concept(inp["problem"]),
     "get_walkthrough": lambda inp, fixture: tools.get_walkthrough(inp["solution"], ax_fixture=fixture),
+    "ask_clarifying_question": lambda inp, fixture: _ack_clarifying_question(),
 }
 
 
@@ -273,13 +283,25 @@ def _strong_grounded_lookup_exists(trace: list[dict]) -> bool:
 
 
 def _needs_hedge(
-    trace: list[dict], walkthrough_steps: list | None, attached_solution: str | None = None
+    trace: list[dict],
+    walkthrough_steps: list | None,
+    attached_solution: str | None = None,
+    is_clarifying_question: bool = False,
 ) -> bool:
     """Deterministic backstop -- prompt-only hedge instructions held ~40-50% of the time
     across live testing, 0% on broad/indirect questions specifically (2026-08-11).
     Fires when this turn made a real attempt (a tool call) but never reached strong
     grounding. Does NOT fire on zero tool calls -- can't distinguish a plain
     conversational close from the separate, not-yet-fixed tool-skip gap.
+
+    is_clarifying_question short-circuits ahead of all of that -- a turn that's
+    ONLY a clarifying question (see tools.ASK_CLARIFYING_QUESTION_SCHEMA) makes no
+    claim at all, so there's nothing to hedge regardless of what the underlying
+    trace looks like. Found live 2026-09-02 (Fable review): muddy_ambiguous and
+    thin_hollow_boundary are trace-identical to a real ungrounded claim (a tool
+    call happened, nothing attached, confidence never hit strong) but the response
+    is just a question -- hedging it read as "treat the following as general
+    guidance" over a bare question with no guidance in it at all.
 
     Known remaining gap, not fixed here: a strong, path-bearing match still only
     certifies the DESTINATION, not every specific claim layered on top of it in
@@ -288,6 +310,8 @@ def _needs_hedge(
     (monitor_button_already_on, multiturn_evidence_arrives_later_turn). Catching
     that needs claim-level grounding, not a trace-level check; left to the
     widened prompt-level grounding rule instead."""
+    if is_clarifying_question:
+        return False
     if walkthrough_steps is not None:
         return not _attach_is_strong(trace, attached_solution)
     if not trace:
@@ -389,6 +413,7 @@ async def _finalize_answer(
     on_chunk: OnChunk | None,
     usage: list[dict],
     attached_solution: str | None = None,
+    is_clarifying_question: bool = False,
 ) -> str:
     """Called once this turn's decider text is fully known (either the
     no-more-tool-calls return or the MAX_ITERATIONS safety net). Hedge decision
@@ -404,7 +429,7 @@ async def _finalize_answer(
     gets told plainly when a turn has no verified answer (so its own prose
     doesn't contradict the prefix that follows it), but the prefix itself never
     depends on the writer honoring that."""
-    hedge = _needs_hedge(trace, walkthrough_steps, attached_solution)
+    hedge = _needs_hedge(trace, walkthrough_steps, attached_solution, is_clarifying_question)
     facts = text
     if hedge:
         facts = (
@@ -630,6 +655,20 @@ async def respond(
                 "content": json.dumps(result),
             })
         msgs.append({"role": "user", "content": tool_results})
+
+        # ask_clarifying_question ends the turn immediately, same as the
+        # no-tool-uses path above -- it's not "not the final answer, keep
+        # looping" like every other tool, it IS the final answer (a claim-free
+        # question). No backfill check here: reaching this branch means trace
+        # is non-empty (this tool call itself is in it), and backfill only
+        # ever applies to a turn with zero tool calls at all.
+        if any(tu.name == "ask_clarifying_question" for tu in tool_uses):
+            text = "\n\n".join(text_parts)
+            text = await _finalize_answer(
+                trace, walkthrough_steps, text, messages, on_chunk, usage,
+                attached_solution, is_clarifying_question=True,
+            )
+            return Result(text=text, walkthrough_steps=walkthrough_steps, trace=trace, messages=msgs, usage=usage)
 
     # Safety net: never return a truly empty response, regardless of why the
     # loop didn't converge on its own. Force one final tools-off call so the

@@ -120,14 +120,50 @@ GET_WALKTHROUGH_SCHEMA = {
         "required": ["solution"],
         "additionalProperties": False,
     },
-    # Cache breakpoint for the whole tools array -- both schemas are static
-    # across every call in a run, but get resent unchanged on every loop
-    # iteration and every turn otherwise (measured 2026-08-05: 66 calls,
-    # 207,869 uncached input tokens across a 24-scenario battery).
+}
+
+# Pure structural signal, no side effect -- exists so "this turn makes no
+# claim" is a hard fact in trace, not something inferred from response text.
+# Found live 2026-09-02 (Fable review of the writer-split battery): the
+# deterministic hedge gate can't currently tell a genuine claim-free
+# clarifying question (muddy_ambiguous, thin_hollow_boundary) apart from an
+# ungrounded claim -- both look identical at the trace level (a tool call
+# happened, nothing attached, no strong grounding). A text heuristic ("ends
+# with a question mark") was considered and rejected: it would wrongly
+# suppress the hedge on hedge_indirect_beat_from_scratch, whose entire
+# response is confident unhedged claims that also happen to end with a
+# trailing offer to go deeper. Same reasoning as every other ambiguous-
+# behavior fix in this file (commit-to-one, backfill, tool-skip): make the
+# model take an explicit, code-checkable action instead of inferring intent
+# from prose.
+ASK_CLARIFYING_QUESTION_SCHEMA = {
+    "name": "ask_clarifying_question",
+    "description": (
+        "Call this when your entire response for this turn is a clarifying question "
+        "and nothing else -- no diagnosis, guidance, or claim alongside it. Marks the "
+        "turn as making no claim, so it won't be hedged as an unconfirmed answer. Only "
+        "for the genuine-toss-up case this prompt already describes (a 'problem' result "
+        "with no distinguishing evidence yet). Never call this if you're also offering "
+        "any guidance, even tentative guidance, in the same response -- that response "
+        "should stand as a real (possibly hedged) answer, not a claim-free question. "
+        "Never call this alongside get_walkthrough."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": False,
+    },
+    # Cache breakpoint for the whole tools array -- all three schemas are
+    # static across every call in a run, but get resent unchanged on every
+    # loop iteration and every turn otherwise (measured 2026-08-05: 66 calls,
+    # 207,869 uncached input tokens across a 24-scenario battery). Must sit
+    # on the LAST schema in the array for the cache breakpoint to cover all
+    # of them -- moved here from get_walkthrough when this schema was added
+    # after it.
     "cache_control": {"type": "ephemeral"},
 }
 
-TOOLS = [LOOKUP_CONCEPT_SCHEMA, GET_WALKTHROUGH_SCHEMA]
+TOOLS = [LOOKUP_CONCEPT_SCHEMA, GET_WALKTHROUGH_SCHEMA, ASK_CLARIFYING_QUESTION_SCHEMA]
 
 
 def _content_summary(name: str, content: dict) -> str:
