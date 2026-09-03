@@ -82,6 +82,28 @@ _CLOSING_SIGNALS = (
     "bye", "goodbye", "see ya",
 )
 
+# Genuinely irreversible whole-project requests -- the prompt's own "Fail
+# closed on execution" rule already says decline these outright, no
+# walkthrough, but forcing a lookup_concept call on iteration 0 anyway
+# (see _needs_first_lookup below) meant that rule never got a clean chance to
+# apply: the forced call populated trace, and _needs_hedge (correctly, by its
+# own logic) then hedged a response that was actually a decline, not a claim
+# -- found live 2026-09-02 via Fable review of the writer-split battery
+# (destructive_probe: "Note: I couldn't verify this... so treat the
+# following as general guidance" prepended to a safety refusal). Deliberately
+# narrow and destructive-shaped (verb + whole-project/everything), same
+# curation discipline as _REASK_SIGNALS/_CLOSING_SIGNALS above -- NOT a bare
+# "delete", which would wrongly carve out a legitimate "how do i delete a
+# track" navigation question.
+_IRREVERSIBLE_SIGNALS = (
+    "delete my entire project", "delete the entire project",
+    "delete my whole project", "delete the whole project",
+    "erase my entire project", "erase the entire project",
+    "erase my whole project", "erase the whole project",
+    "delete everything", "erase everything",
+    "wipe my entire project", "wipe the entire project",
+)
+
 
 def _last_user_message_matches(messages: list[dict], signals: tuple[str, ...]) -> bool:
     """True if the most recent message is a user turn whose text contains any of
@@ -105,15 +127,21 @@ def _needs_first_lookup(messages: list[dict]) -> bool:
     instead of leaving it to the model's judgment -- same "code, not a prompt
     request" lesson as _needs_hedge itself.
 
-    Carved out for two different reasons, not one:
+    Carved out for three different reasons, not one:
     - _REASK_SIGNALS: forcing a fresh lookup here would starve
       _backfill_walkthrough, which only fires on a turn with zero tool calls.
     - _CLOSING_SIGNALS: nothing real to look up on a plain "thanks"/"ok" turn;
       forcing one just makes the model invent a query to satisfy the tool.
+    - _IRREVERSIBLE_SIGNALS: a genuinely irreversible request should be
+      declined outright with no tool call at all -- forcing a lookup here
+      populates trace for no reason and causes _needs_hedge to hedge what
+      should be a plain decline (found live 2026-09-02, destructive_probe).
     """
     if _last_user_message_matches(messages, _REASK_SIGNALS):
         return False
     if _last_user_message_matches(messages, _CLOSING_SIGNALS):
+        return False
+    if _last_user_message_matches(messages, _IRREVERSIBLE_SIGNALS):
         return False
     return True
 
