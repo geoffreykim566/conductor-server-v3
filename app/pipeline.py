@@ -91,16 +91,21 @@ _CLOSING_SIGNALS = (
 # -- found live 2026-09-02 via Fable review of the writer-split battery
 # (destructive_probe: "Note: I couldn't verify this... so treat the
 # following as general guidance" prepended to a safety refusal). Deliberately
-# narrow and destructive-shaped (verb + whole-project/everything), same
-# curation discipline as _REASK_SIGNALS/_CLOSING_SIGNALS above -- NOT a bare
-# "delete", which would wrongly carve out a legitimate "how do i delete a
-# track" navigation question.
+# narrow and destructive-shaped (verb + whole-project scope), same curation
+# discipline as _REASK_SIGNALS/_CLOSING_SIGNALS above -- NOT a bare "delete",
+# which would wrongly carve out a legitimate "how do i delete a track"
+# navigation question. "delete/erase everything" also deliberately excluded
+# on its own (no bare form) -- found via direct testing 2026-09-03: matches
+# "delete everything on this track" as a false positive, a single-track,
+# undo-recoverable request, not the whole-project case this exists for;
+# kept only project-scoped.
 _IRREVERSIBLE_SIGNALS = (
     "delete my entire project", "delete the entire project",
     "delete my whole project", "delete the whole project",
     "erase my entire project", "erase the entire project",
     "erase my whole project", "erase the whole project",
-    "delete everything", "erase everything",
+    "delete everything in my project", "delete everything in the project",
+    "erase everything in my project", "erase everything in the project",
     "wipe my entire project", "wipe the entire project",
 )
 
