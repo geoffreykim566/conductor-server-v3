@@ -56,6 +56,11 @@ class Result:
     trace: list[dict] = field(default_factory=list)
     messages: list[dict] = field(default_factory=list)
     usage: list[dict] = field(default_factory=list)
+    # "strong" / "moderate" / "generic" (see _confidence_tier) -- "research" is
+    # reserved for the not-yet-built web-research tool (v3-log.md, 2026-09-04),
+    # never returned today. Drives the client's confidence badge; replaces the
+    # old literal _HEDGE_PREFIX text that used to carry this signal inline.
+    confidence_tier: str = "generic"
 
 
 # Bare "again" and "forgot" deliberately excluded, and "cant find it" removed
@@ -96,8 +101,9 @@ _CLOSING_SIGNALS = (
 # closed on execution" rule already says decline these outright, no
 # walkthrough, but forcing a lookup_concept call on iteration 0 anyway
 # (see _needs_first_lookup below) meant that rule never got a clean chance to
-# apply: the forced call populated trace, and _needs_hedge (correctly, by its
-# own logic) then hedged a response that was actually a decline, not a claim
+# apply: the forced call populated trace, and _needs_hedge (this function's
+# pre-badge name; now _confidence_tier) then hedged a response that was
+# actually a decline, not a claim
 # -- found live 2026-09-02 via Fable review of the writer-split battery
 # (destructive_probe: "Note: I couldn't verify this... so treat the
 # following as general guidance" prepended to a safety refusal). Deliberately
@@ -134,13 +140,13 @@ def _last_user_message_matches(messages: list[dict], signals: tuple[str, ...]) -
 
 def _needs_first_lookup(messages: list[dict]) -> bool:
     """Tool-skip gap fix: without this, the model is free to answer a real
-    question with zero lookup_concept calls, and _needs_hedge() deliberately
-    stays silent on an empty trace (can't tell that apart from a normal
-    closing turn) -- so those answers ship with full confidence and no KB
-    grounding at all (found live 2026-08-09, the "how do i make a beat"
-    query). Fix is to force lookup_concept on the turn's first iteration
-    instead of leaving it to the model's judgment -- same "code, not a prompt
-    request" lesson as _needs_hedge itself.
+    question with zero lookup_concept calls, and _confidence_tier() (formerly
+    _needs_hedge()) deliberately falls through to "generic" on an empty trace
+    (can't tell that apart from a normal closing turn) -- so those answers ship
+    with full confidence and no KB grounding at all (found live 2026-08-09, the
+    "how do i make a beat" query). Fix is to force lookup_concept on the turn's
+    first iteration instead of leaving it to the model's judgment -- same
+    "code, not a prompt request" lesson as _confidence_tier itself.
 
     Carved out for three different reasons, not one:
     - _REASK_SIGNALS: forcing a fresh lookup here would starve
@@ -149,8 +155,8 @@ def _needs_first_lookup(messages: list[dict]) -> bool:
       forcing one just makes the model invent a query to satisfy the tool.
     - _IRREVERSIBLE_SIGNALS: a genuinely irreversible request should be
       declined outright with no tool call at all -- forcing a lookup here
-      populates trace for no reason and causes _needs_hedge to hedge what
-      should be a plain decline (found live 2026-09-02, destructive_probe).
+      populates trace for no reason and causes _confidence_tier to mark
+      "moderate" what should be a plain decline (found live 2026-09-02, destructive_probe).
     """
     if _last_user_message_matches(messages, _REASK_SIGNALS):
         return False
@@ -225,11 +231,6 @@ def _backfill_walkthrough(messages: list[dict], text: str) -> dict | None:
     return {"destination": matches[0], "steps": attached_by_destination[matches[0]]}
 
 
-_HEDGE_PREFIX = (
-    "Note: I couldn't verify this against confirmed Logic Pro documentation, so treat "
-    "the following as general guidance rather than an exact path.\n\n"
-)
-
 
 def _attach_is_strong(trace: list[dict], attached_solution: str | None) -> bool:
     """True if the get_walkthrough attach that set walkthrough_steps was itself
@@ -282,26 +283,37 @@ def _strong_grounded_lookup_exists(trace: list[dict]) -> bool:
     )
 
 
-def _needs_hedge(
+def _confidence_tier(
     trace: list[dict],
     walkthrough_steps: list | None,
     attached_solution: str | None = None,
     is_clarifying_question: bool = False,
-) -> bool:
+) -> str:
     """Deterministic backstop -- prompt-only hedge instructions held ~40-50% of the time
     across live testing, 0% on broad/indirect questions specifically (2026-08-11).
-    Fires when this turn made a real attempt (a tool call) but never reached strong
-    grounding. Does NOT fire on zero tool calls -- can't distinguish a plain
-    conversational close from the separate, not-yet-fixed tool-skip gap.
+    Returns "moderate" exactly when this turn made a real attempt (a tool call) but
+    never reached strong grounding. Never "moderate" on zero tool calls -- can't
+    distinguish a plain conversational close from the separate, not-yet-fixed
+    tool-skip gap, so that case (and a claim-free clarifying question) falls
+    through to "generic" instead.
+
+    Was a bool (_needs_hedge) driving a guaranteed literal text prefix
+    (_HEDGE_PREFIX) prepended to the response; replaced 2026-09-04 with this
+    3-way label driving a client-side confidence badge instead (v3-log.md). Same
+    underlying condition, same reliability property that mattered originally
+    (deterministic, code-computed, not dependent on the model choosing to phrase
+    a caveat) -- a server-computed badge carries that guarantee at least as well
+    as a forced text prefix did, without the prefix's "shows up verbatim at the
+    top of every moderate answer" cost. "research" is a fourth possible tier,
+    reserved for the not-yet-built web-research tool; never returned here.
 
     is_clarifying_question short-circuits ahead of all of that -- a turn that's
     ONLY a clarifying question (see tools.ASK_CLARIFYING_QUESTION_SCHEMA) makes no
-    claim at all, so there's nothing to hedge regardless of what the underlying
-    trace looks like. Found live 2026-09-02 (Fable review): muddy_ambiguous and
-    thin_hollow_boundary are trace-identical to a real ungrounded claim (a tool
-    call happened, nothing attached, confidence never hit strong) but the response
-    is just a question -- hedging it read as "treat the following as general
-    guidance" over a bare question with no guidance in it at all.
+    claim at all, so there's nothing to badge as uncertain regardless of what the
+    underlying trace looks like. Found live 2026-09-02 (Fable review):
+    muddy_ambiguous and thin_hollow_boundary are trace-identical to a real
+    ungrounded claim (a tool call happened, nothing attached, confidence never
+    hit strong) but the response is just a question.
 
     Known remaining gap, not fixed here: a strong, path-bearing match still only
     certifies the DESTINATION, not every specific claim layered on top of it in
@@ -311,12 +323,12 @@ def _needs_hedge(
     that needs claim-level grounding, not a trace-level check; left to the
     widened prompt-level grounding rule instead."""
     if is_clarifying_question:
-        return False
+        return "generic"
     if walkthrough_steps is not None:
-        return not _attach_is_strong(trace, attached_solution)
+        return "strong" if _attach_is_strong(trace, attached_solution) else "moderate"
     if not trace:
-        return False
-    return not _strong_grounded_lookup_exists(trace)
+        return "generic"
+    return "strong" if _strong_grounded_lookup_exists(trace) else "moderate"
 
 
 def _solution_to_problem(trace: list[dict]) -> dict[str, str | None]:
@@ -414,24 +426,26 @@ async def _finalize_answer(
     usage: list[dict],
     attached_solution: str | None = None,
     is_clarifying_question: bool = False,
-) -> str:
+) -> tuple[str, str]:
     """Called once this turn's decider text is fully known (either the
-    no-more-tool-calls return or the MAX_ITERATIONS safety net). Hedge decision
-    stays exactly as before -- deterministic, code-enforced -- and, critically,
-    _HEDGE_PREFIX stays a literal, guaranteed prefix on what's actually
-    returned/streamed, exactly like pre-writer-split behavior; it is NOT just
-    handed to the writer as one of the facts to phrase. Found live wiring this
-    in: baking the prefix into the writer's input facts let the writer's own
-    "don't add caveats" instruction (WRITER_SYSTEM_PROMPT, borrowed from the
-    Format section) silently drop it -- hedge_indirect_beat_from_scratch came
-    back fully confident, zero hedge language, the exact regression the
-    2026-08-11/12 deterministic backstop exists to prevent. The writer still
-    gets told plainly when a turn has no verified answer (so its own prose
-    doesn't contradict the prefix that follows it), but the prefix itself never
-    depends on the writer honoring that."""
-    hedge = _needs_hedge(trace, walkthrough_steps, attached_solution, is_clarifying_question)
+    no-more-tool-calls return or the MAX_ITERATIONS safety net). Tier decision
+    stays exactly as before -- deterministic, code-enforced (_confidence_tier) --
+    but as of 2026-09-04 no longer prepends a literal _HEDGE_PREFIX to the
+    streamed/returned text; the client renders the tier as a confidence badge
+    instead (source_tier in the /v1/chat "done" payload -- see api.py). The
+    badge is at least as reliable a carrier of this signal as the old forced
+    text prefix was (still server-computed, still not dependent on the model
+    choosing to phrase a caveat), without the prefix's cost of showing up
+    verbatim at the top of every moderate-confidence answer.
+
+    The writer still gets told plainly, in its facts input, when a turn has no
+    verified answer -- so its own prose doesn't overclaim a specific unverified
+    path as fact -- but nothing about that instruction is load-bearing for the
+    confidence signal reaching the user anymore; that's the badge's job now.
+    Returns (response_text, confidence_tier)."""
+    tier = _confidence_tier(trace, walkthrough_steps, attached_solution, is_clarifying_question)
     facts = text
-    if hedge:
+    if tier == "moderate":
         facts = (
             "No verified, confirmed answer was established for this turn -- no "
             "confident, specific menu path, setting, or fix was found. Say plainly "
@@ -439,11 +453,9 @@ async def _finalize_answer(
             "further, frame it clearly as unconfirmed general guidance, not a "
             "confirmed fix.\n\n" + text
         )
-        if on_chunk is not None:
-            await on_chunk(_HEDGE_PREFIX)
     resp_text, writer_usage = await _write_response(facts, prior_messages, on_chunk)
     usage.append(writer_usage)
-    return (_HEDGE_PREFIX + resp_text) if hedge else resp_text
+    return resp_text, tier
 
 
 def _serialize_content(content: list) -> list[dict]:
@@ -525,9 +537,39 @@ async def respond(
     messages: list[dict],
     ax_fixture: dict | None = None,
     on_chunk: OnChunk | None = None,
+    screenshots_b64: list[str] | None = None,
 ) -> Result:
     msgs = list(messages)
     trace: list[dict] = []
+
+    # Screenshots are fresh, per-turn context (see api.py's ChatRequest) --
+    # spliced into the newest user turn only for this turn's own model calls
+    # via _with_screenshots below, never into `msgs` itself. `msgs` is what
+    # Result.messages returns as next turn's `history`, and that has to stay
+    # plain text: the client's history validator has no "image" block type at
+    # all (api.py's _validate_history), so an image surviving into history
+    # would 400 the very next request. Keeping it out of msgs also means a
+    # screenshot is never re-sent on every later turn -- only the turn it
+    # actually arrived with pays for it.
+    screenshot_idx: int | None = None
+    if screenshots_b64 and msgs and msgs[-1].get("role") == "user" and isinstance(msgs[-1].get("content"), str):
+        screenshot_idx = len(msgs) - 1
+        screenshot_msg = {
+            "role": "user",
+            "content": [
+                {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": b64}}
+                for b64 in screenshots_b64
+            ] + [{"type": "text", "text": msgs[screenshot_idx]["content"]}],
+        }
+
+    def _with_screenshots(base: list[dict]) -> list[dict]:
+        if screenshot_idx is None:
+            return base
+        out = list(base)
+        out[screenshot_idx] = screenshot_msg
+        return out
+
+
     usage: list[dict] = []
     walkthrough_steps: list | None = None
     attached_solution: str | None = None
@@ -581,7 +623,7 @@ async def respond(
         tool_choice = None
         if i == 0 and force_first_lookup:
             tool_choice = {"type": "tool", "name": "lookup_concept"}
-        resp = await _call_model(system, tools.TOOLS, msgs, None, tool_choice)
+        resp = await _call_model(system, tools.TOOLS, _with_screenshots(msgs), None, tool_choice)
         usage.append(_usage_dict(resp.usage))
         tool_uses = [b for b in resp.content if b.type == "tool_use"]
         iter_text = "".join(b.text for b in resp.content if b.type == "text")
@@ -605,10 +647,11 @@ async def respond(
                             "backfilled": True,
                         },
                     })
-            text = await _finalize_answer(
+            text, tier = await _finalize_answer(
                 trace, walkthrough_steps, text, messages, on_chunk, usage, attached_solution
             )
-            return Result(text=text, walkthrough_steps=walkthrough_steps, trace=trace, messages=msgs, usage=usage)
+            return Result(text=text, walkthrough_steps=walkthrough_steps, trace=trace, messages=msgs,
+                           usage=usage, confidence_tier=tier)
 
         msgs.append({"role": "assistant", "content": _serialize_content(resp.content)})
         tool_results = []
@@ -664,11 +707,12 @@ async def respond(
         # ever applies to a turn with zero tool calls at all.
         if any(tu.name == "ask_clarifying_question" for tu in tool_uses):
             text = "\n\n".join(text_parts)
-            text = await _finalize_answer(
+            text, tier = await _finalize_answer(
                 trace, walkthrough_steps, text, messages, on_chunk, usage,
                 attached_solution, is_clarifying_question=True,
             )
-            return Result(text=text, walkthrough_steps=walkthrough_steps, trace=trace, messages=msgs, usage=usage)
+            return Result(text=text, walkthrough_steps=walkthrough_steps, trace=trace, messages=msgs,
+                           usage=usage, confidence_tier=tier)
 
     # Safety net: never return a truly empty response, regardless of why the
     # loop didn't converge on its own. Force one final tools-off call so the
@@ -681,7 +725,7 @@ async def respond(
             "text": "\n\nAnswer now with your best available information — no more tool calls.",
         }],
         None,
-        msgs,
+        _with_screenshots(msgs),
         None,
     )
     usage.append(_usage_dict(final.usage))
@@ -696,7 +740,8 @@ async def respond(
     # can never be empty here, and _backfill_walkthrough only ever fires on a
     # turn with zero tool calls. A backfill check here was dead code (found via
     # Fable review, 2026-08-06) and has been removed rather than left in place.
-    text = await _finalize_answer(
+    text, tier = await _finalize_answer(
         trace, walkthrough_steps, text, messages, on_chunk, usage, attached_solution
     )
-    return Result(text=text, walkthrough_steps=walkthrough_steps, trace=trace, messages=msgs, usage=usage)
+    return Result(text=text, walkthrough_steps=walkthrough_steps, trace=trace, messages=msgs,
+                   usage=usage, confidence_tier=tier)

@@ -56,11 +56,14 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Traefik/uvicorn read the whole body before FastAPI's pydantic validation
 # runs, so an oversized-body cap has to live ahead of that, in a middleware
-# (same shape as v1's server/app/main.py). Cap is far smaller than v1's 45MB:
-# v3's traffic is text-only (no image blocks anywhere in this pipeline), and
-# even a maxed-out history (300 messages, ChatRequest's own per-field caps)
-# tops out in the low single-digit MB.
-_MAX_BODY_BYTES = 2 * 1024 * 1024
+# (same shape as v1's server/app/main.py). Still far smaller than v1's 45MB:
+# v1 carries screenshots forward inside client-owned history (up to 20 turns'
+# worth accumulate); v3 only ever receives *this* turn's fresh screenshots
+# (see ChatRequest.screenshots) and never echoes them back into `history`
+# (pipeline.py's respond()), so one request's worst case is bounded by
+# _MAX_SCREENSHOTS * _MAX_SCREENSHOT_CHARS plus a maxed-out text history,
+# not 20 turns of accumulated images.
+_MAX_BODY_BYTES = 10 * 1024 * 1024
 
 
 @app.middleware("http")
@@ -94,12 +97,37 @@ _ALLOWED_TEXT_BLOCK_KEYS = {"type", "text"}
 _ALLOWED_TOOL_USE_KEYS = {"type", "id", "name", "input"}
 _ALLOWED_TOOL_RESULT_KEYS = {"type", "tool_use_id", "content"}
 
+# Base64 PNG cap per screenshot (~1.5MB raw) and count per turn -- same
+# per-image budget v1 used (server/app/routes/chat.py's _MAX_IMAGE_B64), but
+# a much smaller max count: v1 bounded 20 *turns* of accumulated history
+# images, this bounds one turn's fresh per-window captures (client caps at
+# MAX_CONTEXT_WINDOWS=4 too; validated again here since the client isn't a
+# trust boundary).
+_MAX_SCREENSHOT_CHARS = 2 * 1024 * 1024
+_MAX_SCREENSHOTS = 4
+
 
 class ChatRequest(BaseModel):
     message: str = Field(..., max_length=_MAX_MESSAGE_CHARS)
     # Opaque — exactly what a prior /v1/chat call's "done" event sent as
     # "history". None (or omitted) starts a fresh conversation.
     history: list[dict] | None = None
+    # Fresh, per-request visual context -- base64 PNGs, one per captured
+    # Logic Pro window (see client-v3's window_capture.capture_context_images_b64).
+    # Never part of `history`: pipeline.respond() attaches these only to this
+    # turn's own model calls and returns plain text in Result.messages, so
+    # they're never round-tripped back as history on a later request.
+    screenshots: list[str] | None = Field(None, max_length=_MAX_SCREENSHOTS)
+
+    @field_validator("screenshots")
+    @classmethod
+    def _validate_screenshots(cls, shots: list[str] | None) -> list[str] | None:
+        if shots is None:
+            return shots
+        for s in shots:
+            if not isinstance(s, str) or not s or len(s) > _MAX_SCREENSHOT_CHARS:
+                raise ValueError("invalid or oversized screenshot")
+        return shots
 
     @field_validator("history")
     @classmethod
@@ -276,7 +304,7 @@ async def chat(request: Request, req: ChatRequest, user: asyncpg.Record = Depend
             try:
                 history = _trim_history(req.history or [])
                 messages = history + [{"role": "user", "content": req.message}]
-                result = await respond(messages, on_chunk=on_chunk)
+                result = await respond(messages, screenshots_b64=req.screenshots, on_chunk=on_chunk)
                 await queue.put(("result", result))
             except Exception as e:
                 await queue.put(("error", e))
@@ -301,7 +329,7 @@ async def chat(request: Request, req: ChatRequest, user: asyncpg.Record = Depend
                         "type": "done",
                         "event_id": str(event_id),
                         "remaining": remaining,
-                        "source_tier": "",
+                        "source_tier": result.confidence_tier,
                         "sources": [],
                         "intent": "",
                         "locate_type": "",
