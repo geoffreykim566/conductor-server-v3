@@ -166,6 +166,37 @@ _IRREVERSIBLE_SIGNALS = (
 )
 
 
+# Bare greetings -- carved out of the iteration-0 forced lookup_concept call
+# for the same reason as _CLOSING_SIGNALS: nothing real to look up on "hi",
+# forcing one just makes the model invent a fake problem query. Found live
+# 2026-09-04: no carve-out existed for openers at all, only closers, so every
+# greeting forced a real KB search ("Searching internal knowledge base...").
+# Deliberately matched as the WHOLE message (see _is_bare_greeting) rather
+# than _last_user_message_matches's substring-anywhere check used for the
+# other three signal lists -- "hi"/"yo" are common substrings of ordinary
+# words ("this", "history", "yoke"), so containment matching here would
+# wrongly skip the forced lookup on real questions.
+_GREETING_SIGNALS = (
+    "hi", "hey", "hello", "yo", "sup", "hiya", "howdy", "greetings",
+    "hey there", "hi there", "what's up", "whats up", "good morning",
+    "good afternoon", "good evening",
+)
+
+
+def _is_bare_greeting(messages: list[dict]) -> bool:
+    """True if the most recent message is a user turn whose ENTIRE text
+    (punctuation-stripped) is one of _GREETING_SIGNALS -- see that list's
+    comment for why this can't reuse _last_user_message_matches's substring
+    check."""
+    if not messages or messages[-1].get("role") != "user":
+        return False
+    user_text = messages[-1].get("content")
+    if not isinstance(user_text, str):
+        return False
+    normalized = user_text.lower().strip(" !.?").replace("'", "")
+    return normalized in _GREETING_SIGNALS
+
+
 def _last_user_message_matches(messages: list[dict], signals: tuple[str, ...]) -> bool:
     """True if the most recent message is a user turn whose text contains any of
     the given signal phrases (case/apostrophe-insensitive substring match)."""
@@ -188,7 +219,7 @@ def _needs_first_lookup(messages: list[dict]) -> bool:
     first iteration instead of leaving it to the model's judgment -- same
     "code, not a prompt request" lesson as _confidence_tier itself.
 
-    Carved out for three different reasons, not one:
+    Carved out for four different reasons, not one:
     - _REASK_SIGNALS: forcing a fresh lookup here would starve
       _backfill_walkthrough, which only fires on a turn with zero tool calls.
     - _CLOSING_SIGNALS: nothing real to look up on a plain "thanks"/"ok" turn;
@@ -197,12 +228,16 @@ def _needs_first_lookup(messages: list[dict]) -> bool:
       declined outright with no tool call at all -- forcing a lookup here
       populates trace for no reason and causes _confidence_tier to mark
       "moderate" what should be a plain decline (found live 2026-09-02, destructive_probe).
+    - _GREETING_SIGNALS: same reasoning as _CLOSING_SIGNALS, opener instead
+      of closer.
     """
     if _last_user_message_matches(messages, _REASK_SIGNALS):
         return False
     if _last_user_message_matches(messages, _CLOSING_SIGNALS):
         return False
     if _last_user_message_matches(messages, _IRREVERSIBLE_SIGNALS):
+        return False
+    if _is_bare_greeting(messages):
         return False
     return True
 
