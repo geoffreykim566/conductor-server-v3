@@ -585,6 +585,18 @@ def _serialize_content(content: list) -> list[dict]:
             out.append({"type": "text", "text": b.text})
         elif b.type == "tool_use":
             out.append({"type": "tool_use", "id": b.id, "name": b.name, "input": b.input})
+        elif b.type == "thinking":
+            # Dropped, not persisted -- found live 2026-09-04 right after bumping
+            # MODEL to claude-sonnet-5: unlike Sonnet 4.6, Sonnet 5 runs adaptive
+            # thinking by default even with no `thinking` param sent, so every
+            # decider call now produces one of these. api.py's _validate_history
+            # only allows "text"/"tool_use" for assistant blocks -- replaying an
+            # untouched "thinking" block in a later request's history 422s the
+            # whole turn (broke every multi-turn conversation, not just research
+            # ones). Safe to drop: this is a standard, non-interleaved manual
+            # tool loop (no interleaved-thinking beta), so each _call_model
+            # invocation thinks fresh regardless of what a prior iteration did.
+            continue
         else:
             out.append(b.model_dump())
     return out
