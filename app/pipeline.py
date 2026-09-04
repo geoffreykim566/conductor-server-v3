@@ -50,7 +50,12 @@ def _format_duration(seconds: float) -> str:
 # web_search call, see app/research.py). Priority order below applies when an
 # iteration's tool_uses contains more than one name; ask_clarifying_question
 # is deliberately absent -- it ends the turn immediately, no wait to narrate.
-_TOOL_STATUS_PRIORITY = ["web_research", "lookup_concept", "get_walkthrough"]
+# get_walkthrough is also absent -- an in-memory dict attach with no real I/O,
+# found live 2026-09-04 to flash past too fast to read; leaving it unmapped
+# means "Thinking..." (already showing from this iteration's top) just carries
+# through the attach uninterrupted instead of a message appearing only to
+# immediately vanish.
+_TOOL_STATUS_PRIORITY = ["web_research", "lookup_concept"]
 
 
 def _status_for_tools(tool_uses: list) -> str | None:
@@ -62,8 +67,6 @@ def _status_for_tools(tool_uses: list) -> str | None:
             return f"Searching the web for a verified answer (may take up to {_format_duration(RESEARCH_CALL_TIMEOUT_S)})…"
         if name == "lookup_concept":
             return "Searching internal knowledge base…"
-        if name == "get_walkthrough":
-            return "Preparing walkthrough…"
     return None
 
 async def _ack_clarifying_question() -> dict:
