@@ -518,6 +518,7 @@ async def _finalize_answer(
     usage: list[dict],
     attached_solution: str | None = None,
     is_clarifying_question: bool = False,
+    live_state: str | None = None,
 ) -> tuple[str, str]:
     """Called once this turn's decider text is fully known (either the
     no-more-tool-calls return or the MAX_ITERATIONS safety net). Tier decision
@@ -547,6 +548,15 @@ async def _finalize_answer(
             "that you don't have a verified answer for this; if you offer anything "
             "further, frame it clearly as unconfirmed general guidance, not a "
             "confirmed fix.\n\n" + text
+        )
+    # Code-guaranteed, not dependent on the decider's own text having restated
+    # it (see respond()'s comment on live_state) -- appended last so it can't be
+    # buried or dropped by whichever branch above ran.
+    if live_state:
+        facts += (
+            "\n\n## Ground truth for this turn, from Logic Pro's live Accessibility "
+            "state (not the user's claim) -- if anything above conflicts with this, "
+            "this is correct:\n\n" + live_state
         )
     resp_text, writer_usage = await _write_response(facts, prior_messages, on_chunk)
     usage.append(writer_usage)
@@ -700,6 +710,19 @@ async def respond(
         state_blocks.append("\n".join(f"- {k}: {v}" for k, v in ax_fixture.items()))
     if ax_state:
         state_blocks.append(ax_state)
+    # Also handed to _finalize_answer below (as `live_state`) so the writer call
+    # gets it verbatim in its `facts` input -- the decider seeing this block in
+    # its own system prompt is not enough on its own. Found live 2026-09-04
+    # (battery Fable review): the writer's system prompt is built fresh from
+    # WRITER_SYSTEM_PROMPT + facts (see _write_response) and never includes this
+    # block, so a correction only reached the final answer when the decider's
+    # own generated text happened to restate it -- confirmed failing on a direct
+    # user-claim contradiction (ax_contradicts_user_claim, ax_state_contradicts_
+    # user_claim both wrong in the 2026-09-04 full-battery run). Appending it to
+    # facts is a code-guaranteed backstop, not a hope that the decider restates
+    # it -- same "code over prompt" reasoning as everything else pushed state
+    # relies on in this file.
+    live_state = "\n\n".join(state_blocks) if state_blocks else None
     if state_blocks:
         system_text += (
             "\n\n## Live state for this turn\n\n"
@@ -707,7 +730,7 @@ async def respond(
             "API -- ground truth, not something the user said or you inferred. This "
             "outranks stated claims, seed_weight, and anything read from a screenshot "
             "when they conflict.\n\n"
-            + "\n\n".join(state_blocks)
+            + live_state
         )
     # Cached as its own block: identical across every iteration of this turn's
     # loop (system+tools resent unchanged on each one -- measured 2026-08-05:
@@ -763,7 +786,8 @@ async def respond(
                         },
                     })
             text, tier = await _finalize_answer(
-                trace, walkthrough_steps, text, messages, on_chunk, usage, attached_solution
+                trace, walkthrough_steps, text, messages, on_chunk, usage, attached_solution,
+                live_state=live_state,
             )
             return Result(text=text, walkthrough_steps=walkthrough_steps, trace=trace, messages=msgs,
                            usage=usage, confidence_tier=tier, sources=_collect_sources(trace))
@@ -838,7 +862,7 @@ async def respond(
             text = "\n\n".join(text_parts)
             text, tier = await _finalize_answer(
                 trace, walkthrough_steps, text, messages, on_chunk, usage,
-                attached_solution, is_clarifying_question=True,
+                attached_solution, is_clarifying_question=True, live_state=live_state,
             )
             return Result(text=text, walkthrough_steps=walkthrough_steps, trace=trace, messages=msgs,
                            usage=usage, confidence_tier=tier, sources=_collect_sources(trace))
@@ -870,7 +894,8 @@ async def respond(
     # turn with zero tool calls. A backfill check here was dead code (found via
     # Fable review, 2026-08-06) and has been removed rather than left in place.
     text, tier = await _finalize_answer(
-        trace, walkthrough_steps, text, messages, on_chunk, usage, attached_solution
+        trace, walkthrough_steps, text, messages, on_chunk, usage, attached_solution,
+        live_state=live_state,
     )
     return Result(text=text, walkthrough_steps=walkthrough_steps, trace=trace, messages=msgs,
                    usage=usage, confidence_tier=tier, sources=_collect_sources(trace))
