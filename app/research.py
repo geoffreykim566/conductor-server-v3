@@ -12,13 +12,21 @@ firing a real web-search call on every weak/no-hit lookup_concept result
 would be the costlier, more eager choice, in a project that hasn't yet
 measured per-turn cost since the writer-split).
 
-source_tier/sources are returned here but NOT wired into the confidence badge
-(pipeline.py's _confidence_tier / Result.confidence_tier, api.py's
-"source_tier"/"sources" response fields, client-v3's message_widget.py) --
-that fix is mid-flight elsewhere as of this writing. Deliberately left
-untouched to avoid stepping on it; once it lands, _confidence_tier gains its
-already-reserved "research" tier and api.py's hardcoded "sources": [] gets
-the real list from here.
+The coarse confidence badge IS wired end-to-end: a successful call earns
+pipeline.py's _confidence_tier "research" label (trusted like "strong"), and
+`sources` flows through Result.sources into api.py's "sources" response field
+and client-v3's badge/source-chip UI. Stale note this docstring used to carry
+here ("NOT wired... mid-flight elsewhere") was left over from before that
+landed -- corrected 2026-09-04. What's still NOT wired: the fine-grained
+per-call `source_tier` this module computes (confirmed-research /
+community-research / genre-inference, see _CONFIDENCE_TO_TIER) never reaches
+_confidence_tier -- every successful call gets the same "research" badge
+regardless of which of those three it actually was. Also latent as of the
+same date: _parse_confidence's regex requires a line starting with literal
+"CONFIDENCE:" and misses the model's own bold-markdown output
+("**CONFIDENCE:**" was observed live), silently defaulting to
+commonly_believed -- harmless while the fine-grained tier isn't surfaced
+anywhere, will matter once it is.
 """
 from __future__ import annotations
 
@@ -57,6 +65,20 @@ _CONFIDENCE_TO_TIER: dict[str, str] = {
     "commonly_believed": "community-research",
     "genre_inferred": "genre-inference",
 }
+
+# Bounds on what this tool's result carries forward. Unlike ax_state/screenshots
+# (system-prompt-only, never touch `msgs` at all -- see pipeline.py's respond()),
+# a tool_result has to stay in conversation history to pair with its tool_use
+# (Anthropic API requirement -- there's no screenshot-style total exclusion
+# available here, omitting it would 400 every later request in the same
+# conversation, not just quietly grow it). So this has to actually be capped,
+# not excluded. Found live 2026-09-04: an uncapped 22-source, long-findings
+# result (query: rage-rap production techniques) pushed a later turn's replayed
+# history past api.py's 20,000-char per-block cap, 422ing every subsequent
+# request in that conversation. Applied once here rather than per-caller so the
+# decider/writer and the persisted history version are always the same content.
+_MAX_FINDINGS_CHARS = 6_000
+_MAX_SOURCES = 10
 
 
 def _parse_confidence(text: str) -> str:
@@ -197,6 +219,10 @@ async def web_research(query: str) -> dict:
     sources = _extract_sources(all_content, confidence)
     if not sources and findings:
         sources = _extract_sources_from_text(findings, confidence)
+
+    if len(findings) > _MAX_FINDINGS_CHARS:
+        findings = findings[:_MAX_FINDINGS_CHARS] + "\n\n... (truncated)"
+    sources = sources[:_MAX_SOURCES]
 
     log.warning(
         "[web_research_timing] SUCCESS after %.1fs total (%d continuation(s), %d sources, query=%r)",
