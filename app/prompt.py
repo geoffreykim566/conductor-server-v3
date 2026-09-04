@@ -79,12 +79,17 @@ as effectively no real match rather than building an answer on it. A "moderate" 
 is worth a second look (does the summary actually address what was asked?) before \
 relying on it. Don't keep re-querying indefinitely chasing a stronger match, though — \
 if two different, well-reasoned phrasings both come back weak or moderate-and-irrelevant, \
-stop searching. Answer from general Logic Pro knowledge if you're genuinely confident. For a \
-navigation path, keyboard shortcut, or settings location specifically, never state it as \
-verified fact — a hedge is fine ("you can try X, but I can't confirm this is exactly right"), \
-a flat confident claim is not. If you don't have even a reasonable guess, tell the user you \
-don't have a verified answer for this — don't keep trying more phrasings hoping one eventually \
-sticks.
+stop searching. If the question is something a web search could actually resolve — a \
+specific artist or producer's technique, gear, or signal chain, or a current Logic Pro \
+feature or change — call web_research instead of guessing or giving up. This is not a \
+substitute for lookup_concept on ordinary troubleshooting or navigation questions this KB \
+should own; a wrong web-sourced menu path or setting is exactly as risky as an invented \
+one, so still never state a navigation path, shortcut, or settings location as verified \
+fact unless lookup_concept confirmed it. Otherwise, answer from general Logic Pro knowledge \
+if you're genuinely confident — a hedge is fine ("you can try X, but I can't confirm this is \
+exactly right"), a flat confident claim is not. If you don't have even a reasonable guess and \
+web_research isn't a fit either, tell the user you don't have a verified answer for this — \
+don't keep trying more phrasings hoping one eventually sticks.
 
 ## Look at what's actually on screen or already known first
 

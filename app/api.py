@@ -105,6 +105,9 @@ _ALLOWED_TOOL_RESULT_KEYS = {"type", "tool_use_id", "content"}
 # trust boundary).
 _MAX_SCREENSHOT_CHARS = 2 * 1024 * 1024
 _MAX_SCREENSHOTS = 4
+# Text, not images -- generous relative to ax_capture.py's own ~12k-char cap
+# (client is not a trust boundary, validated again here regardless).
+_MAX_AX_STATE_CHARS = 32 * 1024
 
 
 class ChatRequest(BaseModel):
@@ -118,6 +121,11 @@ class ChatRequest(BaseModel):
     # turn's own model calls and returns plain text in Result.messages, so
     # they're never round-tripped back as history on a later request.
     screenshots: list[str] | None = Field(None, max_length=_MAX_SCREENSHOTS)
+    # Fresh, per-request Accessibility context -- text dump of currently open
+    # Logic windows/dialogs (see client-v3's core.ax_capture.capture_ax_state).
+    # Same lifetime rule as screenshots: this turn's model calls only, never
+    # echoed into history.
+    ax_state: str | None = Field(None, max_length=_MAX_AX_STATE_CHARS)
 
     @field_validator("screenshots")
     @classmethod
@@ -300,11 +308,17 @@ async def chat(request: Request, req: ChatRequest, user: asyncpg.Record = Depend
         async def on_chunk(text: str) -> None:
             await queue.put(("chunk", text))
 
+        async def on_status(text: str) -> None:
+            await queue.put(("status", text))
+
         async def run() -> None:
             try:
                 history = _trim_history(req.history or [])
                 messages = history + [{"role": "user", "content": req.message}]
-                result = await respond(messages, screenshots_b64=req.screenshots, on_chunk=on_chunk)
+                result = await respond(
+                    messages, screenshots_b64=req.screenshots, ax_state=req.ax_state,
+                    on_chunk=on_chunk, on_status=on_status,
+                )
                 await queue.put(("result", result))
             except Exception as e:
                 await queue.put(("error", e))
@@ -315,6 +329,8 @@ async def chat(request: Request, req: ChatRequest, user: asyncpg.Record = Depend
                 kind, payload = await queue.get()
                 if kind == "chunk":
                     yield _sse({"type": "chunk", "text": payload})
+                elif kind == "status":
+                    yield _sse({"type": "status", "text": payload})
                 elif kind == "error":
                     yield _sse({"type": "error", "message": f"{type(payload).__name__}: {payload}"})
                     return
@@ -330,7 +346,7 @@ async def chat(request: Request, req: ChatRequest, user: asyncpg.Record = Depend
                         "event_id": str(event_id),
                         "remaining": remaining,
                         "source_tier": result.confidence_tier,
-                        "sources": [],
+                        "sources": result.sources,
                         "intent": "",
                         "locate_type": "",
                         "element": "",

@@ -36,9 +36,14 @@ SCENARIOS_FILE = Path(__file__).parent.parent / "scenarios" / "battery.json"
 BETWEEN_SCENARIOS_DELAY_S = 8
 
 
-def _actual_outcome(trace: list[dict], response_text: str = "") -> dict:
+def _actual_outcome(trace: list[dict], response_text: str = "", confidence_tier: str = "", sources: list | None = None) -> dict:
     lookup_calls = [c for c in trace if c["tool"] == "lookup_concept"]
     walkthrough_calls = [c for c in trace if c["tool"] == "get_walkthrough"]
+    # web_research_called: fire/no-fire grading for the new tool (v3-log.md
+    # 2026-09-04) -- the trigger is entirely model-decided (prompt.py + the
+    # tool's own schema description), not a deterministic gate, so this is
+    # the only way to check it structurally rather than eyeballing transcripts.
+    research_calls = [c for c in trace if c["tool"] == "web_research"]
 
     # Graded on the FIRST lookup_concept call -- the initial classification is
     # what this field is meant to test. A later call (e.g. re-querying a known
@@ -78,6 +83,10 @@ def _actual_outcome(trace: list[dict], response_text: str = "") -> dict:
         "attached_solutions": attached_solutions,
         "no_tool_calls": len(trace) == 0,
         "response_text": response_text,
+        "web_research_called": len(research_calls) > 0,
+        "web_research_queries": [c["input"].get("query") for c in research_calls],
+        "confidence_tier": confidence_tier,
+        "sources_present": bool(sources),
     }
 
 
@@ -137,6 +146,8 @@ async def run_scenario(scenario: dict) -> dict:
     messages: list[dict] = []
     trace: list[dict] = []
     response_text: str = ""
+    confidence_tier: str = ""
+    sources: list = []
     scenario_usage: list[dict] = []
     verdicts: list[dict] = []
     for i, turn in enumerate(scenario["turns"], 1):
@@ -147,6 +158,8 @@ async def run_scenario(scenario: dict) -> dict:
         messages = result.messages
         trace = result.trace  # graded against the scenario's top-level 'expect' below
         response_text = result.text  # ditto, for response_contains/response_not_contains
+        confidence_tier = result.confidence_tier
+        sources = result.sources
         scenario_usage.extend(result.usage)
 
         print(f"\n  --- turn {i}: {turn['text']!r} ---")
@@ -165,9 +178,10 @@ async def run_scenario(scenario: dict) -> dict:
         print(f"  response: {result.text}")
         print(f"  walkthrough attached: {result.walkthrough_steps is not None}"
               + (f" -> {result.walkthrough_steps}" if result.walkthrough_steps else ""))
+        print(f"  confidence_tier: {result.confidence_tier!r}, sources: {len(result.sources)}")
 
         if "expect" in turn:
-            turn_verdicts = _grade(turn["expect"], _actual_outcome(result.trace, result.text))
+            turn_verdicts = _grade(turn["expect"], _actual_outcome(result.trace, result.text, result.confidence_tier, result.sources))
             for v in turn_verdicts:
                 v["turn"] = i
             verdicts.extend(turn_verdicts)
@@ -177,7 +191,7 @@ async def run_scenario(scenario: dict) -> dict:
                 print(f"    [{status}] {v['field']}: expected={v['expected']!r} actual={v['actual']!r}")
 
     if "expect" in scenario:
-        final_verdicts = _grade(scenario["expect"], _actual_outcome(trace, response_text))
+        final_verdicts = _grade(scenario["expect"], _actual_outcome(trace, response_text, confidence_tier, sources))
         for v in final_verdicts:
             v["turn"] = "final"
         verdicts.extend(final_verdicts)

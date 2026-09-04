@@ -153,17 +153,48 @@ ASK_CLARIFYING_QUESTION_SCHEMA = {
         "properties": {},
         "additionalProperties": False,
     },
-    # Cache breakpoint for the whole tools array -- all three schemas are
+}
+
+# Executor lives in app/research.py (its own nested Sonnet + web_search call,
+# not a DB lookup like the tools above) -- kept out of this file the same way
+# v1 split router.py's glue from research.py's actual call. Model-decided
+# trigger, not a deterministic gate: the description below is the only thing
+# telling the model when to call this (v3-log.md 2026-09-04 scoping note) --
+# a code-forced call on every weak/no-hit lookup_concept result was
+# considered and rejected as the costlier, more eager option.
+WEB_RESEARCH_SCHEMA = {
+    "name": "web_research",
+    "description": (
+        "Search the web for information outside this KB's coverage -- specific artist/producer "
+        "techniques, gear, current Logic Pro features/changes, or anything else lookup_concept has "
+        "no real match for (its match_confidence came back 'weak' or there was no match at all). "
+        "Call this instead of answering from pretrained knowledge when a question asks for "
+        "something you'd otherwise have to guess at. Don't call it for ordinary troubleshooting or "
+        "navigation questions lookup_concept already covers -- this is for genuinely out-of-KB "
+        "information, not a first resort."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "query": {
+                "type": "string",
+                "description": "A focused web-search query capturing exactly what needs researching.",
+            }
+        },
+        "required": ["query"],
+        "additionalProperties": False,
+    },
+    # Cache breakpoint for the whole tools array -- all four schemas are
     # static across every call in a run, but get resent unchanged on every
     # loop iteration and every turn otherwise (measured 2026-08-05: 66 calls,
     # 207,869 uncached input tokens across a 24-scenario battery). Must sit
     # on the LAST schema in the array for the cache breakpoint to cover all
-    # of them -- moved here from get_walkthrough when this schema was added
-    # after it.
+    # of them -- moved here from ask_clarifying_question when this schema was
+    # added after it.
     "cache_control": {"type": "ephemeral"},
 }
 
-TOOLS = [LOOKUP_CONCEPT_SCHEMA, GET_WALKTHROUGH_SCHEMA, ASK_CLARIFYING_QUESTION_SCHEMA]
+TOOLS = [LOOKUP_CONCEPT_SCHEMA, GET_WALKTHROUGH_SCHEMA, ASK_CLARIFYING_QUESTION_SCHEMA, WEB_RESEARCH_SCHEMA]
 
 
 def _content_summary(name: str, content: dict) -> str:

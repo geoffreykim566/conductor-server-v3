@@ -19,6 +19,15 @@ DATABASE_URL = os.environ.get(
 MODEL = "claude-sonnet-4-6"
 MAX_TOKENS = 3072
 
+# web_research tool's own nested Sonnet + web_search call (see app/research.py).
+# Started at 90.0 (v1's own default) but raised 2026-09-04: live testing hit
+# the 90s ceiling on every one of 3 real research-battery calls in one run
+# (max_uses=3, up to 2 pause_turn continuations for a thorough multi-source
+# synthesis routinely runs past it) -- a call that times out can never earn
+# the trusted "research" confidence tier (see pipeline.py::_confidence_tier),
+# so a too-tight budget silently defeats the whole point of trusting it.
+RESEARCH_CALL_TIMEOUT_S = float(os.environ.get("RESEARCH_CALL_TIMEOUT_S", "150.0"))
+
 # The "writer" call (see pipeline.py::_write_response) rephrases the decider's
 # already-decided facts into user-facing prose with zero tool vocabulary --
 # deliberately a separate, cheaper model, since it only phrases, never weighs

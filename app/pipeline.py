@@ -13,11 +13,12 @@ from typing import Awaitable, Callable
 
 from anthropic import AsyncAnthropic
 
-from app import tools
-from app.config import CENTRAL_ANTHROPIC_KEY, MAX_TOKENS, MODEL, WRITER_MODEL
+from app import research, tools
+from app.config import CENTRAL_ANTHROPIC_KEY, MAX_TOKENS, MODEL, RESEARCH_CALL_TIMEOUT_S, WRITER_MODEL
 from app.prompt import SYSTEM_PROMPT, WRITER_SYSTEM_PROMPT
 
 OnChunk = Callable[[str], Awaitable[None]]
+OnStatus = Callable[[str], Awaitable[None]]
 
 MAX_ITERATIONS = 6
 
@@ -33,6 +34,38 @@ LOOKUP_ATTEMPT_LIMIT = 4
 
 _client = AsyncAnthropic(api_key=CENTRAL_ANTHROPIC_KEY)
 
+
+def _format_duration(seconds: float) -> str:
+    if seconds < 60:
+        return f"{int(seconds)} seconds"
+    minutes = seconds / 60
+    if minutes == int(minutes):
+        return f"{int(minutes)} minute{'s' if minutes != 1 else ''}"
+    return f"{minutes:.1f} minutes"
+
+
+# Status shown in the still-empty assistant bubble while a tool call this
+# turn is in flight -- distinguishes the two real wait states client-v3 can't
+# otherwise tell apart (a fast KB vector search vs. a nested Sonnet+
+# web_search call, see app/research.py). Priority order below applies when an
+# iteration's tool_uses contains more than one name; ask_clarifying_question
+# is deliberately absent -- it ends the turn immediately, no wait to narrate.
+_TOOL_STATUS_PRIORITY = ["web_research", "lookup_concept", "get_walkthrough"]
+
+
+def _status_for_tools(tool_uses: list) -> str | None:
+    names = {tu.name for tu in tool_uses}
+    for name in _TOOL_STATUS_PRIORITY:
+        if name not in names:
+            continue
+        if name == "web_research":
+            return f"Searching the web for a verified answer (may take up to {_format_duration(RESEARCH_CALL_TIMEOUT_S)})…"
+        if name == "lookup_concept":
+            return "Searching internal knowledge base…"
+        if name == "get_walkthrough":
+            return "Preparing walkthrough…"
+    return None
+
 async def _ack_clarifying_question() -> dict:
     """No-op executor for tools.ASK_CLARIFYING_QUESTION_SCHEMA -- the tool call
     itself is the entire point (a hard, code-checkable signal that this turn
@@ -46,6 +79,7 @@ _EXECUTORS = {
     "lookup_concept": lambda inp, fixture: tools.lookup_concept(inp["problem"]),
     "get_walkthrough": lambda inp, fixture: tools.get_walkthrough(inp["solution"], ax_fixture=fixture),
     "ask_clarifying_question": lambda inp, fixture: _ack_clarifying_question(),
+    "web_research": lambda inp, fixture: research.web_research(inp["query"]),
 }
 
 
@@ -56,11 +90,14 @@ class Result:
     trace: list[dict] = field(default_factory=list)
     messages: list[dict] = field(default_factory=list)
     usage: list[dict] = field(default_factory=list)
-    # "strong" / "moderate" / "generic" (see _confidence_tier) -- "research" is
-    # reserved for the not-yet-built web-research tool (v3-log.md, 2026-09-04),
-    # never returned today. Drives the client's confidence badge; replaces the
-    # old literal _HEDGE_PREFIX text that used to carry this signal inline.
+    # "strong" / "moderate" / "research" / "generic" (see _confidence_tier).
+    # Drives the client's confidence badge; replaces the old literal
+    # _HEDGE_PREFIX text that used to carry this signal inline.
     confidence_tier: str = "generic"
+    # Citations from this turn's web_research call(s), if any -- empty for
+    # every other turn. Rendered as source chips client-side (message_widget.py
+    # set_sources, built ahead of the tool itself on 2026-09-04).
+    sources: list[dict] = field(default_factory=list)
 
 
 # Bare "again" and "forgot" deliberately excluded, and "cant find it" removed
@@ -283,6 +320,22 @@ def _strong_grounded_lookup_exists(trace: list[dict]) -> bool:
     )
 
 
+def _successful_research_exists(trace: list[dict]) -> bool:
+    """True if some web_research call this turn actually returned findings --
+    not just was called. A timed-out/errored call (see app/research.py) or one
+    that genuinely found nothing has no real content behind it and must fall
+    through to the ordinary strong/moderate grounding check below, same as any
+    other unsuccessful tool attempt -- "research was attempted" isn't the same
+    claim as "research grounds this answer." Found live 2026-09-04: the
+    research-battery's Mac-Studio-chip scenario hit web_research's own 90s
+    timeout, and correctly still needs the ordinary hedge path, not a false
+    "research" badge on an empty result."""
+    return any(
+        c["tool"] == "web_research" and not c["output"].get("error") and c["output"].get("findings")
+        for c in trace
+    )
+
+
 def _confidence_tier(
     trace: list[dict],
     walkthrough_steps: list | None,
@@ -299,13 +352,25 @@ def _confidence_tier(
 
     Was a bool (_needs_hedge) driving a guaranteed literal text prefix
     (_HEDGE_PREFIX) prepended to the response; replaced 2026-09-04 with this
-    3-way label driving a client-side confidence badge instead (v3-log.md). Same
+    label driving a client-side confidence badge instead (v3-log.md). Same
     underlying condition, same reliability property that mattered originally
     (deterministic, code-computed, not dependent on the model choosing to phrase
     a caveat) -- a server-computed badge carries that guarantee at least as well
     as a forced text prefix did, without the prefix's "shows up verbatim at the
-    top of every moderate answer" cost. "research" is a fourth possible tier,
-    reserved for the not-yet-built web-research tool; never returned here.
+    top of every moderate answer" cost.
+
+    "research" (added 2026-09-04, same day web_research shipped) is trusted the
+    same way "strong" is -- a real citation-backed finding is not the same kind
+    of claim as an unverified guess, and shouldn't get the "no verified answer"
+    hedge facts _finalize_answer injects for "moderate" (confirmed live: before
+    this branch existed, a fully cited Skrillex/FM8 answer and a real Mac-Studio-
+    chip finding both opened with "I don't have a verified answer" anyway,
+    because this function had no idea web_research had even run). Checked after
+    the walkthrough branch, not before -- a turn that both attaches a real
+    destination AND separately researched something else (see
+    research_mixed_kb_and_research) keeps grading off the attach, its own
+    already-correct primary claim, not the secondary research aside; sources
+    still reach the client via Result.sources regardless of which tier wins.
 
     is_clarifying_question short-circuits ahead of all of that -- a turn that's
     ONLY a clarifying question (see tools.ASK_CLARIFYING_QUESTION_SCHEMA) makes no
@@ -321,14 +386,38 @@ def _confidence_tier(
     beyond what the tool result actually said) -- found live 2026-08-20/21
     (monitor_button_already_on, multiturn_evidence_arrives_later_turn). Catching
     that needs claim-level grounding, not a trace-level check; left to the
-    widened prompt-level grounding rule instead."""
+    widened prompt-level grounding rule instead. Same caveat now applies to
+    "research" -- a cited finding grounds what the sources actually said, not
+    every detail the model adds while translating it into a Logic Pro answer."""
     if is_clarifying_question:
         return "generic"
     if walkthrough_steps is not None:
         return "strong" if _attach_is_strong(trace, attached_solution) else "moderate"
+    if _successful_research_exists(trace):
+        return "research"
     if not trace:
         return "generic"
     return "strong" if _strong_grounded_lookup_exists(trace) else "moderate"
+
+
+def _collect_sources(trace: list[dict]) -> list[dict]:
+    """Every source cited by a successful web_research call this turn, in call
+    order, de-duplicated by URL. Empty for a turn that never called
+    web_research or whose call(s) all errored/found nothing -- mirrors
+    _successful_research_exists' own definition of "successful" rather than
+    trusting whatever a failed call's output happens to contain."""
+    sources: list[dict] = []
+    seen: set[str] = set()
+    for c in trace:
+        if c["tool"] != "web_research" or c["output"].get("error"):
+            continue
+        for src in c["output"].get("sources") or []:
+            url = src.get("url")
+            if not url or url in seen:
+                continue
+            seen.add(url)
+            sources.append(src)
+    return sources
 
 
 def _solution_to_problem(trace: list[dict]) -> dict[str, str | None]:
@@ -445,6 +534,9 @@ async def _finalize_answer(
     Returns (response_text, confidence_tier)."""
     tier = _confidence_tier(trace, walkthrough_steps, attached_solution, is_clarifying_question)
     facts = text
+    # Only "moderate" gets the hedge facts injected below -- "research" is
+    # trusted the same as "strong" (see _confidence_tier's 2026-09-04 note) and
+    # deliberately falls straight through to facts = text, unhedged.
     if tier == "moderate":
         facts = (
             "No verified, confirmed answer was established for this turn -- no "
@@ -537,7 +629,9 @@ async def respond(
     messages: list[dict],
     ax_fixture: dict | None = None,
     on_chunk: OnChunk | None = None,
+    on_status: OnStatus | None = None,
     screenshots_b64: list[str] | None = None,
+    ax_state: str | None = None,
 ) -> Result:
     msgs = list(messages)
     trace: list[dict] = []
@@ -591,15 +685,26 @@ async def respond(
     # it -- a decision point it's already been observed skipping under real
     # conditions (found live 2026-08-04, the monitor-button hallucination).
     system_text = SYSTEM_PROMPT
+    # ax_fixture (dict) is the test battery's hand-authored, deterministic-gating
+    # mechanism (see tools.py's toggle_ax_key/value_ax_key) -- never populated by
+    # a real client request. ax_state (str) is the real thing: a live text dump
+    # of whatever Logic windows/dialogs are actually open (client-v3's
+    # core.ax_capture), same "pushed, not pulled" reasoning, just not shaped as
+    # named key/value pairs since it's a passive tree read, not curated fixture
+    # data. Both compose into the same instruction block when present.
+    state_blocks = []
     if ax_fixture:
-        state_lines = "\n".join(f"- {k}: {v}" for k, v in ax_fixture.items())
+        state_blocks.append("\n".join(f"- {k}: {v}" for k, v in ax_fixture.items()))
+    if ax_state:
+        state_blocks.append(ax_state)
+    if state_blocks:
         system_text += (
             "\n\n## Live state for this turn\n\n"
             "Read directly from the running Logic Pro project via the Accessibility "
             "API -- ground truth, not something the user said or you inferred. This "
             "outranks stated claims, seed_weight, and anything read from a screenshot "
             "when they conflict.\n\n"
-            f"{state_lines}"
+            + "\n\n".join(state_blocks)
         )
     # Cached as its own block: identical across every iteration of this turn's
     # loop (system+tools resent unchanged on each one -- measured 2026-08-05:
@@ -619,7 +724,14 @@ async def respond(
         # The decider's own text never reaches the client directly anymore --
         # only the writer call (see _finalize_answer) streams -- so every
         # decider call runs non-streaming regardless of whether this respond()
-        # call was itself given an on_chunk.
+        # call was itself given an on_chunk. Status text takes the same shape:
+        # "Thinking..." while this call is in flight (we don't know yet
+        # whether -- or which -- tool it'll pick), overwritten below once
+        # tool_uses is known, and reset back to "Thinking..." here on every
+        # later iteration too (e.g. after tool results come back and the
+        # decider is composing on top of them).
+        if on_status:
+            await on_status("Thinking…")
         tool_choice = None
         if i == 0 and force_first_lookup:
             tool_choice = {"type": "tool", "name": "lookup_concept"}
@@ -651,9 +763,13 @@ async def respond(
                 trace, walkthrough_steps, text, messages, on_chunk, usage, attached_solution
             )
             return Result(text=text, walkthrough_steps=walkthrough_steps, trace=trace, messages=msgs,
-                           usage=usage, confidence_tier=tier)
+                           usage=usage, confidence_tier=tier, sources=_collect_sources(trace))
 
         msgs.append({"role": "assistant", "content": _serialize_content(resp.content)})
+        if on_status:
+            status_text = _status_for_tools(tool_uses)
+            if status_text:
+                await on_status(status_text)
         tool_results = []
         for tu in tool_uses:
             if tu.name == "lookup_concept":
@@ -688,6 +804,16 @@ async def respond(
             else:
                 executor = _EXECUTORS.get(tu.name)
                 result = {"error": f"unknown tool {tu.name!r}"} if executor is None else await executor(tu.input, ax_fixture)
+            # web_research is the only executor that makes its own real API call
+            # (a nested Sonnet + web_search request, see app/research.py) --
+            # pop its usage back out here so the turn's real token spend still
+            # gets counted (api.py sums Result.usage into the logged event),
+            # without that bookkeeping key ever reaching the model inside the
+            # tool_result content below. No-op for every other tool (none of
+            # them set "_usage").
+            call_usage = result.pop("_usage", None) if isinstance(result, dict) else None
+            if call_usage:
+                usage.append(call_usage)
             trace.append({"tool": tu.name, "input": tu.input, "output": result})
             if tu.name == "get_walkthrough" and result.get("attached"):
                 walkthrough_steps = result.get("steps")
@@ -712,7 +838,7 @@ async def respond(
                 attached_solution, is_clarifying_question=True,
             )
             return Result(text=text, walkthrough_steps=walkthrough_steps, trace=trace, messages=msgs,
-                           usage=usage, confidence_tier=tier)
+                           usage=usage, confidence_tier=tier, sources=_collect_sources(trace))
 
     # Safety net: never return a truly empty response, regardless of why the
     # loop didn't converge on its own. Force one final tools-off call so the
@@ -744,4 +870,4 @@ async def respond(
         trace, walkthrough_steps, text, messages, on_chunk, usage, attached_solution
     )
     return Result(text=text, walkthrough_steps=walkthrough_steps, trace=trace, messages=msgs,
-                   usage=usage, confidence_tier=tier)
+                   usage=usage, confidence_tier=tier, sources=_collect_sources(trace))
