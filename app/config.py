@@ -16,7 +16,7 @@ DAILY_BUDGET_USD = float(os.environ.get("DAILY_BUDGET_USD", "10"))
 DATABASE_URL = os.environ.get(
     "DATABASE_URL", "postgresql://conductor:conductor@localhost:5432/conductor"
 )
-MODEL = "claude-sonnet-4-6"
+MODEL = "claude-sonnet-5"
 MAX_TOKENS = 3072
 
 # web_research tool's own nested Sonnet + web_search call (see app/research.py).
