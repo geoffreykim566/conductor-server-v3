@@ -243,5 +243,24 @@
    "turns": [{"text": "what's the shortcut to freeze a track, and separately, what plugins does bon iver typically use to get that vocoder vocal sound"}]},
 
   {"name": "research_close_call_documented_bug", "note": "2026-09-04 research-battery addition -- exploratory only, no hard web_research_called assertion. A troubleshooting-shaped AND specific/factual question (a version-specific crash under a precise repro condition) sits right on the boundary the prompt draws between 'ordinary troubleshooting' (no-fire) and 'something a web search could resolve' (fire) -- genuinely ambiguous which side this should land on, meant for transcript review rather than pass/fail grading.",
-   "turns": [{"text": "why does logic pro crash specifically when i try to bounce a project with more than 60 tracks on an m1 mac"}]}
+   "turns": [{"text": "why does logic pro crash specifically when i try to bounce a project with more than 60 tracks on an m1 mac"}]},
+
+  {"name": "ax_state_free_text_diagnostic_relevant", "note": "2026-09-04 ax_state-battery addition -- tests the NEW free-text AX capture (client-v3's core.ax_capture, distinct from the older ax_fixture dict) actually gets used for real diagnosis when the query doesn't name the control directly. ax_state below is shaped like a real ax_capture.py dump, not a curated key/value pair.",
+   "expect": {"response_contains_any": ["Low Cut", "800"]},
+   "turns": [{"text": "my bass guitar sounds really thin, any idea why", "ax_state": "### Audio 3\n- AXWindow title='Audio 3'\n  - AXStaticText value='Channel EQ'\n  - AXGroup desc='EQ'\n    - AXCheckBox desc='Low Cut' value=True\n    - AXSlider desc='Low Cut Frequency' value=800.0\n    - AXSlider desc='Low Cut Q' value=12.0"}]},
+
+  {"name": "ax_state_orientation_query_uses_context", "note": "2026-09-04 ax_state-battery addition -- regression test for a real live miss found 2026-09-04 (see v3-log.md): the query 'walk me through what is currently loaded on this channel' flatly denied having any screen context ('I don't have a verified answer for this one -- I can't see your screen') despite ax_state being present that same turn, while a near-identical 'what am I working on right now' correctly described the loaded plugin from the same kind of state. Locks in the expected behavior going forward.",
+   "expect": {"response_contains_any": ["Channel EQ", "Compressor"], "response_not_contains": ["share a screenshot", "can't see your screen", "cannot see your screen", "can't see what"]},
+   "turns": [{"text": "walk me through what is currently loaded on this channel", "ax_state": "### Audio 4\n- AXWindow title='Audio 4'\n  - AXStaticText value='Channel EQ'\n  - AXGroup desc='EQ'\n    - AXCheckBox desc='High Shelf' value=True\n    - AXSlider desc='High Shelf Frequency' value=6000.0\n  - AXStaticText value='Compressor'\n  - AXSlider desc='Threshold' value=-18.0\n  - AXSlider desc='Ratio' value=4.0"}]},
+
+  {"name": "ax_state_contradicts_user_claim", "note": "2026-09-04 ax_state-battery addition -- free-text analog of the existing ax_contradicts_user_claim (which only ever exercised the older ax_fixture dict). User states the tempo is 128 BPM; the pushed ax_state text says it's actually 90.0. Tests that raw-text AX context, not just curated fixture keys, still outranks a stated claim per prompt.py's own 'Live state... outranks a screenshot, a stated claim' instruction.",
+   "expect": {"response_contains": ["90"]},
+   "turns": [{"text": "my project tempo is 128 bpm and the drums still feel like they're dragging, whats going on", "ax_state": "### Project - Tracks\n- AXWindow title='Project - Tracks'\n  - AXGroup desc='Control Bar'\n    - AXSlider desc='Tempo' value=90.0"}]},
+
+  {"name": "ax_state_irrelevant_context_no_distraction", "note": "2026-09-04 ax_state-battery addition -- pushes a real, unrelated plugin/channel ax_state dump alongside an ordinary, already-covered KB navigation question (same query/expect as slowed_direct). Tests that a large irrelevant AX blob doesn't distract from or degrade normal destination routing.",
+   "expect": {"match": "single", "walkthrough_destination": "sample rate"},
+   "turns": [{"text": "wheres sample rate", "ax_state": "### Audio 5\n- AXWindow title='Audio 5'\n  - AXStaticText value='Compressor'\n  - AXSlider desc='Threshold' value=-12.0\n  - AXSlider desc='Ratio' value=2.0\n  - AXSlider desc='Attack' value=5.0\n  - AXSlider desc='Release' value=150.0"}]},
+
+  {"name": "ax_state_absent_no_screen_fabrication", "note": "2026-09-04 ax_state-battery addition -- exploratory, no hard expect block on purpose (same pattern as collision_software_monitoring). No ax_state and no screenshot pushed this turn; query asks what's currently on screen. Real risk being watched for: fabricating plausible-sounding specifics instead of admitting no visibility. For transcript review.",
+   "turns": [{"text": "whats loaded on my current channel strip right now"}]}
 ]

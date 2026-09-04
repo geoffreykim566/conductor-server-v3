@@ -153,8 +153,13 @@ async def run_scenario(scenario: dict) -> dict:
     for i, turn in enumerate(scenario["turns"], 1):
         messages.append({"role": "user", "content": turn["text"]})
         ax_fixture = turn.get("ax_fixture")
+        # Free-text AX capture (client-v3's core.ax_capture) -- distinct from
+        # ax_fixture above, which stays the curated key/value dict used by the
+        # toggle_ax_key/value_ax_key gating tests. This exercises the real
+        # per-turn mechanism a live client actually sends.
+        ax_state = turn.get("ax_state")
 
-        result = await respond(messages, ax_fixture=ax_fixture)
+        result = await respond(messages, ax_fixture=ax_fixture, ax_state=ax_state)
         messages = result.messages
         trace = result.trace  # graded against the scenario's top-level 'expect' below
         response_text = result.text  # ditto, for response_contains/response_not_contains
@@ -165,6 +170,8 @@ async def run_scenario(scenario: dict) -> dict:
         print(f"\n  --- turn {i}: {turn['text']!r} ---")
         if ax_fixture:
             print(f"  [ax_fixture: {ax_fixture}]")
+        if ax_state:
+            print(f"  [ax_state: {ax_state[:200]}{'...' if len(ax_state) > 200 else ''}]")
         for call in result.trace:
             print(f"    tool call: {call['tool']}({call['input']})")
             out = call["output"]
