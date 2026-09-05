@@ -28,7 +28,7 @@ services:
         condition: service_healthy
     ports:
       - "127.0.0.1:8000:8000"
-    # Serves the /v1/chat, /v1/register HTTP layer (app/api.py) for
+    # Serves the /v3/chat, /v3/register HTTP layer (app/api.py) for
     # client-v3 to talk to. The old scenario-runner scripts (run_scenarios,
     # run_graded_battery, drive_turn) still work via `docker compose exec`
     # regardless of what the container's own foreground command is.

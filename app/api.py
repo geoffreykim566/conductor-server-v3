@@ -11,7 +11,7 @@ Conversation continuity is opaque round-tripping, not a server-side
 session store — chosen because pipeline.respond() is explicitly designed
 stateless ("history is the only state," see pipeline.py's own docstring),
 and a server-side store would contradict that. The client sends back
-exactly the `history` a prior `/v1/chat` call returned (the full raw
+exactly the `history` a prior `/v3/chat` call returned (the full raw
 message list respond() produced, including tool_use/tool_result blocks)
 plus the new user turn; nothing is kept here between requests. This is
 what makes the battery's verified multi-turn behaviors (backfill,
@@ -19,7 +19,7 @@ fallback continuity) apply to live traffic too, not just the harness.
 Trimmed to MAX_HISTORY_MESSAGES before each call (_trim_history below).
 
 pipeline.respond() streams the final answer's text via an on_chunk
-callback (see pipeline.py's _call_model) — /v1/chat forwards each piece as
+callback (see pipeline.py's _call_model) — /v3/chat forwards each piece as
 its own SSE "chunk" event as soon as it arrives, not one lump at the end.
 """
 import asyncio
@@ -112,7 +112,7 @@ _MAX_AX_STATE_CHARS = 32 * 1024
 
 class ChatRequest(BaseModel):
     message: str = Field(..., max_length=_MAX_MESSAGE_CHARS)
-    # Opaque — exactly what a prior /v1/chat call's "done" event sent as
+    # Opaque — exactly what a prior /v3/chat call's "done" event sent as
     # "history". None (or omitted) starts a fresh conversation.
     history: list[dict] | None = None
     # Fresh, per-request visual context -- base64 PNGs, one per captured
@@ -228,7 +228,7 @@ def _trim_history(messages: list[dict]) -> list[dict]:
     return messages
 
 
-@app.post("/v1/register")
+@app.post("/v3/register")
 @limiter.limit(REGISTER_RATE_LIMIT)
 async def register(request: Request):
     cid = uuid.uuid4()
@@ -242,7 +242,7 @@ async def register(request: Request):
     return {"conductor_id": token}
 
 
-@app.get("/v1/me")
+@app.get("/v3/me")
 async def get_me(user: asyncpg.Record = Depends(current_user)):
     return {
         "free_used": user["free_used"],
@@ -256,13 +256,13 @@ class Profile(BaseModel):
     role: str | None = Field(None, max_length=50)
 
 
-@app.put("/v1/me")
+@app.put("/v3/me")
 async def update_me(p: Profile, user: asyncpg.Record = Depends(current_user)):
     await db.update_profile(user["id"], p.experience, p.role)
     return {"ok": True}
 
 
-@app.delete("/v1/me")
+@app.delete("/v3/me")
 async def delete_me(user: asyncpg.Record = Depends(current_user)):
     await db.mark_uninstalled(user["id"])
     return {"ok": True}
@@ -273,7 +273,7 @@ class RatingIn(BaseModel):
     rating: int = Field(..., ge=-1, le=1)
 
 
-@app.post("/v1/ratings")
+@app.post("/v3/ratings")
 async def set_rating(r: RatingIn, user: asyncpg.Record = Depends(current_user)):
     ok = await db.set_rating(r.event_id, user["id"], r.rating)
     if not ok:
@@ -281,7 +281,7 @@ async def set_rating(r: RatingIn, user: asyncpg.Record = Depends(current_user)):
     return {"ok": True}
 
 
-@app.post("/v1/chat")
+@app.post("/v3/chat")
 @limiter.limit(RATE_LIMIT)
 async def chat(request: Request, req: ChatRequest, user: asyncpg.Record = Depends(current_user)):
     # Budget check before claim: a breaker-refused request must not burn a

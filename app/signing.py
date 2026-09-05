@@ -1,7 +1,7 @@
 """HMAC signing for conductor ids — fabricated ids die here, before the DB.
 
 Wire format: `<uuid>.<hex sig>` where sig = HMAC-SHA256(CONDUCTOR_ID_SECRET,
-canonical uuid string). Only /v1/register mints tokens; everything else just
+canonical uuid string). Only /v3/register mints tokens; everything else just
 verifies, so a valid token is proof the server issued this id. Ported from
 server/app/signing.py (v1) — same design, v3's own secret.
 """

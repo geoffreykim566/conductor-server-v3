@@ -585,7 +585,7 @@ async def _finalize_answer(
     stays exactly as before -- deterministic, code-enforced (_confidence_tier) --
     but as of 2026-09-04 no longer prepends a literal _HEDGE_PREFIX to the
     streamed/returned text; the client renders the tier as a confidence badge
-    instead (source_tier in the /v1/chat "done" payload -- see api.py). The
+    instead (source_tier in the /v3/chat "done" payload -- see api.py). The
     badge is at least as reliable a carrier of this signal as the old forced
     text prefix was (still server-computed, still not dependent on the model
     choosing to phrase a caveat), without the prefix's cost of showing up

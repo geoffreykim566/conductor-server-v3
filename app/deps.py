@@ -1,7 +1,7 @@
 """Identity — the only place auth is decided.
 
 X-Conductor-Id carries a server-signed token (`<uuid>.<sig>`, minted by
-/v1/register — see signing.py). A bare or tampered uuid fails HMAC
+/v3/register — see signing.py). A bare or tampered uuid fails HMAC
 verification before ever touching the DB; a valid token is upserted lazily
 so a row lost to a DB reset self-heals.
 """

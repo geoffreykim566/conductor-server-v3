@@ -11,7 +11,7 @@ RATE_LIMIT = os.environ.get("RATE_LIMIT", "10/minute")
 REGISTER_RATE_LIMIT = os.environ.get("REGISTER_RATE_LIMIT", "5/day")
 
 # Global circuit breaker: once trailing-24h spend (event_costs) crosses this,
-# /v1/chat refuses new requests with 503 until spend rolls out of the window.
+# /v3/chat refuses new requests with 503 until spend rolls out of the window.
 DAILY_BUDGET_USD = float(os.environ.get("DAILY_BUDGET_USD", "10"))
 DATABASE_URL = os.environ.get(
     "DATABASE_URL", "postgresql://conductor:conductor@localhost:5432/conductor"
@@ -46,5 +46,5 @@ FREE_LIMIT = int(os.environ.get("FREE_LIMIT", "50"))
 
 # Message-count cap on round-tripped history, the v3 equivalent of the old
 # client-side _MAX_CONTEXT_MESSAGES trim -- unbounded history was a known gap
-# once /v1/chat started round-tripping it opaquely (see api.py).
+# once /v3/chat started round-tripping it opaquely (see api.py).
 MAX_HISTORY_MESSAGES = int(os.environ.get("MAX_HISTORY_MESSAGES", "60"))
