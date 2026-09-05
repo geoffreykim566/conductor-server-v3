@@ -8,4 +8,5 @@ COPY seed ./seed
 COPY scenarios ./scenarios
 RUN pip install --no-cache-dir .
 
-CMD ["python", "-m", "app.run_scenarios"]
+EXPOSE 8000
+CMD uvicorn app.api:app --host 0.0.0.0 --port ${PORT:-8000}
