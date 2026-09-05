@@ -339,6 +339,26 @@ def _attach_is_strong(trace: list[dict], attached_solution: str | None) -> bool:
     return "strong" in confidences
 
 
+def _moderate_grounded_lookup_exists(trace: list[dict]) -> bool:
+    """True if some lookup_concept call this turn hit at least 'moderate'
+    match_confidence. A 'weak' top hit is explicitly documented (tools.py's
+    _confidence_label) as "likely not actually relevant, don't treat this as
+    a real match" -- collapsing it into the same "moderate" UI badge as a
+    genuine partial match misrepresents a nonsensical/out-of-KB query (e.g.
+    "ww") as "confirmed against the KB, just not confidently." Found live
+    2026-09-04.
+
+    startswith, not equality: _confidence_label's return value is the
+    model-facing advisory sentence, not a clean tag -- only "strong" comes
+    back bare with no suffix ("moderate ..."/"weak ..." both carry trailing
+    advisory text, see tools.py)."""
+    return any(
+        c["tool"] == "lookup_concept"
+        and str(c["output"].get("match_confidence", "")).startswith(("strong", "moderate"))
+        for c in trace
+    )
+
+
 def _strong_grounded_lookup_exists(trace: list[dict]) -> bool:
     """True if some lookup_concept call this turn hit strong confidence AND
     surfaced at least one solution with real fix content (has_path). A correct,
@@ -382,8 +402,11 @@ def _confidence_tier(
 ) -> str:
     """Deterministic backstop -- prompt-only hedge instructions held ~40-50% of the time
     across live testing, 0% on broad/indirect questions specifically (2026-08-11).
-    Returns "moderate" exactly when this turn made a real attempt (a tool call) but
-    never reached strong grounding. Never "moderate" on zero tool calls -- can't
+    Returns "moderate" exactly when this turn made a real attempt (a tool call) that hit
+    at least a genuine 'moderate' lookup_concept match (see _moderate_grounded_lookup_exists)
+    but never reached strong grounding -- a lookup whose only hit was 'weak' (tools.py:
+    "likely not actually relevant") is treated the same as no real attempt, not a
+    confirmed-but-uncertain one. Never "moderate" on zero tool calls -- can't
     distinguish a plain conversational close from the separate, not-yet-fixed
     tool-skip gap, so that case (and a claim-free clarifying question) falls
     through to "generic" instead.
@@ -435,7 +458,9 @@ def _confidence_tier(
         return "research"
     if not trace:
         return "generic"
-    return "strong" if _strong_grounded_lookup_exists(trace) else "moderate"
+    if _strong_grounded_lookup_exists(trace):
+        return "strong"
+    return "moderate" if _moderate_grounded_lookup_exists(trace) else "generic"
 
 
 def _collect_sources(trace: list[dict]) -> list[dict]:
