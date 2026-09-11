@@ -710,6 +710,21 @@ async def _call_model(
         return await stream.get_final_message()
 
 
+def _media_type_for_b64(b64: str) -> str:
+    """Sniff a screenshot's media type from its base64 prefix.
+
+    v0.3.0 clients send PNG; v0.3.1+ send JPEG (client-v3 window_capture.py,
+    after a 1568px PNG of a brushed-metal plugin window blew past the
+    per-image cap live, 2026-09-09). The request shape carries no media type,
+    so sniff the magic bytes rather than break old clients: base64 of
+    `\\x89PNG` starts "iVBOR", base64 of the JPEG SOI marker `\\xff\\xd8\\xff`
+    starts "/9j/". Unknown falls back to PNG, the pre-0.3.1 behavior.
+    """
+    if b64.startswith("/9j/"):
+        return "image/jpeg"
+    return "image/png"
+
+
 async def respond(
     messages: list[dict],
     ax_fixture: dict | None = None,
@@ -736,7 +751,7 @@ async def respond(
         screenshot_msg = {
             "role": "user",
             "content": [
-                {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": b64}}
+                {"type": "image", "source": {"type": "base64", "media_type": _media_type_for_b64(b64), "data": b64}}
                 for b64 in screenshots_b64
             ] + [{"type": "text", "text": msgs[screenshot_idx]["content"]}],
         }

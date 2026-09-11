@@ -116,6 +116,41 @@ def test_too_many_history_messages_rejected() -> None:
     print("PASS: history past the message-count ceiling is rejected.")
 
 
+def test_oversized_screenshot_dropped_not_rejected() -> None:
+    # Found live 2026-09-09: a brushed-metal plugin window as a 1568px PNG
+    # exceeded the per-image cap and 422'd every turn. Screenshots are
+    # best-effort pushed context, so an oversized one is dropped and the
+    # request proceeds without it (v0.3.0 clients still send PNG).
+    from app.api import _MAX_SCREENSHOT_CHARS
+    small, big = "a" * 100, "b" * (_MAX_SCREENSHOT_CHARS + 1)
+    req = ChatRequest(message="hi", screenshots=[small, big])
+    assert req.screenshots == [small], "oversized screenshot must be dropped, small one kept"
+    req = ChatRequest(message="hi", screenshots=[big])
+    assert req.screenshots is None, "all-oversized must collapse to None, not an empty list"
+    print("PASS: oversized screenshot is dropped, request still accepted.")
+
+
+def test_malformed_screenshot_still_rejected() -> None:
+    for bad in ([""], [None], [123]):
+        try:
+            ChatRequest(message="hi", screenshots=bad)
+        except ValidationError:
+            continue
+        raise AssertionError(f"malformed screenshot {bad!r} must still be rejected")
+    print("PASS: malformed screenshots are still rejected.")
+
+
+def test_screenshot_media_type_sniffed() -> None:
+    import base64
+    from app.pipeline import _media_type_for_b64
+    png = base64.b64encode(b"\x89PNG\r\n\x1a\n" + b"\x00" * 8).decode()
+    jpg = base64.b64encode(b"\xff\xd8\xff\xe0" + b"\x00" * 8).decode()
+    assert _media_type_for_b64(png) == "image/png"
+    assert _media_type_for_b64(jpg) == "image/jpeg"
+    assert _media_type_for_b64("zzzz") == "image/png", "unknown prefix falls back to png (v0.3.0 behavior)"
+    print("PASS: screenshot media type is sniffed from the base64 prefix.")
+
+
 def main() -> None:
     test_valid_shapes_accepted()
     test_smuggled_message_key_rejected()
@@ -128,6 +163,9 @@ def main() -> None:
     test_oversized_text_rejected()
     test_oversized_tool_use_input_rejected()
     test_too_many_history_messages_rejected()
+    test_oversized_screenshot_dropped_not_rejected()
+    test_malformed_screenshot_still_rejected()
+    test_screenshot_media_type_sniffed()
 
 
 if __name__ == "__main__":

@@ -24,11 +24,13 @@ its own SSE "chunk" event as soon as it arrives, not one lump at the end.
 """
 import asyncio
 import json
+import logging
 import uuid
 from contextlib import asynccontextmanager
 
 import asyncpg
 from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 from slowapi import _rate_limit_exceeded_handler
@@ -39,6 +41,8 @@ from app.config import MAX_HISTORY_MESSAGES, RATE_LIMIT, REGISTER_RATE_LIMIT
 from app.deps import current_user
 from app.pipeline import respond
 from app.ratelimit import limiter
+
+log = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -53,6 +57,26 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+@app.exception_handler(RequestValidationError)
+async def _log_validation_errors(request: Request, exc: RequestValidationError):
+    # A 422 used to be invisible server-side: nothing logged which validator
+    # fired, and the client collapses every 413/422 into one generic "message
+    # too long" bubble. Found live 2026-09-09: a user hit that bubble on every
+    # turn and the cause (an oversized screenshot, see _validate_screenshots)
+    # had to be reconstructed by re-measuring captures by hand. Log the
+    # failing field + message here so the next one is a one-line diagnosis.
+    # Also strip pydantic's `input`/`ctx` echo from the response body -- for
+    # ChatRequest.screenshots that "input" is the full multi-MB base64 image,
+    # which the default handler would have sent straight back to the client.
+    errors = [
+        {"loc": e.get("loc"), "msg": e.get("msg"), "type": e.get("type")}
+        for e in exc.errors()
+    ]
+    log.warning("[validation_422] %s %s: %s", request.method, request.url.path, errors)
+    return JSONResponse({"detail": errors}, status_code=422)
+
 
 # Traefik/uvicorn read the whole body before FastAPI's pydantic validation
 # runs, so an oversized-body cap has to live ahead of that, in a middleware
@@ -97,7 +121,8 @@ _ALLOWED_TEXT_BLOCK_KEYS = {"type", "text"}
 _ALLOWED_TOOL_USE_KEYS = {"type", "id", "name", "input"}
 _ALLOWED_TOOL_RESULT_KEYS = {"type", "tool_use_id", "content"}
 
-# Base64 PNG cap per screenshot (~1.5MB raw) and count per turn -- same
+# Base64 cap per screenshot (~1.5MB raw; PNG from v0.3.0 clients, JPEG from
+# v0.3.1+ -- pipeline.py sniffs which) and count per turn -- same
 # per-image budget v1 used (server/app/routes/chat.py's _MAX_IMAGE_B64), but
 # a much smaller max count: v1 bounded 20 *turns* of accumulated history
 # images, this bounds one turn's fresh per-window captures (client caps at
@@ -132,10 +157,26 @@ class ChatRequest(BaseModel):
     def _validate_screenshots(cls, shots: list[str] | None) -> list[str] | None:
         if shots is None:
             return shots
+        kept: list[str] = []
         for s in shots:
-            if not isinstance(s, str) or not s or len(s) > _MAX_SCREENSHOT_CHARS:
-                raise ValueError("invalid or oversized screenshot")
-        return shots
+            if not isinstance(s, str) or not s:
+                raise ValueError("invalid screenshot")
+            if len(s) > _MAX_SCREENSHOT_CHARS:
+                # Drop, don't reject. Screenshots are best-effort context the
+                # client pushes silently every turn (never something the user
+                # attached on purpose), so one oversized capture must not fail
+                # the whole request. Found live 2026-09-09: a 1568px PNG of
+                # Logic's Compressor in its brushed-metal Studio VCA skin came
+                # in at ~2.7M base64 chars (cap 2M), 422ing every turn while
+                # that window was open -- the client reported it as "message
+                # too long". Client-side fix (JPEG encoding) ships in v0.3.1;
+                # this keeps already-installed v0.3.0 clients working meanwhile.
+                log.warning(
+                    "[screenshot_dropped] %d chars > cap %d", len(s), _MAX_SCREENSHOT_CHARS
+                )
+                continue
+            kept.append(s)
+        return kept or None
 
     @field_validator("history")
     @classmethod
