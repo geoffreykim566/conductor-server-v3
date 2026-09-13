@@ -33,6 +33,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field, field_validator
+from typing import Literal
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
@@ -151,6 +152,16 @@ class ChatRequest(BaseModel):
     # Same lifetime rule as screenshots: this turn's model calls only, never
     # echoed into history.
     ax_state: str | None = Field(None, max_length=_MAX_AX_STATE_CHARS)
+    # Client wants to approve web research before it runs (v0.3.2+ sends
+    # True). When the decider picks web_research, the stream ends with a
+    # "research_prompt" event instead of running it; the client then re-POSTs
+    # with `resume`. Older clients omit it and research runs as before.
+    research_confirm: bool = False
+    # Second half of that two-phase turn: `history` is the transcript the
+    # research_prompt event handed back (ending in the pending tool_use) and
+    # `message` is ignored. No free message is claimed for a resume -- the
+    # first half already paid for this turn.
+    resume: Literal["allow_research", "deny_research"] | None = None
 
     @field_validator("screenshots")
     @classmethod
@@ -240,6 +251,22 @@ class ChatRequest(BaseModel):
                     if len(block.get("content", "")) > _MAX_TEXT_CHARS:
                         raise ValueError("tool_result content too long")
         return msgs
+
+
+def _pending_research_query(history: list[dict] | None) -> str | None:
+    """The web_research query a parked transcript is waiting on, or None if
+    `history` isn't shaped like one (must end in an assistant message whose
+    tool_use blocks include web_research, with no results after it)."""
+    if not history:
+        return None
+    last = history[-1]
+    if last.get("role") != "assistant" or not isinstance(last.get("content"), list):
+        return None
+    for b in last["content"]:
+        if isinstance(b, dict) and b.get("type") == "tool_use" and b.get("name") == "web_research":
+            q = (b.get("input") or {}).get("query")
+            return q if isinstance(q, str) else ""
+    return None
 
 
 def _json_default(o):
@@ -332,16 +359,31 @@ async def chat(request: Request, req: ChatRequest, user: asyncpg.Record = Depend
             status_code=503,
             detail={"error": "free_tier_paused", "message": "Free tier is busy — try again later."},
         )
-    # Claimed before any model call — a request that never gets a real answer
-    # still cost a real API call if claimed after, so claim first and fail
-    # closed on the cap rather than risk free messages that don't decrement.
-    claimed = await db.claim_free_message(user["id"])
-    if claimed is None:
-        raise HTTPException(
-            status_code=402,
-            detail={"error": "free_limit_reached", "limit": user["free_limit"]},
-        )
-    remaining = max(claimed["free_limit"] - claimed["free_used"], 0)
+    if req.resume:
+        # Resuming a parked research turn: validated against the shape
+        # pipeline.respond() parks (the client is not a trust boundary), and
+        # not charged again -- the first half of this turn already claimed
+        # its free message. Known soft spot: history isn't signed, so a
+        # hand-built "parked" transcript gets one uncharged answer; the free
+        # tier is a soft cap, accepted 2026-09-13.
+        if _pending_research_query(req.history) is None:
+            log.warning("[resume_422] resume=%s with no pending web_research in history", req.resume)
+            raise HTTPException(
+                status_code=422,
+                detail={"error": "no_pending_research", "message": "Nothing to resume."},
+            )
+        remaining = max(user["free_limit"] - user["free_used"], 0)
+    else:
+        # Claimed before any model call — a request that never gets a real answer
+        # still cost a real API call if claimed after, so claim first and fail
+        # closed on the cap rather than risk free messages that don't decrement.
+        claimed = await db.claim_free_message(user["id"])
+        if claimed is None:
+            raise HTTPException(
+                status_code=402,
+                detail={"error": "free_limit_reached", "limit": user["free_limit"]},
+            )
+        remaining = max(claimed["free_limit"] - claimed["free_used"], 0)
 
     async def stream():
         queue: asyncio.Queue = asyncio.Queue()
@@ -355,10 +397,13 @@ async def chat(request: Request, req: ChatRequest, user: asyncpg.Record = Depend
         async def run() -> None:
             try:
                 history = _trim_history(req.history or [])
-                messages = history + [{"role": "user", "content": req.message}]
+                # A resume's history already ends with this turn's parked
+                # tool call; the user message is further back inside it.
+                messages = history if req.resume else history + [{"role": "user", "content": req.message}]
                 result = await respond(
                     messages, screenshots_b64=req.screenshots, ax_state=req.ax_state,
                     on_chunk=on_chunk, on_status=on_status,
+                    research_confirm=req.research_confirm, resume=req.resume,
                 )
                 await queue.put(("result", result))
             except Exception as e:
@@ -382,6 +427,17 @@ async def chat(request: Request, req: ChatRequest, user: asyncpg.Record = Depend
                     event_id = await db.insert_event(
                         user_id=user["id"], tokens_in=tokens_in, tokens_out=tokens_out
                     )
+                    if result.pending_research_query is not None:
+                        # Parked for user approval (see pipeline.respond).
+                        # The usage so far is logged above (it was real
+                        # spend); the resume's own event is the one the
+                        # client gets an event_id for, so ratings land there.
+                        yield _sse({
+                            "type": "research_prompt",
+                            "query": result.pending_research_query,
+                            "history": result.messages,
+                        })
+                        return
                     yield _sse({
                         "type": "done",
                         "event_id": str(event_id),
@@ -406,6 +462,11 @@ async def chat(request: Request, req: ChatRequest, user: asyncpg.Record = Depend
                     return
         finally:
             if not task.done():
+                # Reached when the client drops the connection mid-turn
+                # (Starlette cancels this generator on http.disconnect) --
+                # the Esc cancel in v0.3.2+ clients, or a crash. Cancelling
+                # the task aborts whatever model/research call is in flight.
                 task.cancel()
+                log.warning("[turn_cancelled] client disconnected mid-turn; pipeline task cancelled")
 
     return StreamingResponse(stream(), media_type="text/event-stream")

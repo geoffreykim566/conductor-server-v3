@@ -8,7 +8,9 @@ History is the only state — nothing is pinned server-side between turns.
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass, field
+from types import SimpleNamespace
 from typing import Awaitable, Callable
 
 from anthropic import AsyncAnthropic
@@ -20,6 +22,8 @@ from app.prompt import SYSTEM_PROMPT, WRITER_SYSTEM_PROMPT
 OnChunk = Callable[[str], Awaitable[None]]
 OnStatus = Callable[[str], Awaitable[None]]
 
+log = logging.getLogger(__name__)
+
 MAX_ITERATIONS = 6
 
 # Whether a "moderate" confidence tier also injects the "say you don't have a
@@ -27,6 +31,19 @@ MAX_ITERATIONS = 6
 # Off since 2026-09-12 together with the client badge -- see api.py's done
 # payload for why. The tier itself is still computed.
 HEDGE_MODERATE_TURNS = False
+
+# tool_result handed to the decider in place of a web_research call the user
+# said No to (resume="deny_research"). Code-guaranteed, like the lookup cap
+# below: the model learns it can't research and must answer as unverified,
+# rather than a prompt line asking it to.
+_RESEARCH_DECLINED = {
+    "error": (
+        "The user declined web research for this turn. Do not call web_research "
+        "again this turn. Answer from general Logic Pro knowledge if you can, "
+        "framed clearly as unverified general guidance, not a confirmed answer -- "
+        "or say plainly that you don't have a verified answer for this."
+    )
+}
 
 # Hard, code-enforced cap on lookup_concept calls within one turn — a prompt
 # instruction to "stop retrying" is a request, not a guarantee. Found live
@@ -70,7 +87,7 @@ def _status_for_tools(tool_uses: list) -> str | None:
         if name not in names:
             continue
         if name == "web_research":
-            return f"Searching the web for a verified answer (may take up to {_format_duration(RESEARCH_CALL_TIMEOUT_S)})…"
+            return "Searching the web for a verified answer…"
         if name == "lookup_concept":
             return "Searching internal knowledge base…"
     return None
@@ -103,6 +120,12 @@ class Result:
     # Drives the client's confidence badge; replaces the old literal
     # _HEDGE_PREFIX text that used to carry this signal inline.
     confidence_tier: str = "generic"
+    # Set (and everything else left at its empty default) when a
+    # research_confirm=True request reached a web_research call the user
+    # hasn't approved yet: the turn is parked, `messages` carries the
+    # transcript so far (ending in the pending tool_use) for the client to
+    # hand back with resume="allow_research"/"deny_research". See respond().
+    pending_research_query: str | None = None
     # Citations from this turn's web_research call(s), if any -- empty for
     # every other turn. Rendered as source chips client-side (message_widget.py
     # set_sources, built ahead of the tool itself on 2026-09-04).
@@ -755,6 +778,75 @@ def _media_type_for_b64(b64: str) -> str:
     return "image/png"
 
 
+def _last_user_text_index(msgs: list[dict]) -> int | None:
+    """Index of the newest plain-string user message -- the turn boundary
+    (same definition api.py's _trim_history snaps to)."""
+    for i in range(len(msgs) - 1, -1, -1):
+        m = msgs[i]
+        if m.get("role") == "user" and isinstance(m.get("content"), str):
+            return i
+    return None
+
+
+def _pending_tool_uses(msgs: list[dict]) -> list:
+    """tool_use blocks of a parked transcript's final assistant message, as
+    objects with the .name/.input/.id the dispatch loop reads off SDK blocks.
+    Empty unless the transcript really ends that way (no results after it)."""
+    if not msgs or msgs[-1].get("role") != "assistant" or not isinstance(msgs[-1].get("content"), list):
+        return []
+    return [
+        SimpleNamespace(type="tool_use", name=b.get("name"), input=b.get("input") or {}, id=b.get("id"))
+        for b in msgs[-1]["content"]
+        if isinstance(b, dict) and b.get("type") == "tool_use"
+    ]
+
+
+def _restore_turn_state(tail: list[dict]) -> dict:
+    """Rebuild what respond() had accumulated when it parked the turn --
+    trace, decider prose, a walkthrough attach, the lookup count -- from the
+    completed tool-loop iterations between the user message and the pending
+    assistant message. Nothing is stored server-side, so this is the only
+    way an attach made before the research prompt survives into the answer
+    (research_mixed_kb_and_research is a real scenario shape)."""
+    trace: list[dict] = []
+    text_parts: list[str] = []
+    walkthrough_steps = None
+    attached_solution = None
+    lookup_attempts = 0
+    calls: dict[str, dict] = {}
+    for m in tail:
+        content = m.get("content")
+        if not isinstance(content, list):
+            continue
+        for b in content:
+            if not isinstance(b, dict):
+                continue
+            if m.get("role") == "assistant":
+                if b.get("type") == "text" and b.get("text"):
+                    text_parts.append(b["text"])
+                elif b.get("type") == "tool_use":
+                    calls[b.get("id")] = {"tool": b.get("name"), "input": b.get("input") or {}}
+            elif b.get("type") == "tool_result" and b.get("tool_use_id") in calls:
+                call = calls[b["tool_use_id"]]
+                try:
+                    output = json.loads(b.get("content") or "{}")
+                except (TypeError, ValueError):
+                    output = {"raw": b.get("content")}
+                if not isinstance(output, dict):
+                    output = {"raw": output}
+                entry = {"tool": call["tool"], "input": call["input"], "output": output}
+                trace.append(entry)
+                if call["tool"] == "lookup_concept":
+                    lookup_attempts += 1
+                if call["tool"] == "get_walkthrough" and output.get("attached") and walkthrough_steps is None:
+                    walkthrough_steps = output.get("steps")
+                    attached_solution = call["input"].get("solution")
+    return {
+        "trace": trace, "text_parts": text_parts, "walkthrough_steps": walkthrough_steps,
+        "attached_solution": attached_solution, "lookup_attempts": lookup_attempts,
+    }
+
+
 async def respond(
     messages: list[dict],
     ax_fixture: dict | None = None,
@@ -762,9 +854,41 @@ async def respond(
     on_status: OnStatus | None = None,
     screenshots_b64: list[str] | None = None,
     ax_state: str | None = None,
+    research_confirm: bool = False,
+    resume: str | None = None,
 ) -> Result:
+    """research_confirm: the client wants to approve web research before it
+    runs. When True and the decider calls web_research, this returns early
+    with Result.pending_research_query set (nothing executed, no answer) so
+    the client can ask the user. Installed clients that don't send it get
+    the pre-2026-09-13 behaviour: research runs whenever the decider picks it.
+
+    resume: "allow_research" or "deny_research" -- `messages` is then the
+    transcript a prior call parked (ending in the assistant's pending
+    tool_use(s)), and this call picks the turn up by executing those instead
+    of calling the model first. Deny swaps the web_research result for
+    _RESEARCH_DECLINED; allow runs it. Either way research is never prompted
+    for again within this call. Stateless like everything else here: the
+    parked transcript lives in the client's history round-trip, not on the
+    server.
+    """
     msgs = list(messages)
     trace: list[dict] = []
+    pending_tool_uses: list | None = None
+    research_authorized = resume == "allow_research"
+    research_denied = resume == "deny_research"
+    if resume:
+        # `messages` (used below by _needs_first_lookup, _backfill_walkthrough
+        # and the writer's plain history) must end at this turn's user
+        # message like it does on a fresh call -- the parked tool-loop tail
+        # is replayed into msgs/trace/text_parts instead.
+        turn_start = _last_user_text_index(msgs)
+        if turn_start is None:
+            raise ValueError("resume: no user turn in history")
+        messages = msgs[: turn_start + 1]
+        pending_tool_uses = _pending_tool_uses(msgs)
+        if not pending_tool_uses:
+            raise ValueError("resume: history does not end in a pending tool call")
 
     # Screenshots are fresh, per-turn context (see api.py's ChatRequest) --
     # spliced into the newest user turn only for this turn's own model calls
@@ -775,9 +899,12 @@ async def respond(
     # would 400 the very next request. Keeping it out of msgs also means a
     # screenshot is never re-sent on every later turn -- only the turn it
     # actually arrived with pays for it.
+    # The turn's user message is msgs[-1] on a fresh call; on a resume it's
+    # further back (the parked tool-loop tail follows it), hence the search.
     screenshot_idx: int | None = None
-    if screenshots_b64 and msgs and msgs[-1].get("role") == "user" and isinstance(msgs[-1].get("content"), str):
-        screenshot_idx = len(msgs) - 1
+    if screenshots_b64 and msgs:
+        screenshot_idx = _last_user_text_index(msgs)
+    if screenshot_idx is not None:
         screenshot_msg = {
             "role": "user",
             "content": [
@@ -809,6 +936,13 @@ async def respond(
     # order) instead of only the terminal one's fixes this at the root,
     # rather than papering over it with a post-hoc content check.
     text_parts: list[str] = []
+    if resume:
+        restored = _restore_turn_state(msgs[len(messages):-1])
+        trace.extend(restored["trace"])
+        text_parts.extend(restored["text_parts"])
+        walkthrough_steps = restored["walkthrough_steps"]
+        attached_solution = restored["attached_solution"]
+        lookup_attempts = restored["lookup_attempts"]
 
     # Pushed, not pulled: live state (when known for this turn) is handed to the
     # model automatically rather than waiting on it to decide to call a tool for
@@ -883,17 +1017,23 @@ async def respond(
         # tool_uses is known, and reset back to "Thinking..." here on every
         # later iteration too (e.g. after tool results come back and the
         # decider is composing on top of them).
-        if on_status:
-            await on_status("Thinking…")
-        tool_choice = None
-        if i == 0 and force_first_lookup:
-            tool_choice = {"type": "tool", "name": "lookup_concept"}
-        resp = await _call_model(system, tools.TOOLS, _with_screenshots(msgs), None, tool_choice)
-        usage.append(_usage_dict(resp.usage))
-        tool_uses = [b for b in resp.content if b.type == "tool_use"]
-        iter_text = "".join(b.text for b in resp.content if b.type == "text")
-        if iter_text:
-            text_parts.append(iter_text)
+        if i == 0 and pending_tool_uses:
+            # Resumed turn: the model already made this iteration's call (it's
+            # the last message in msgs); execute what it asked for.
+            tool_uses = pending_tool_uses
+            resp = None
+        else:
+            if on_status:
+                await on_status("Thinking…")
+            tool_choice = None
+            if i == 0 and force_first_lookup:
+                tool_choice = {"type": "tool", "name": "lookup_concept"}
+            resp = await _call_model(system, tools.TOOLS, _with_screenshots(msgs), None, tool_choice)
+            usage.append(_usage_dict(resp.usage))
+            tool_uses = [b for b in resp.content if b.type == "tool_use"]
+            iter_text = "".join(b.text for b in resp.content if b.type == "text")
+            if iter_text:
+                text_parts.append(iter_text)
 
         if not tool_uses:
             text = "\n\n".join(text_parts)
@@ -919,7 +1059,21 @@ async def respond(
             return Result(text=text, walkthrough_steps=walkthrough_steps, trace=trace, messages=msgs,
                            usage=usage, confidence_tier=tier, sources=_collect_sources(trace))
 
-        msgs.append({"role": "assistant", "content": _serialize_content(resp.content)})
+        if resp is not None:
+            msgs.append({"role": "assistant", "content": _serialize_content(resp.content)})
+        # Park the turn before executing ANY of this iteration's tools when
+        # one of them is an unapproved web_research: the client asks the
+        # user and resumes with the whole batch, so every tool_use in the
+        # assistant message still gets exactly one tool_result (a partial set
+        # is rejected by the API).
+        if research_confirm and not research_authorized and not research_denied:
+            pending = [tu for tu in tool_uses if tu.name == "web_research"]
+            if pending:
+                log.warning("[research_prompt] parking turn for user approval, query=%r", pending[0].input.get("query"))
+                return Result(
+                    text="", walkthrough_steps=None, trace=trace, messages=msgs, usage=usage,
+                    confidence_tier="generic", pending_research_query=str(pending[0].input.get("query", "")),
+                )
         if on_status:
             status_text = _status_for_tools(tool_uses)
             if status_text:
@@ -955,6 +1109,8 @@ async def respond(
                     "attached": False,
                     "reason": _FALLBACK_REFUSAL if same_bucket else _UNRELATED_REFUSAL,
                 }
+            elif tu.name == "web_research" and research_denied:
+                result = dict(_RESEARCH_DECLINED)
             else:
                 executor = _EXECUTORS.get(tu.name)
                 result = {"error": f"unknown tool {tu.name!r}"} if executor is None else await executor(tu.input, ax_fixture)
