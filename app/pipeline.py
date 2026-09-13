@@ -22,6 +22,12 @@ OnStatus = Callable[[str], Awaitable[None]]
 
 MAX_ITERATIONS = 6
 
+# Whether a "moderate" confidence tier also injects the "say you don't have a
+# verified answer" instruction into the writer's facts (_finalize_answer).
+# Off since 2026-09-12 together with the client badge -- see api.py's done
+# payload for why. The tier itself is still computed.
+HEDGE_MODERATE_TURNS = False
+
 # Hard, code-enforced cap on lookup_concept calls within one turn — a prompt
 # instruction to "stop retrying" is a request, not a guarantee. Found live
 # 2026-07-30: a genuinely absent topic ("wheres the monitor button") kept
@@ -602,7 +608,12 @@ async def _finalize_answer(
     # Only "moderate" gets the hedge facts injected below -- "research" is
     # trusted the same as "strong" (see _confidence_tier's 2026-09-04 note) and
     # deliberately falls straight through to facts = text, unhedged.
-    if tier == "moderate":
+    # Gated off 2026-09-12 (HEDGE_MODERATE_TURNS): same over-firing as the
+    # badge -- the tier is a trace rule, so a correct read of live state
+    # ("which tracks are muted") got the writer told to open with "I don't
+    # have a verified answer". Re-enable once the tier can tell an
+    # observation from a recommendation.
+    if tier == "moderate" and HEDGE_MODERATE_TURNS:
         facts = (
             "No verified, confirmed answer was established for this turn -- no "
             "confident, specific menu path, setting, or fix was found. Say plainly "

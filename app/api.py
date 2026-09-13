@@ -386,7 +386,15 @@ async def chat(request: Request, req: ChatRequest, user: asyncpg.Record = Depend
                         "type": "done",
                         "event_id": str(event_id),
                         "remaining": remaining,
-                        "source_tier": result.confidence_tier,
+                        # Badge disabled 2026-09-12: the tier is a trace rule
+                        # (any moderate lookup_concept hit with no strong
+                        # grounding) and fires on observational answers the
+                        # lookup had nothing to do with -- 27/77 turns in the
+                        # 09-04 battery, both "which tracks are muted" turns
+                        # today. Still computed (battery grading, logs); just
+                        # not sent. Clients ignore an unknown tier, so this
+                        # hides the chip on installed v0.3.1 builds too.
+                        "source_tier": "",
                         "sources": result.sources,
                         "intent": "",
                         "locate_type": "",
