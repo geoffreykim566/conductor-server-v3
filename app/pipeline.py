@@ -579,6 +579,7 @@ async def _finalize_answer(
     attached_solution: str | None = None,
     is_clarifying_question: bool = False,
     live_state: str | None = None,
+    had_screenshots: bool = False,
 ) -> tuple[str, str]:
     """Called once this turn's decider text is fully known (either the
     no-more-tool-calls return or the MAX_ITERATIONS safety net). Tier decision
@@ -609,14 +610,32 @@ async def _finalize_answer(
             "further, frame it clearly as unconfirmed general guidance, not a "
             "confirmed fix.\n\n" + text
         )
+    # The writer only ever sees text (see _plain_history), never the turn's
+    # screenshots, so left to itself it describes its own vantage point --
+    # found live 2026-09-12: asked "can you see my screen?", it answered "No,
+    # I'm reading from Logic Pro's accessibility data", because the live-state
+    # block below was the only context it had. Tell it what the decider saw.
+    if had_screenshots:
+        facts = (
+            "The facts below were worked out from screenshots of the user's open "
+            "Logic Pro windows (plus live project state where noted). Speak as "
+            "someone looking at their screen; never say you can't see it.\n\n"
+            + facts
+        )
     # Code-guaranteed, not dependent on the decider's own text having restated
     # it (see respond()'s comment on live_state) -- appended last so it can't be
-    # buried or dropped by whichever branch above ran.
+    # buried or dropped by whichever branch above ran. Framed as a partial set
+    # of live values, not "ground truth": it's authoritative for the items it
+    # lists, silent on everything else (a 2026-09-12 finding -- track-header
+    # mute state wasn't in it at all, and the old wording made both models
+    # treat that silence as "can't tell").
     if live_state:
         facts += (
-            "\n\n## Ground truth for this turn, from Logic Pro's live Accessibility "
-            "state (not the user's claim) -- if anything above conflicts with this, "
-            "this is correct:\n\n" + live_state
+            "\n\n## Live values read from the Logic Pro project this turn (not the "
+            "user's claim). Authoritative for the items listed here -- if anything "
+            "above contradicts one of these values, this is correct. Labels are "
+            "Logic's internal accessibility names, not the on-screen ones:\n\n"
+            + live_state
         )
     resp_text, writer_usage = await _write_response(facts, prior_messages, on_chunk)
     usage.append(writer_usage)
@@ -810,21 +829,31 @@ async def respond(
     # it -- same "code over prompt" reasoning as everything else pushed state
     # relies on in this file.
     live_state = "\n\n".join(state_blocks) if state_blocks else None
-    if state_blocks:
-        system_text += (
-            "\n\n## Live state for this turn\n\n"
-            "Read directly from the running Logic Pro project via the Accessibility "
-            "API -- ground truth, not something the user said or you inferred. This "
-            "outranks stated claims, seed_weight, and anything read from a screenshot "
-            "when they conflict.\n\n"
-            + live_state
-        )
     # Cached as its own block: identical across every iteration of this turn's
     # loop (system+tools resent unchanged on each one -- measured 2026-08-05:
     # 66 calls, 207,869 uncached input tokens across a 24-scenario battery).
     # The safety-net call below appends its own instruction as a second,
     # uncached block so it still hits this same cache entry.
+    #
+    # The live-state section is deliberately its OWN block after the cached
+    # one, never concatenated into it: it changes every turn, and while it
+    # was part of the same text (2026-09-04 .. 2026-09-12) the cache prefix
+    # changed every turn too, so the static prompt never hit across turns.
     system = [{"type": "text", "text": system_text, "cache_control": {"type": "ephemeral"}}]
+    if state_blocks:
+        system.append({
+            "type": "text",
+            "text": (
+                "\n\n## Live state for this turn\n\n"
+                "Values read directly from the running Logic Pro project via the "
+                "Accessibility API -- not something the user said or you inferred. "
+                "Authoritative for every control and value listed here; beats a stated "
+                "claim or seed_weight for those items. It is partial: anything it doesn't "
+                "list is not unknown -- read it from the attached screenshot. Labels are "
+                "Logic's internal accessibility names, not the on-screen ones.\n\n"
+                + live_state
+            ),
+        })
 
     # Tool-skip gap fix: force lookup_concept on this turn's first iteration
     # (see _needs_first_lookup) instead of leaving "call a tool at all" up to
@@ -874,7 +903,7 @@ async def respond(
                     })
             text, tier = await _finalize_answer(
                 trace, walkthrough_steps, text, messages, on_chunk, usage, attached_solution,
-                live_state=live_state,
+                live_state=live_state, had_screenshots=screenshot_idx is not None,
             )
             return Result(text=text, walkthrough_steps=walkthrough_steps, trace=trace, messages=msgs,
                            usage=usage, confidence_tier=tier, sources=_collect_sources(trace))
@@ -950,6 +979,7 @@ async def respond(
             text, tier = await _finalize_answer(
                 trace, walkthrough_steps, text, messages, on_chunk, usage,
                 attached_solution, is_clarifying_question=True, live_state=live_state,
+                had_screenshots=screenshot_idx is not None,
             )
             return Result(text=text, walkthrough_steps=walkthrough_steps, trace=trace, messages=msgs,
                            usage=usage, confidence_tier=tier, sources=_collect_sources(trace))
@@ -982,7 +1012,7 @@ async def respond(
     # Fable review, 2026-08-06) and has been removed rather than left in place.
     text, tier = await _finalize_answer(
         trace, walkthrough_steps, text, messages, on_chunk, usage, attached_solution,
-        live_state=live_state,
+        live_state=live_state, had_screenshots=screenshot_idx is not None,
     )
     return Result(text=text, walkthrough_steps=walkthrough_steps, trace=trace, messages=msgs,
                    usage=usage, confidence_tier=tier, sources=_collect_sources(trace))
