@@ -77,14 +77,25 @@ async def claim_free_message(user_id: uuid.UUID) -> asyncpg.Record | None:
     )
 
 
-async def insert_event(*, user_id: uuid.UUID, tokens_in: int, tokens_out: int) -> uuid.UUID:
+async def insert_event(
+    *,
+    user_id: uuid.UUID,
+    tokens_in: int,
+    tokens_out: int,
+    model: str | None = None,
+    source_tier: str | None = None,
+    latency_ms: int | None = None,
+    prompt: str | None = None,
+    response: str | None = None,
+) -> uuid.UUID:
     row = await pool().fetchrow(
         """
-        insert into events (user_id, tokens_in, tokens_out)
-        values ($1, $2, $3)
+        insert into events (user_id, tokens_in, tokens_out,
+                             model, source_tier, latency_ms, prompt, response)
+        values ($1, $2, $3, $4, $5, $6, $7, $8)
         returning id
         """,
-        user_id, tokens_in, tokens_out,
+        user_id, tokens_in, tokens_out, model, source_tier, latency_ms, prompt, response,
     )
     return row["id"]
 

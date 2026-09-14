@@ -44,6 +44,11 @@ RELEVANCE_FLOOR = float(os.environ.get("RELEVANCE_FLOOR", "0.65"))
 
 FREE_LIMIT = int(os.environ.get("FREE_LIMIT", "50"))
 
+# /admin dashboard basic auth. Unset ADMIN_PASSWORD fails closed (see
+# admin.py::_require_admin) -- never falls through to comparing against "".
+ADMIN_USER = os.environ.get("ADMIN_USER", "admin")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
+
 # Message-count cap on round-tripped history, the v3 equivalent of the old
 # client-side _MAX_CONTEXT_MESSAGES trim -- unbounded history was a known gap
 # once /v3/chat started round-tripping it opaquely (see api.py).

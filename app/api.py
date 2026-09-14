@@ -25,6 +25,7 @@ its own SSE "chunk" event as soon as it arrives, not one lump at the end.
 import asyncio
 import json
 import logging
+import time
 import uuid
 from contextlib import asynccontextmanager
 
@@ -36,8 +37,8 @@ from pydantic import BaseModel, Field, field_validator
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
-from app import budget, db, signing
-from app.config import MAX_HISTORY_MESSAGES, RATE_LIMIT, REGISTER_RATE_LIMIT
+from app import admin, budget, db, signing
+from app.config import MAX_HISTORY_MESSAGES, MODEL, RATE_LIMIT, REGISTER_RATE_LIMIT
 from app.deps import current_user
 from app.pipeline import respond
 from app.ratelimit import limiter
@@ -57,6 +58,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.include_router(admin.router)
 
 
 @app.exception_handler(RequestValidationError)
@@ -364,6 +366,7 @@ async def chat(request: Request, req: ChatRequest, user: asyncpg.Record = Depend
             except Exception as e:
                 await queue.put(("error", e))
 
+        turn_started = time.monotonic()
         task = asyncio.create_task(run())
         try:
             while True:
@@ -380,7 +383,10 @@ async def chat(request: Request, req: ChatRequest, user: asyncpg.Record = Depend
                     tokens_in = sum(u["input_tokens"] for u in result.usage)
                     tokens_out = sum(u["output_tokens"] for u in result.usage)
                     event_id = await db.insert_event(
-                        user_id=user["id"], tokens_in=tokens_in, tokens_out=tokens_out
+                        user_id=user["id"], tokens_in=tokens_in, tokens_out=tokens_out,
+                        model=MODEL, source_tier=result.confidence_tier,
+                        latency_ms=round((time.monotonic() - turn_started) * 1000),
+                        prompt=req.message, response=result.text,
                     )
                     yield _sse({
                         "type": "done",
