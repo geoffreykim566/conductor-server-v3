@@ -4,3 +4,6 @@
 .venv/
 __pycache__/
 *.pyc
+.DS_Store
+test_runs/
+scenarios/probe_results/*.json
