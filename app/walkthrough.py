@@ -94,9 +94,14 @@ def path_to_walkthrough_steps(path: list, args: dict | None = None) -> list | No
             step_out = {"ax_open_plugin": val}
             if str(args.get("new", "")).lower() in ("true", "1", "yes"):
                 step_out["new"] = True
+            if args.get("track"):
+                step_out["track"] = str(args["track"])
             steps.append(step_out)
         elif stype == "ax_set_param":
             flush_menu()
-            steps.append({"ax_set_param": dict(val)})
+            spec = dict(val)
+            if args.get("track"):
+                spec["track"] = str(args["track"])
+            steps.append({"ax_set_param": spec})
     flush_menu()
     return steps or None

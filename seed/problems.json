@@ -2042,14 +2042,25 @@
       "kind": "destination",
       "aliases": [
         "add a plugin",
-        "insert a plugin",
-        "load a plugin",
-        "put a plugin on this track",
+        "add a plugin to this track",
+        "add an effect",
         "add an effect to the track",
-        "open a plugin window",
-        "add reverb plugin",
+        "add audio effect plugin to track",
         "add compressor plugin",
+        "add compressor to the vocal",
+        "add plugin",
+        "add reverb plugin",
+        "add valhalla to the track",
+        "give me an eq on this track",
+        "insert a plugin",
         "insert an audio effect",
+        "insert effect plugin",
+        "load a plugin",
+        "load a reverb on the track",
+        "open a plugin window",
+        "open plugin window",
+        "put a plugin on the track",
+        "put a plugin on this track",
         "use a third-party plugin"
       ],
       "content": {
@@ -2057,7 +2068,8 @@
       },
       "args": {
         "plugin": "exact plugin name as Logic lists it",
-        "new": "optional, true only if the user explicitly wants another instance"
+        "new": "optional, true only if the user explicitly wants another instance",
+        "track": "optional: track name to act on (e.g. Audio 1); defaults to the selected track"
       },
       "path": [
         {
@@ -2071,15 +2083,25 @@
       "tier": "established",
       "kind": "destination",
       "aliases": [
-        "change a plugin setting",
         "adjust a plugin knob",
-        "set the low cut",
-        "set the threshold",
-        "turn the ratio up",
+        "adjust the eq band",
+        "change a plugin setting",
+        "change eq setting on the track",
         "change the frequency on the eq",
-        "set a plugin control to a value",
+        "change the low cut frequency",
         "dial in a plugin parameter",
-        "edit plugin value"
+        "edit plugin value",
+        "enable the low cut",
+        "set a plugin control to a value",
+        "set plugin knob to value",
+        "set the feedback on the delay",
+        "set the low cut",
+        "set the low cut to 80",
+        "set the ratio",
+        "set the threshold",
+        "set threshold to -18",
+        "turn on the high cut",
+        "turn the ratio up"
       ],
       "content": {
         "opens": "Sets one parameter of a plugin loaded on the selected track to an exact value, e.g. Channel EQ Low Cut Frequency to 80 (Hz), Compressor Threshold to -18 (dB), Tape Delay Feedback to 40 (%). Opens the plugin window if needed, writes the value directly through Logic's Controls view (works on every plugin incl. third-party), and reverts on request. The parameter name must be the control's label as Logic shows it in the plugin's Controls view (Low Cut Frequency, Peak 1 Gain, Threshold, Ratio, Feedback, Mix ...); the value is a plain number in the control's displayed unit. If the plugin is not on the track yet, use 'open plugin' first in the same turn."
@@ -2087,7 +2109,8 @@
       "args": {
         "plugin": "exact plugin name",
         "param": "control label as shown in Logic",
-        "value": "number in the control's displayed unit"
+        "value": "number in the control's displayed unit",
+        "track": "optional: track name to act on; defaults to the selected track"
       },
       "path": [
         {

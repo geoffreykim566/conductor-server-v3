@@ -120,7 +120,9 @@ GET_WALKTHROUGH_SCHEMA = {
                 "type": "object",
                 "description": (
                     "Only for template solutions whose content names arguments (currently "
-                    "'open plugin': plugin[, new]; 'set plugin parameter': plugin, param, value). "
+                    "'open plugin': plugin[, new, track]; 'set plugin parameter': plugin, param, "
+                    "value[, track]). track = a track name when the user names one (else the "
+                    "selected track is used). "
                     "Take them from the user's words and the live state: plugin = the exact "
                     "plugin name as Logic lists it, param = the control's label as Logic shows "
                     "it, value = a plain number in the displayed unit. Omit for ordinary "

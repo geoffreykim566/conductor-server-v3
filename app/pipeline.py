@@ -629,6 +629,20 @@ async def _finalize_answer(
     Returns (response_text, confidence_tier)."""
     tier = _confidence_tier(trace, walkthrough_steps, attached_solution, is_clarifying_question)
     facts = text
+    # Agentic action steps (2026-09-18) run on the CLIENT, after this response,
+    # when the user presses Run (or immediately in auto mode). Found live the
+    # same day: the writer said "Loaded ValhallaSupermassive onto Audio 2" before
+    # anything ran, and the next turn then treated its own claim as fact. Code-
+    # guaranteed framing, not a prompt hope.
+    if walkthrough_steps and any(
+        isinstance(st, dict) and any(k.startswith("ax_") for k in st) for st in walkthrough_steps
+    ):
+        facts = (
+            "An action is attached to this reply as a card the user runs with one press; "
+            "it has NOT happened yet. Describe it in one short sentence as about to happen "
+            "(\"This adds X to the selected track\" / \"This sets Y to Z\"), never as done, "
+            "and don't list manual steps for it -- the card does it.\n\n" + text
+        )
     # Only "moderate" gets the hedge facts injected below -- "research" is
     # trusted the same as "strong" (see _confidence_tier's 2026-09-04 note) and
     # deliberately falls straight through to facts = text, unhedged.

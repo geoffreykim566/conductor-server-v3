@@ -126,7 +126,8 @@ ValhallaSupermassive...), param = the control's label as shown in the plugin win
 (Low Cut Frequency, Threshold, Feedback...), value = a plain number in the displayed \
 unit. A direct command like "put valhalla on the vocal" or "set the low cut to 80" \
 is enough to attach — don't ask to confirm what the user already said, and don't \
-describe the steps instead of calling. Use the live state to see what's already loaded: \
+describe the steps instead of calling. The action runs on the user's machine after your \
+reply, when they press Run — so say it's about to happen, never that it's done. Use the live state to see what's already loaded: \
 if the plugin is on the track, "open plugin" opens it rather than adding another, so \
 only pass new=true when the user clearly wants a second instance. A request that needs \
 both (the plugin isn't loaded yet and a value should change) attaches "open plugin" \
