@@ -1052,5 +1052,103 @@
         "text": "put valhalla on the vocal"
       }
     ]
+  },
+  {
+    "name": "args_open_plugin_valhalla",
+    "note": "2026-09-18 template-args addition: not-in-KB plugin by direct command; must attach 'open plugin' with args.plugin extracted, not narrate.",
+    "turns": [
+      {
+        "text": "put valhalla supermassive on this track",
+        "ax_state": "### Untitled - Tracks\n- AXLayoutItem desc='Audio 1'\n  - AXTextField desc='name' value='Audio 1'\n  - AXButton desc='audio plug-in'\n  - AXButton desc='EQ' value='off'"
+      }
+    ],
+    "expect": {
+      "walkthrough_destination": "open plugin",
+      "walkthrough_args": {
+        "plugin": "valhalla"
+      }
+    }
+  },
+  {
+    "name": "args_open_plugin_phat_fx",
+    "note": "2026-09-18 template-args addition: stock plugin with no KB row of its own.",
+    "turns": [
+      {
+        "text": "add phat fx to the vocal",
+        "ax_state": "### Untitled - Tracks\n- AXLayoutItem desc='Audio 1'\n  - AXTextField desc='name' value='Audio 1'\n  - AXButton desc='audio plug-in'\n  - AXButton desc='EQ' value='off'"
+      }
+    ],
+    "expect": {
+      "walkthrough_destination": "open plugin",
+      "walkthrough_args": {
+        "plugin": "phat fx"
+      }
+    }
+  },
+  {
+    "name": "args_open_plugin_kb_plugin_prefers_template_or_row",
+    "note": "2026-09-18: 'channel eq' has its own KB row AND the template covers it -- either destination is acceptable, as long as something executable attaches.",
+    "turns": [
+      {
+        "text": "open channel eq",
+        "ax_state": "### Untitled - Tracks\n- AXLayoutItem desc='Audio 1'\n  - AXTextField desc='name' value='Audio 1'\n  - AXButton desc='audio plug-in'\n  - AXButton desc='EQ' value='off'"
+      }
+    ],
+    "expect": {
+      "walkthrough_destination": [
+        "channel eq",
+        "open plugin"
+      ]
+    }
+  },
+  {
+    "name": "args_set_param_low_cut",
+    "note": "2026-09-18 template-args addition: plugin already loaded (ax_state shows it) -> set plugin parameter with plugin/param/value extracted; value must be the plain number.",
+    "turns": [
+      {
+        "text": "set the low cut on the eq to 80hz",
+        "ax_state": "### Audio 1\n- AXWindow title='Audio 1'\n  - AXStaticText value='Channel EQ'\n  - AXGroup desc='EQ'\n    - AXCheckBox desc='Low Cut' value=False\n    - AXSlider desc='Low Cut Frequency' value=0.0\n    - AXSlider desc='Peak 1 Gain' value=240.0\n### Untitled - Tracks\n- AXLayoutItem desc='Audio 1'\n  - AXGroup desc='Channel EQ'\n    - AXCheckBox desc='bypass' value=0\n    - AXButton desc='open'\n    - AXButton desc='list'\n  - AXButton desc='audio plug-in'"
+      }
+    ],
+    "expect": {
+      "walkthrough_destination": "set plugin parameter",
+      "walkthrough_args": {
+        "plugin": "channel eq",
+        "param": "low cut",
+        "value": "80"
+      }
+    }
+  },
+  {
+    "name": "args_set_param_threshold_not_loaded",
+    "note": "2026-09-18: compressor is NOT on the track; the correct first attach is 'open plugin' (compressor), with the threshold change in prose (one attach per turn).",
+    "turns": [
+      {
+        "text": "put a compressor on this and set the threshold to -18",
+        "ax_state": "### Untitled - Tracks\n- AXLayoutItem desc='Audio 1'\n  - AXTextField desc='name' value='Audio 1'\n  - AXButton desc='audio plug-in'\n  - AXButton desc='EQ' value='off'"
+      }
+    ],
+    "expect": {
+      "walkthrough_destination": [
+        "open plugin",
+        "compressor"
+      ]
+    }
+  },
+  {
+    "name": "args_open_plugin_already_loaded_no_new",
+    "note": "2026-09-18: Channel EQ already on the track per ax_state; 'open the eq' should attach 'open plugin' (opens existing) or the channel eq row -- and must NOT pass new=true.",
+    "turns": [
+      {
+        "text": "open the eq",
+        "ax_state": "### Audio 1\n- AXWindow title='Audio 1'\n  - AXStaticText value='Channel EQ'\n  - AXGroup desc='EQ'\n    - AXCheckBox desc='Low Cut' value=False\n    - AXSlider desc='Low Cut Frequency' value=0.0\n    - AXSlider desc='Peak 1 Gain' value=240.0\n### Untitled - Tracks\n- AXLayoutItem desc='Audio 1'\n  - AXGroup desc='Channel EQ'\n    - AXCheckBox desc='bypass' value=0\n    - AXButton desc='open'\n    - AXButton desc='list'\n  - AXButton desc='audio plug-in'"
+      }
+    ],
+    "expect": {
+      "walkthrough_destination": [
+        "open plugin",
+        "channel eq"
+      ]
+    }
   }
 ]

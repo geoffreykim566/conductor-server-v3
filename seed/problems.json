@@ -4,10 +4,10 @@
       "name": "sample rate mismatch",
       "tier": "established",
       "content": {
-        "symptom": "the entire project plays back sped up or slowed down and pitched up or down accordingly (like a record at the wrong RPM) \u2014 not just one region, and not fixed by changing tempo or Smart Tempo settings",
-        "cause": "the project's sample rate doesn't match the audio interface's actual output sample rate \u2014 Logic's engine and the interface disagree on how many samples per second make up a second of audio, so playback runs at the wrong rate",
-        "fix": "Step 1: Open File > Project Settings > Audio and check the project's Sample Rate. Step 2: Open macOS Audio MIDI Setup (Spotlight search) and confirm the interface's own sample rate matches \u2014 some interfaces have a hardware switch or their own control panel that can override what Logic requests. Step 3: Set both to the same value (44.1 kHz and 48 kHz are the most common) and restart playback.",
-        "do_not": "do not chase this as a tempo or Smart Tempo problem \u2014 tempo changes preserve pitch (time-stretching), a true sample-rate mismatch does not; if speed and pitch are both off together, it's the sample rate, not the tempo"
+        "symptom": "the entire project plays back sped up or slowed down and pitched up or down accordingly (like a record at the wrong RPM) — not just one region, and not fixed by changing tempo or Smart Tempo settings",
+        "cause": "the project's sample rate doesn't match the audio interface's actual output sample rate — Logic's engine and the interface disagree on how many samples per second make up a second of audio, so playback runs at the wrong rate",
+        "fix": "Step 1: Open File > Project Settings > Audio and check the project's Sample Rate. Step 2: Open macOS Audio MIDI Setup (Spotlight search) and confirm the interface's own sample rate matches — some interfaces have a hardware switch or their own control panel that can override what Logic requests. Step 3: Set both to the same value (44.1 kHz and 48 kHz are the most common) and restart playback.",
+        "do_not": "do not chase this as a tempo or Smart Tempo problem — tempo changes preserve pitch (time-stretching), a true sample-rate mismatch does not; if speed and pitch are both off together, it's the sample rate, not the tempo"
       },
       "path": null,
       "extends_to": "sample rate",
@@ -22,7 +22,7 @@
         "symptom": "a sample or recorded audio region sounds warped, sped up, or slowed down after being imported or after changing the project tempo",
         "cause": "Logic's Smart Tempo is set to 'Keep' or 'Automatic' and is stretching the audio to match the project tempo",
         "fix": "To fix one region: select it, open the Region Inspector (press I), click the 'Region:' disclosure header to expand it if needed, and set the 'Smart Tempo' dropdown to Off. To prevent it for all future imports: File > Project Settings > Smart Tempo > set 'Set Imported Files To' to Flex Off.",
-        "do_not": "do not change the project tempo to try to match the audio \u2014 this affects the whole project"
+        "do_not": "do not change the project tempo to try to match the audio — this affects the whole project"
       },
       "path": null,
       "kind": "diagnosis",
@@ -32,10 +32,10 @@
       "name": "muddy bass",
       "tier": "established",
       "content": {
-        "zone": "low-mid resonance, roughly 100\u2013300 Hz",
+        "zone": "low-mid resonance, roughly 100–300 Hz",
         "remove_when": "bass sounds unclear, conflicts with the kick, or makes the low end feel soupy",
-        "remove_move": "narrow bell cut in the 150\u2013300 Hz range; sweep to find the buildup peak on this bass",
-        "do_not": "do not boost the sub (60\u201380 Hz) to compensate \u2014 that makes the problem worse on small speakers"
+        "remove_move": "narrow bell cut in the 150–300 Hz range; sweep to find the buildup peak on this bass",
+        "do_not": "do not boost the sub (60–80 Hz) to compensate — that makes the problem worse on small speakers"
       },
       "path": null,
       "kind": "diagnosis",
@@ -45,9 +45,9 @@
       "name": "muddy vocals",
       "tier": "established",
       "content": {
-        "zone": "low-mid buildup, roughly 200\u2013400 Hz",
+        "zone": "low-mid buildup, roughly 200–400 Hz",
         "remove_when": "vocals sound unclear, masked, or hard to hear in the mix",
-        "remove_move": "narrow bell cut 2\u20134 dB somewhere in the 200\u2013350 Hz range \u2014 sweep slowly to find where the buildup lives on this specific vocal",
+        "remove_move": "narrow bell cut 2–4 dB somewhere in the 200–350 Hz range — sweep slowly to find where the buildup lives on this specific vocal",
         "do_not": "do not boost high frequencies to try to cut through the mud; remove the mud first, then judge"
       },
       "path": null,
@@ -58,10 +58,10 @@
       "name": "kick and bass clash",
       "tier": "established",
       "content": {
-        "zone": "low end, 60\u2013200 Hz \u2014 kick sub weight and bass fundamental overlap",
+        "zone": "low end, 60–200 Hz — kick sub weight and bass fundamental overlap",
         "remove_when": "the kick and bass sound like one unclear blob, cancel each other out, or the low end feels congested",
-        "remove_move": "sidechain compress the bass to the kick, and EQ the kick and bass to own different sub zones \u2014 e.g. kick peaks at 60 Hz, bass peaks at 80\u2013100 Hz",
-        "do_not": "do not boost both the kick and bass at the same sub frequency \u2014 choose one to own that zone"
+        "remove_move": "sidechain compress the bass to the kick, and EQ the kick and bass to own different sub zones — e.g. kick peaks at 60 Hz, bass peaks at 80–100 Hz",
+        "do_not": "do not boost both the kick and bass at the same sub frequency — choose one to own that zone"
       },
       "path": null,
       "kind": "diagnosis",
@@ -71,11 +71,11 @@
       "name": "deep bass",
       "tier": "preference",
       "content": {
-        "zone": "sub, 60\u201380 Hz; low-mid mud at 200\u2013350 Hz",
+        "zone": "sub, 60–80 Hz; low-mid mud at 200–350 Hz",
         "remove_when": "bass is overpowering, flabby, or makes small speakers distort",
         "add_when": "bass feels thin, weak, or lacks sub weight",
-        "add_move": "gentle bell boost at 60\u201380 Hz; cut 200\u2013350 Hz to clear the mud that competes with the sub",
-        "do_not": "do not boost sub without cutting the muddy low-mid zone \u2014 you'll add weight and mud at the same time"
+        "add_move": "gentle bell boost at 60–80 Hz; cut 200–350 Hz to clear the mud that competes with the sub",
+        "do_not": "do not boost sub without cutting the muddy low-mid zone — you'll add weight and mud at the same time"
       },
       "path": null,
       "kind": "diagnosis",
@@ -87,9 +87,9 @@
       "content": {
         "zone": "stereo field; mid/side balance",
         "add_when": "mix sounds narrow, mono-ish, or elements feel crowded in the center",
-        "add_move": "pan complementary elements away from center; use Stereo Spread on pads/synths/reverb; keep bass and kick mono below 100\u2013150 Hz",
+        "add_move": "pan complementary elements away from center; use Stereo Spread on pads/synths/reverb; keep bass and kick mono below 100–150 Hz",
         "remove_when": "mix doesn't translate to mono, sounds hollow in the center, or elements phase-cancel",
-        "do_not": "do not widen the bass below 100\u2013150 Hz \u2014 it causes phase cancellation in mono"
+        "do_not": "do not widen the bass below 100–150 Hz — it causes phase cancellation in mono"
       },
       "path": null,
       "kind": "diagnosis",
@@ -99,10 +99,10 @@
       "name": "mix collapses in mono",
       "tier": "established",
       "content": {
-        "zone": "stereo field \u2014 phase relationship between L and R channels, especially below 200 Hz",
+        "zone": "stereo field — phase relationship between L and R channels, especially below 200 Hz",
         "remove_when": "the mix sounds full and wide in stereo but becomes thin, hollow, or loses instruments when played in mono (phone speaker, Bluetooth)",
         "remove_move": "mono the mix and solo tracks one by one to find what disappears; common culprits are stereo widening on bass, out-of-phase samples, or a doubled vocal that phase-cancels",
-        "do_not": "do not assume a mix that sounds wide in stereo will translate to mono \u2014 always check in mono before finishing"
+        "do_not": "do not assume a mix that sounds wide in stereo will translate to mono — always check in mono before finishing"
       },
       "path": null,
       "kind": "diagnosis",
@@ -127,9 +127,9 @@
       "tier": "established",
       "content": {
         "symptom": "Logic's meters show activity and playback runs normally, but there is no sound from speakers or headphones; other apps may also go silent at the same time",
-        "cause": "macOS Core Audio has entered a bad state and lost its connection to the output device \u2014 a known macOS bug",
+        "cause": "macOS Core Audio has entered a bad state and lost its connection to the output device — a known macOS bug",
         "fix": "Toggle Core Audio off and back on: Logic Pro > Settings > Audio > Devices tab > uncheck 'Enable Core Audio', wait 2 seconds, then re-enable it. If other apps are also silent, restart the Mac.",
-        "do_not": "do not adjust faders, output routing, or plugin settings first \u2014 the issue is at the macOS audio system level"
+        "do_not": "do not adjust faders, output routing, or plugin settings first — the issue is at the macOS audio system level"
       },
       "path": null,
       "extends_to": "audio settings",
@@ -142,7 +142,7 @@
       "content": {
         "symptom": "the interface doesn't appear in Logic Pro > Settings > Audio device list, or Logic shows no input signal even with the interface connected and working in other apps",
         "cause": "the interface is not visible to macOS Core Audio, Logic lacks microphone privacy permission, or a driver conflict exists",
-        "fix": "Step 1: Open macOS Audio MIDI Setup \u2014 if the interface doesn't appear there, Logic won't see it either; try a different USB port/cable. Step 2: Check System Settings > Privacy & Security > Microphone and ensure Logic Pro has access. Step 3: Reinstall the interface's driver if one is required.",
+        "fix": "Step 1: Open macOS Audio MIDI Setup — if the interface doesn't appear there, Logic won't see it either; try a different USB port/cable. Step 2: Check System Settings > Privacy & Security > Microphone and ensure Logic Pro has access. Step 3: Reinstall the interface's driver if one is required.",
         "do_not": "do not adjust buffer size or device settings in Logic until the interface appears correctly in macOS Audio MIDI Setup"
       },
       "path": null,
@@ -156,7 +156,7 @@
         "symptom": "spinning beach ball, dropout clicks, or Logic's System Overload alert",
         "cause": "real-time plugin processing demand exceeds what the buffer can deliver",
         "fix": "increase the I/O buffer size (try 256 or 512 samples while mixing); then freeze CPU-heavy tracks (right-click the track header > Freeze Track)",
-        "do_not": "do not dismiss the alert and keep working at the same settings \u2014 the dropout will keep happening"
+        "do_not": "do not dismiss the alert and keep working at the same settings — the dropout will keep happening"
       },
       "path": null,
       "extends_to": "buffer size",
@@ -170,7 +170,7 @@
         "symptom": "Logic shows a 'System Overload' or 'Disk Too Slow' alert despite the Mac being a powerful M1/M2/M3/M4 machine",
         "cause": "Logic is not using all available CPU threads (a known issue with the 'Automatic' thread setting on Apple Silicon), or macOS Voice Isolation is adding processing overhead",
         "fix": "Set Processing Threads to the maximum available number rather than 'Automatic'. Change Multithreading from 'Playback and Live Tracks' to 'Playback'. Disable macOS Voice Isolation in Control Center if active. Freeze CPU-heavy tracks.",
-        "do_not": "do not dismiss the overload alert and keep working \u2014 freeze the most CPU-intensive tracks before continuing"
+        "do_not": "do not dismiss the overload alert and keep working — freeze the most CPU-intensive tracks before continuing"
       },
       "path": null,
       "extends_to": "processing threads",
@@ -182,7 +182,7 @@
       "tier": "established",
       "content": {
         "symptom": "channel strip meters don't move or respond at all when you sing or play, even with a working, correctly-configured audio interface connected",
-        "fix": "macOS System Settings > Privacy & Security > Microphone \u2014 toggle Logic Pro on. After granting access, quit and relaunch Logic Pro \u2014 macOS does not apply a newly granted permission to an already-running process."
+        "fix": "macOS System Settings > Privacy & Security > Microphone — toggle Logic Pro on. After granting access, quit and relaunch Logic Pro — macOS does not apply a newly granted permission to an already-running process."
       },
       "path": null,
       "kind": "diagnosis",
@@ -192,10 +192,10 @@
       "name": "recording latency and monitoring delay",
       "tier": "established",
       "content": {
-        "symptom": "you can hear yourself delayed by 20\u201350ms or more when singing or playing through Logic with software monitoring active; recorded audio appears slightly late on the timeline",
+        "symptom": "you can hear yourself delayed by 20–50ms or more when singing or playing through Logic with software monitoring active; recorded audio appears slightly late on the timeline",
         "cause": "the I/O buffer size is too large, or plugins with high latency in the channel strip are adding monitoring delay (PDC)",
         "fix": "Step 1: Reduce the I/O buffer size to 64 or 128 samples. Step 2: Choose Record > Low Latency Monitoring Mode to bypass latency-adding plugins on record-enabled tracks. Step 3: If your interface supports direct monitoring, use that instead.",
-        "do_not": "do not leave a large buffer and try to sing or play along to the delayed signal \u2014 the perceived delay will affect your performance and the recorded timing"
+        "do_not": "do not leave a large buffer and try to sing or play along to the delayed signal — the perceived delay will affect your performance and the recorded timing"
       },
       "path": null,
       "extends_to": "low latency monitoring mode",
@@ -213,7 +213,7 @@
         "sample buffer"
       ],
       "content": {
-        "opens": "Audio settings pane, Devices tab \u2014 I/O Buffer Size pop-up menu (32 to 1024 samples). Use 64-128 samples while recording to minimize latency; switch to 256-512 while mixing to reduce CPU load."
+        "opens": "Audio settings pane, Devices tab — I/O Buffer Size pop-up menu (32 to 1024 samples). Use 64-128 samples while recording to minimize latency; switch to 256-512 while mixing to reduce CPU load."
       },
       "path": [
         {
@@ -245,7 +245,7 @@
         "44.1 kHz vs 48 kHz"
       ],
       "content": {
-        "opens": "Project Settings window, Audio tab \u2014 Sample Rate, Spatial Audio, Surround Format, Pan Law, and Apple Loops quality. Change the project's sample rate here (most commonly between 44.1 kHz and 48 kHz)."
+        "opens": "Project Settings window, Audio tab — Sample Rate, Spatial Audio, Surround Format, Pan Law, and Apple Loops quality. Change the project's sample rate here (most commonly between 44.1 kHz and 48 kHz)."
       },
       "path": [
         {
@@ -277,7 +277,7 @@
         "processing threads setting"
       ],
       "content": {
-        "opens": "Audio settings pane, Devices tab \u2014 Processing Threads pop-up menu. Controls how many CPU threads Logic's audio engine uses; set to the maximum available rather than 'Automatic' on Apple Silicon."
+        "opens": "Audio settings pane, Devices tab — Processing Threads pop-up menu. Controls how many CPU threads Logic's audio engine uses; set to the maximum available rather than 'Automatic' on Apple Silicon."
       },
       "path": [
         {
@@ -308,7 +308,7 @@
         "low latency monitoring"
       ],
       "content": {
-        "opens": "Toggles Low Latency Monitoring Mode \u2014 bypasses latency-adding plugins on record-enabled tracks so software monitoring stays close to real time."
+        "opens": "Toggles Low Latency Monitoring Mode — bypasses latency-adding plugins on record-enabled tracks so software monitoring stays close to real time."
       },
       "path": [
         {
@@ -332,7 +332,7 @@
         "logic audio preferences"
       ],
       "content": {
-        "opens": "Settings window, Audio tab \u2014 output/input device selection, Core Audio on/off, sample rate, and buffer size all live here."
+        "opens": "Settings window, Audio tab — output/input device selection, Core Audio on/off, sample rate, and buffer size all live here."
       },
       "path": [
         {
@@ -360,7 +360,7 @@
         "I button track header"
       ],
       "content": {
-        "opens": "Opens the Configure Track Header panel, where Input Monitoring (the \"I\" button on audio tracks) can be checked or unchecked. If it's already checked, the button is already visible on the track header \u2014 check the current state before assuming it needs enabling."
+        "opens": "Opens the Configure Track Header panel, where Input Monitoring (the \"I\" button on audio tracks) can be checked or unchecked. If it's already checked, the button is already visible on the track header — check the current state before assuming it needs enabling."
       },
       "toggle_ax_key": "input_monitoring_button_visible",
       "path": [
@@ -385,7 +385,7 @@
         "reassign shortcuts"
       ],
       "content": {
-        "opens": "Key Commands window \u2014 search, reassign, or add keyboard shortcuts for any Logic function. Default shortcut: Option+K."
+        "opens": "Key Commands window — search, reassign, or add keyboard shortcuts for any Logic function. Default shortcut: Option+K."
       },
       "path": [
         {
@@ -405,7 +405,7 @@
         "enable disable plugins"
       ],
       "content": {
-        "opens": "Plug-in Manager \u2014 scan for, enable, or disable installed Audio Units plugins."
+        "opens": "Plug-in Manager — scan for, enable, or disable installed Audio Units plugins."
       },
       "path": [
         {
@@ -433,7 +433,7 @@
         "export mixdown"
       ],
       "content": {
-        "opens": "Bounce dialog \u2014 renders the entire project down to a single mixed audio file. This is how you export your final mix or master as one file (MP3, WAV, AIFF) \u2014 not separate per-track stems. Set output format, bit depth, sample rate, normalization, and bounce range. Default shortcut: Cmd+B."
+        "opens": "Bounce dialog — renders the entire project down to a single mixed audio file. This is how you export your final mix or master as one file (MP3, WAV, AIFF) — not separate per-track stems. Set output format, bit depth, sample rate, normalization, and bounce range. Default shortcut: Cmd+B."
       },
       "path": [
         {
@@ -453,7 +453,7 @@
         "overlapping recordings setting"
       ],
       "content": {
-        "opens": "File Type and Bit Depth for recorded audio, and Overlapping Track Recordings behavior. Settings window, Recording tab \u2014 Audio Recording section (File Type, e.g. WAVE/AIFF, and Bit Depth, e.g. 24-bit), MIDI Recording section (Auto Record Enable), and Overlapping Track Recordings section (Cycle Off/Cycle On/Replace behavior, set separately for MIDI and Audio \u2014 e.g. Audio Cycle On defaults to \"Create Take Folder\")."
+        "opens": "File Type and Bit Depth for recorded audio, and Overlapping Track Recordings behavior. Settings window, Recording tab — Audio Recording section (File Type, e.g. WAVE/AIFF, and Bit Depth, e.g. 24-bit), MIDI Recording section (Auto Record Enable), and Overlapping Track Recordings section (Cycle Off/Cycle On/Replace behavior, set separately for MIDI and Audio — e.g. Audio Cycle On defaults to \"Create Take Folder\")."
       },
       "path": [
         {
@@ -481,7 +481,7 @@
         "recording save location"
       ],
       "content": {
-        "opens": "Turn on or enable count-in / pre-roll before recording starts, or change where recorded audio files are saved. Project Settings window, Recording tab \u2014 count-in, pre-roll, Allow tempo change recording, Automatically colorize takes, MIDI data reduction and duplicate erasure, and Audio Recording Path (the folder new recordings are saved to)."
+        "opens": "Turn on or enable count-in / pre-roll before recording starts, or change where recorded audio files are saved. Project Settings window, Recording tab — count-in, pre-roll, Allow tempo change recording, Automatically colorize takes, MIDI data reduction and duplicate erasure, and Audio Recording Path (the folder new recordings are saved to)."
       },
       "path": [
         {
@@ -508,7 +508,7 @@
         "fixed tempo vs adapt setting"
       ],
       "content": {
-        "opens": "Project Settings window, Smart Tempo tab \u2014 set whether the project uses a fixed tempo, adapts to audio, or keeps the original recording tempo."
+        "opens": "Project Settings window, Smart Tempo tab — set whether the project uses a fixed tempo, adapts to audio, or keeps the original recording tempo."
       },
       "path": [
         {
@@ -535,7 +535,7 @@
         "Channel EQ plugin"
       ],
       "content": {
-        "opens": "Channel EQ plugin \u2014 8-band parametric EQ with a real-time frequency analyzer. Opened via Search and Add Plug-in (Ctrl+Cmd+P): type 'cha' to filter, then press Return."
+        "opens": "Channel EQ plugin — 8-band parametric EQ with a real-time frequency analyzer. Opened via Search and Add Plug-in (Ctrl+Cmd+P): type 'cha' to filter, then press Return."
       },
       "path": [
         {
@@ -569,7 +569,7 @@
         "vintage compressor plugin"
       ],
       "content": {
-        "opens": "Compressor plugin \u2014 threshold, ratio, attack, release, knee, makeup gain with multiple vintage circuit models. Opened via Search and Add Plug-in (Ctrl+Cmd+P): type 'com' to filter, then press Return. Search also matches Squash Compressor, AUMultibandCompressor, and Multipressor \u2014 Return picks whichever ranks first, which favors whatever was searched most recently, so an unrelated recent search can make this open the wrong one."
+        "opens": "Compressor plugin — threshold, ratio, attack, release, knee, makeup gain with multiple vintage circuit models. Opened via Search and Add Plug-in (Ctrl+Cmd+P): type 'com' to filter, then press Return. Search also matches Squash Compressor, AUMultibandCompressor, and Multipressor — Return picks whichever ranks first, which favors whatever was searched most recently, so an unrelated recent search can make this open the wrong one."
       },
       "path": [
         {
@@ -604,7 +604,7 @@
         "Space Designer plugin"
       ],
       "content": {
-        "opens": "Space Designer plugin \u2014 convolution reverb for realistic room ambience and acoustic space, using a built-in impulse response library (real recorded spaces, not an algorithm) and envelope controls. Good for putting drums, vocals, or any track in a believable-sounding room. Opened via Search and Add Plug-in (Ctrl+Cmd+P): type 'spa' to filter, then press Return."
+        "opens": "Space Designer plugin — convolution reverb for realistic room ambience and acoustic space, using a built-in impulse response library (real recorded spaces, not an algorithm) and envelope controls. Good for putting drums, vocals, or any track in a believable-sounding room. Opened via Search and Add Plug-in (Ctrl+Cmd+P): type 'spa' to filter, then press Return."
       },
       "path": [
         {
@@ -639,7 +639,7 @@
         "Tape Delay plugin"
       ],
       "content": {
-        "opens": "Tape Delay plugin \u2014 tempo-synced delay with tape flutter, saturation, and filter controls. Opened via Search and Add Plug-in (Ctrl+Cmd+P): type 'tape delay' to filter, then press Return. Search also matches Tru-Tape Delay \u2014 Return picks whichever ranks first, which favors whatever was searched most recently, so an unrelated recent search can make this open the wrong one."
+        "opens": "Tape Delay plugin — tempo-synced delay with tape flutter, saturation, and filter controls. Opened via Search and Add Plug-in (Ctrl+Cmd+P): type 'tape delay' to filter, then press Return. Search also matches Tru-Tape Delay — Return picks whichever ranks first, which favors whatever was searched most recently, so an unrelated recent search can make this open the wrong one."
       },
       "path": [
         {
@@ -702,7 +702,7 @@
         "de-essing plugin"
       ],
       "content": {
-        "opens": "DeEsser 2 plugin \u2014 frequency-selective dynamic compression targeting sibilant consonants. Opened via Search and Add Plug-in (Ctrl+Cmd+P): type 'dee' to filter, then press Return."
+        "opens": "DeEsser 2 plugin — frequency-selective dynamic compression targeting sibilant consonants. Opened via Search and Add Plug-in (Ctrl+Cmd+P): type 'dee' to filter, then press Return."
       },
       "path": [
         {
@@ -772,7 +772,7 @@
         "flex dropdown"
       ],
       "content": {
-        "opens": "Click the Flex button on the track header (or press Cmd+F) to open the Flex dropdown \u2014 the same menu used for Flex Pitch. \"Monophonic\" is checked by default; below the divider choose a Flex Time algorithm: Automatic (Polyphonic), Monophonic, Slicing, Rhythmic, Polyphonic, Speed (FX), or Tempophone (FX). Use Slicing or Rhythmic for drums, Monophonic for vocals."
+        "opens": "Click the Flex button on the track header (or press Cmd+F) to open the Flex dropdown — the same menu used for Flex Pitch. \"Monophonic\" is checked by default; below the divider choose a Flex Time algorithm: Automatic (Polyphonic), Monophonic, Slicing, Rhythmic, Polyphonic, Speed (FX), or Tempophone (FX). Use Slicing or Rhythmic for drums, Monophonic for vocals."
       },
       "path": [
         {
@@ -820,7 +820,7 @@
         "mixer view"
       ],
       "content": {
-        "opens": "The Mixer \u2014 all track channel strips side by side with faders, sends, inserts, and EQ thumbnails. The All / Tracks / Single buttons at top-left control which channels are visible \u2014 switching modes accidentally is a common cause of channels appearing to disappear. Shortcut: X (toggle in main window), Cmd+2 (floating window)."
+        "opens": "The Mixer — all track channel strips side by side with faders, sends, inserts, and EQ thumbnails. The All / Tracks / Single buttons at top-left control which channels are visible — switching modes accidentally is a common cause of channels appearing to disappear. Shortcut: X (toggle in main window), Cmd+2 (floating window)."
       },
       "path": [
         {
@@ -837,7 +837,7 @@
         "smart controls panel"
       ],
       "content": {
-        "opens": "Smart Controls panel at the bottom of the main window \u2014 simplified controls for the selected track's instruments and effects. Automatically changes based on which track is selected. Shortcut: B."
+        "opens": "Smart Controls panel at the bottom of the main window — simplified controls for the selected track's instruments and effects. Automatically changes based on which track is selected. Shortcut: B."
       },
       "path": [
         {
@@ -855,7 +855,7 @@
         "loop library"
       ],
       "content": {
-        "opens": "Loop Browser panel \u2014 search Apple Loops by instrument, genre, mood, or keyword. Green loops are Apple Loops that stretch to match project tempo; purple loops are fixed-tempo audio files. Shortcut: O."
+        "opens": "Loop Browser panel — search Apple Loops by instrument, genre, mood, or keyword. Green loops are Apple Loops that stretch to match project tempo; purple loops are fixed-tempo audio files. Shortcut: O."
       },
       "path": [
         {
@@ -874,7 +874,7 @@
         "render in place"
       ],
       "content": {
-        "opens": "Bounce in Place \u2014 render a region with its effects baked in: commits/prints the selected region's track plugins permanently into new audio, in place, so they're no longer separately editable afterward. Opens the Bounce in Place dialog. Select a region first, then press Ctrl+B. Also accessible by right-clicking a region and choosing Bounce or Join > Bounce In Place."
+        "opens": "Bounce in Place — render a region with its effects baked in: commits/prints the selected region's track plugins permanently into new audio, in place, so they're no longer separately editable afterward. Opens the Bounce in Place dialog. Select a region first, then press Ctrl+B. Also accessible by right-clicking a region and choosing Bounce or Join > Bounce In Place."
       },
       "path": [
         {
@@ -893,7 +893,7 @@
         "stem export"
       ],
       "content": {
-        "opens": "Export dialog \u2014 exports each track as a separate individual audio file (stems), one file per track \u2014 this is NOT a single mixed-down file (for a single final mixed file, use Bounce Project, Cmd+B, instead). Options for format, bit depth, sample rate, and whether to include the master effects chain. Shortcut: Shift+Cmd+E. Menu path: File > Export > All Tracks as Audio Files..."
+        "opens": "Export dialog — exports each track as a separate individual audio file (stems), one file per track — this is NOT a single mixed-down file (for a single final mixed file, use Bounce Project, Cmd+B, instead). Options for format, bit depth, sample rate, and whether to include the master effects chain. Shortcut: Shift+Cmd+E. Menu path: File > Export > All Tracks as Audio Files..."
       },
       "path": [
         {
@@ -934,7 +934,7 @@
         "piano roll editor"
       ],
       "content": {
-        "opens": "Piano Roll editor \u2014 MIDI note data as horizontal bars on a grid. Fastest access: double-click any MIDI region. The lower-right corner of a note resizes its length; drag from the body to move it. Shortcut: Cmd+4."
+        "opens": "Piano Roll editor — MIDI note data as horizontal bars on a grid. Fastest access: double-click any MIDI region. The lower-right corner of a note resizes its length; drag from the body to move it. Shortcut: Cmd+4."
       },
       "path": [
         {
@@ -953,7 +953,7 @@
         "drummer complexity intensity controls"
       ],
       "content": {
-        "opens": "Drummer Editor panel (header reads 'Session Player') \u2014 appears only when a Drummer region is selected. Three tabs: Main (separate Complexity and Intensity sliders \u2014 not a combined XY pad \u2014 plus per-instrument kit-piece density selectors, Fill Amount/Fill Complexity/Swing knobs, and a Follow Rhythm Of control (in the kick/snare row's pattern popover) that follows either the Chords track or a specific track), Details (Ghost Notes, Feel, Dynamics, and Humanize knobs, plus Snare/Percussion/Hi-Hat type and Tempo dropdowns), and Manual (click-to-program step grid for hand-placed hits). Change genre and drummer character in the Library panel (shortcut: Y)."
+        "opens": "Drummer Editor panel (header reads 'Session Player') — appears only when a Drummer region is selected. Three tabs: Main (separate Complexity and Intensity sliders — not a combined XY pad — plus per-instrument kit-piece density selectors, Fill Amount/Fill Complexity/Swing knobs, and a Follow Rhythm Of control (in the kick/snare row's pattern popover) that follows either the Chords track or a specific track), Details (Ghost Notes, Feel, Dynamics, and Humanize knobs, plus Snare/Percussion/Hi-Hat type and Tempo dropdowns), and Manual (click-to-program step grid for hand-placed hits). Change genre and drummer character in the Library panel (shortcut: Y)."
       },
       "path": null
     },
@@ -966,7 +966,7 @@
         "capture last take"
       ],
       "content": {
-        "opens": "Retroactively captures MIDI played during the last playback pass \u2014 even without being in record mode \u2014 and creates a new MIDI region. Works for MIDI only, not audio. The buffer clears when you stop and play again without capturing. Shortcut: Shift+R. Also accessible via the Flashback Capture button in the control bar."
+        "opens": "Retroactively captures MIDI played during the last playback pass — even without being in record mode — and creates a new MIDI region. Works for MIDI only, not audio. The buffer clears when you stop and play again without capturing. Shortcut: Shift+R. Also accessible via the Flashback Capture button in the control bar."
       },
       "path": [
         {
@@ -984,7 +984,7 @@
         "note chase setting"
       ],
       "content": {
-        "opens": "Project Settings window, MIDI tab \u2014 Chase section controls whether Logic re-triggers notes, controllers, and program changes when playback starts mid-section. If held chords don't sound when starting playback in the middle of a section, enable Chase > Notes here."
+        "opens": "Project Settings window, MIDI tab — Chase section controls whether Logic re-triggers notes, controllers, and program changes when playback starts mid-section. If held chords don't sound when starting playback in the middle of a section, enable Chase > Notes here."
       },
       "path": [
         {
@@ -1011,7 +1011,7 @@
         "marker track"
       ],
       "content": {
-        "opens": "Global Tracks area above the Tracks Area \u2014 Tempo, Time Signature, Key, Marker, Movie, Transposition, and Beat Mapping tracks that apply to the whole project. Right-click the header to choose which tracks are visible. The Tempo track is where you automate tempo changes. Shortcut: G."
+        "opens": "Global Tracks area above the Tracks Area — Tempo, Time Signature, Key, Marker, Movie, Transposition, and Beat Mapping tracks that apply to the whole project. Right-click the header to choose which tracks are visible. The Tempo track is where you automate tempo changes. Shortcut: G."
       },
       "path": [
         {
@@ -1030,7 +1030,7 @@
         "punch loop"
       ],
       "content": {
-        "opens": "Cycle mode \u2014 Logic loops playback between the yellow markers in the ruler. Recording while cycle is active creates Take Folders by default (one take per pass) \u2014 this default is configurable in Recording Settings. Drag in the ruler area to set the cycle region. Shortcut: C."
+        "opens": "Cycle mode — Logic loops playback between the yellow markers in the ruler. Recording while cycle is active creates Take Folders by default (one take per pass) — this default is configurable in Recording Settings. Drag in the ruler area to set the cycle region. Shortcut: C."
       },
       "path": [
         {
@@ -1049,7 +1049,7 @@
         "output ceiling limiter"
       ],
       "content": {
-        "opens": "Adaptive Limiter \u2014 look-ahead brickwall limiter with Output Ceiling and Gain controls. Set Out Ceiling to -0.1 dB (not 0 dB) to prevent inter-sample clipping on streaming platforms. Typically the last insert on the Stereo Out. Opened via Search and Add Plug-in (Ctrl+Cmd+P): type 'ada' to filter, then press Return."
+        "opens": "Adaptive Limiter — look-ahead brickwall limiter with Output Ceiling and Gain controls. Set Out Ceiling to -0.1 dB (not 0 dB) to prevent inter-sample clipping on streaming platforms. Typically the last insert on the Stereo Out. Opened via Search and Add Plug-in (Ctrl+Cmd+P): type 'ada' to filter, then press Return."
       },
       "path": [
         {
@@ -1082,7 +1082,7 @@
         "multiband compressor"
       ],
       "content": {
-        "opens": "Multipressor \u2014 Logic's multiband compressor. Splits the signal into up to 4 frequency bands with independent compression per band. Useful on a master or drum bus to control dynamics in specific frequency ranges without affecting overall tonal balance. Opened via Search and Add Plug-in (Ctrl+Cmd+P): type 'multip' to filter, then press Return."
+        "opens": "Multipressor — Logic's multiband compressor. Splits the signal into up to 4 frequency bands with independent compression per band. Useful on a master or drum bus to control dynamics in specific frequency ranges without affecting overall tonal balance. Opened via Search and Add Plug-in (Ctrl+Cmd+P): type 'multip' to filter, then press Return."
       },
       "path": [
         {
@@ -1128,7 +1128,7 @@
         "stereo imaging plugin"
       ],
       "content": {
-        "opens": "Stereo Spread \u2014 widens the stereo image by separating frequencies across the left-right field. Upper frequencies spread wider; lower frequencies stay centered. Keep bass mono \u2014 the lower frequency bands intentionally have reduced spread. Opened via Search and Add Plug-in (Ctrl+Cmd+P): type 'stereo sp' to filter, then press Return."
+        "opens": "Stereo Spread — widens the stereo image by separating frequencies across the left-right field. Upper frequencies spread wider; lower frequencies stay centered. Keep bass mono — the lower frequency bands intentionally have reduced spread. Opened via Search and Add Plug-in (Ctrl+Cmd+P): type 'stereo sp' to filter, then press Return."
       },
       "path": [
         {
@@ -1187,7 +1187,7 @@
         "imported file tempo default"
       ],
       "content": {
-        "opens": "Project Settings window, Smart Tempo tab, 'Defaults for Flex and Smart Tempo Region Setting' section \u2014 'Set Imported Files To' dropdown. Controls whether Flex is applied by default to newly imported audio files. Set to 'Flex Off' to prevent Logic from automatically stretching/warping imported samples and loops to match project tempo. This is a per-project setting, not a global preference."
+        "opens": "Project Settings window, Smart Tempo tab, 'Defaults for Flex and Smart Tempo Region Setting' section — 'Set Imported Files To' dropdown. Controls whether Flex is applied by default to newly imported audio files. Set to 'Flex Off' to prevent Logic from automatically stretching/warping imported samples and loops to match project tempo. This is a per-project setting, not a global preference."
       },
       "path": [
         {
@@ -1217,7 +1217,7 @@
         "metronome click settings"
       ],
       "content": {
-        "opens": "Project Settings window, Metronome tab \u2014 controls click sound, volume, and whether the click plays during recording only or also during playback. To hear the click only during recording, right-click the metronome button in the control bar and choose Click While Recording."
+        "opens": "Project Settings window, Metronome tab — controls click sound, volume, and whether the click plays during recording only or also during playback. To hear the click only during recording, right-click the metronome button in the control bar and choose Click While Recording."
       },
       "path": [
         {
@@ -1244,7 +1244,7 @@
         "click toggle"
       ],
       "content": {
-        "opens": "Press K to toggle the click on and off \u2014 a global key command, works no matter what's selected or in focus. To hear the click only while recording (not during playback), right-click the metronome button in the control bar (just left of the tempo/LCD display) and choose Click While Recording. For click sound, volume, or other detailed options, see Metronome Settings."
+        "opens": "Press K to toggle the click on and off — a global key command, works no matter what's selected or in focus. To hear the click only while recording (not during playback), right-click the metronome button in the control bar (just left of the tempo/LCD display) and choose Click While Recording. For click sound, volume, or other detailed options, see Metronome Settings."
       },
       "path": null
     },
@@ -1257,7 +1257,7 @@
         "controller data editor"
       ],
       "content": {
-        "opens": "Event List editor \u2014 all MIDI events as a numerical list with exact position, pitch, velocity, and length. Useful for removing unwanted pitch bend data or stray controller messages sent by a hardware keyboard. Shortcut: Cmd+7."
+        "opens": "Event List editor — all MIDI events as a numerical list with exact position, pitch, velocity, and length. Useful for removing unwanted pitch bend data or stray controller messages sent by a hardware keyboard. Shortcut: Cmd+7."
       },
       "path": [
         {
@@ -1275,7 +1275,7 @@
         "quantize pop-up"
       ],
       "content": {
-        "opens": "Quantize pop-up in the Region Inspector \u2014 snaps MIDI notes to the nearest rhythmic grid division. Non-destructive: changing the value updates the region live. For swing/shuffle feel, adjust the Q-Swing slider below the Quantize pop-up. Shortcut: Q (applies current value), I (open Inspector)."
+        "opens": "Quantize pop-up in the Region Inspector — snaps MIDI notes to the nearest rhythmic grid division. Non-destructive: changing the value updates the region live. For swing/shuffle feel, adjust the Q-Swing slider below the Quantize pop-up. Shortcut: Q (applies current value), I (open Inspector)."
       },
       "path": [
         {
@@ -1320,7 +1320,7 @@
         "region follow tempo setting"
       ],
       "content": {
-        "opens": "Region Inspector (select an audio region, press I) \u2014 click the 'Region:' disclosure header to expand it if collapsed, revealing a 'Smart Tempo' dropdown (there is no 'Follow Tempo' checkbox, despite common phrasing/older docs). Options: Off, On, On + Align Bars, On + Align Bars and Beats. Set to Off to stop this specific region from stretching to match project tempo, overriding the project-wide Smart Tempo setting for that region only. The expanded Region box also shows Mute, Loop, Quantize, Q-Swing, Transpose, Fine Tune, Pitch Source, Flex, File Tempo, and Gain. Note: pressing I toggles the Inspector and the Region disclosure remembers its last expanded/collapsed state \u2014 if either is already open, this path can act in the wrong direction until the executor gets a pre-check for already-satisfied steps."
+        "opens": "Region Inspector (select an audio region, press I) — click the 'Region:' disclosure header to expand it if collapsed, revealing a 'Smart Tempo' dropdown (there is no 'Follow Tempo' checkbox, despite common phrasing/older docs). Options: Off, On, On + Align Bars, On + Align Bars and Beats. Set to Off to stop this specific region from stretching to match project tempo, overriding the project-wide Smart Tempo setting for that region only. The expanded Region box also shows Mute, Loop, Quantize, Q-Swing, Transpose, Fine Tune, Pitch Source, Flex, File Tempo, and Gain. Note: pressing I toggles the Inspector and the Region disclosure remembers its last expanded/collapsed state — if either is already open, this path can act in the wrong direction until the executor gets a pre-check for already-satisfied steps."
       },
       "path": [
         {
@@ -1346,7 +1346,7 @@
         "auto-split silent regions"
       ],
       "content": {
-        "opens": "Remove Silence dialog \u2014 automatically splits a region at quiet sections below a threshold, creating multiple shorter regions from one long one. Adjust Threshold, Minimum Time to Accept as Silence, and Pre/Post Attack/Release to avoid clipping phrase starts and ends. Key Command name: 'Remove Silence from Audio Region'. Shortcut: Ctrl+X on a selected audio region."
+        "opens": "Remove Silence dialog — automatically splits a region at quiet sections below a threshold, creating multiple shorter regions from one long one. Adjust Threshold, Minimum Time to Accept as Silence, and Pre/Post Attack/Release to avoid clipping phrase starts and ends. Key Command name: 'Remove Silence from Audio Region'. Shortcut: Ctrl+X on a selected audio region."
       },
       "path": [
         {
@@ -1364,7 +1364,7 @@
         "automatic mastering"
       ],
       "content": {
-        "opens": "Mastering Assistant \u2014 AI-driven mastering that analyzes the mix and applies EQ, compression, and limiting to match a target loudness. Requires Apple Silicon (M1 or later) and Logic Pro 10.7.5 or later."
+        "opens": "Mastering Assistant — AI-driven mastering that analyzes the mix and applies EQ, compression, and limiting to match a target loudness. Requires Apple Silicon (M1 or later) and Logic Pro 10.7.5 or later."
       },
       "path": null
     },
@@ -1377,7 +1377,7 @@
         "ChromaVerb reverb"
       ],
       "content": {
-        "opens": "ChromaVerb plugin \u2014 Logic's algorithmic reverb with 14 room types, a visual frequency-response display, and per-frequency-band damping controls. Better for creative and musical reverb; Space Designer is better for realistic acoustic spaces using impulse responses. Opened via Search and Add Plug-in (Ctrl+Cmd+P): type 'chromav' to filter (not 'chroma' \u2014 collides with ChromaGlow), then press Return."
+        "opens": "ChromaVerb plugin — Logic's algorithmic reverb with 14 room types, a visual frequency-response display, and per-frequency-band damping controls. Better for creative and musical reverb; Space Designer is better for realistic acoustic spaces using impulse responses. Opened via Search and Add Plug-in (Ctrl+Cmd+P): type 'chromav' to filter (not 'chroma' — collides with ChromaGlow), then press Return."
       },
       "path": [
         {
@@ -1427,7 +1427,7 @@
         "create audio track"
       ],
       "content": {
-        "opens": "Creates a new Audio track directly, with a channel strip ready for recording or importing audio \u2014 this is the track type for recording vocals or any live instrument. Faster than the general New Tracks\u2026 dialog when you already know you want an audio track. Shortcut: Option+Cmd+A (also Track > New Audio Track)."
+        "opens": "Creates a new Audio track directly, with a channel strip ready for recording or importing audio — this is the track type for recording vocals or any live instrument. Faster than the general New Tracks… dialog when you already know you want an audio track. Shortcut: Option+Cmd+A (also Track > New Audio Track)."
       },
       "path": [
         {
@@ -1445,7 +1445,7 @@
         "create software instrument track"
       ],
       "content": {
-        "opens": "Creates a new Software Instrument track directly, ready to load an instrument plugin. Faster than the general New Tracks\u2026 dialog when you already know you want a software instrument. Shortcut: Option+Cmd+S (also Track > New Software Instrument Track)."
+        "opens": "Creates a new Software Instrument track directly, ready to load an instrument plugin. Faster than the general New Tracks… dialog when you already know you want a software instrument. Shortcut: Option+Cmd+S (also Track > New Software Instrument Track)."
       },
       "path": [
         {
@@ -1462,7 +1462,7 @@
         "add external MIDI track"
       ],
       "content": {
-        "opens": "Creates a new External MIDI track \u2014 routes MIDI to an external hardware synth or sound module rather than a software instrument inside Logic. Shortcut: Option+Cmd+X (also Track > New External MIDI Track)."
+        "opens": "Creates a new External MIDI track — routes MIDI to an external hardware synth or sound module rather than a software instrument inside Logic. Shortcut: Option+Cmd+X (also Track > New External MIDI Track)."
       },
       "path": [
         {
@@ -1481,7 +1481,7 @@
         "session player track dialog"
       ],
       "content": {
-        "opens": "Opens the New Session Player Track dialog \u2014 Logic's session players (Drummer and other AI performers) generate parts that follow the song. Shortcut: Option+Cmd+U (also Track > New Session Player SI Track\u2026). See the drummer editor entry for editing an existing Drummer region."
+        "opens": "Opens the New Session Player Track dialog — Logic's session players (Drummer and other AI performers) generate parts that follow the song. Shortcut: Option+Cmd+U (also Track > New Session Player SI Track…). See the drummer editor entry for editing an existing Drummer region."
       },
       "path": [
         {
@@ -1517,7 +1517,7 @@
         "add track"
       ],
       "content": {
-        "opens": "New Tracks dialog \u2014 choose the track type (Audio, Software Instrument, External MIDI, or a Session Player) and how many to create, in one place, before anything is created. Use this when you're not yet sure which specific type you want; if you already know, the direct shortcuts are faster (Option+Cmd+A audio, Option+Cmd+S software instrument, Option+Cmd+X external MIDI, Option+Cmd+U session player). Menu: Track > New Tracks\u2026 (shortcut Option+Cmd+N)."
+        "opens": "New Tracks dialog — choose the track type (Audio, Software Instrument, External MIDI, or a Session Player) and how many to create, in one place, before anything is created. Use this when you're not yet sure which specific type you want; if you already know, the direct shortcuts are faster (Option+Cmd+A audio, Option+Cmd+S software instrument, Option+Cmd+X external MIDI, Option+Cmd+U session player). Menu: Track > New Tracks… (shortcut Option+Cmd+N)."
       },
       "path": [
         {
@@ -1526,7 +1526,7 @@
         },
         {
           "type": "menu",
-          "value": "New Tracks\u2026"
+          "value": "New Tracks…"
         }
       ]
     },
@@ -1534,12 +1534,12 @@
       "name": "muddy guitars",
       "tier": "established",
       "content": {
-        "zone": "low-mid buildup, roughly 150\u2013350 Hz; acoustic boom at 80\u2013120 Hz",
+        "zone": "low-mid buildup, roughly 150–350 Hz; acoustic boom at 80–120 Hz",
         "add_when": "intentionally warm, lo-fi, or vintage guitar tone",
         "add_move": "gentle low-shelf boost below 250 Hz; ease or remove the high-pass filter",
         "remove_when": "guitars sound thick, boomy, or are cluttering the low end and making the mix congested",
-        "remove_move": "high-pass filter at 80\u2013120 Hz on electric guitar (100\u2013150 Hz on acoustic) to remove low-end bleed; narrow bell cut at 200\u2013350 Hz to reduce body buildup",
-        "do_not": "do not skip the high-pass filter on guitars \u2014 the low end they add below 80 Hz almost never helps the mix and always fights the kick and bass"
+        "remove_move": "high-pass filter at 80–120 Hz on electric guitar (100–150 Hz on acoustic) to remove low-end bleed; narrow bell cut at 200–350 Hz to reduce body buildup",
+        "do_not": "do not skip the high-pass filter on guitars — the low end they add below 80 Hz almost never helps the mix and always fights the kick and bass"
       },
       "path": null,
       "kind": "diagnosis",
@@ -1549,11 +1549,11 @@
       "name": "muddy mix",
       "tier": "established",
       "content": {
-        "zone": "low-mid buildup across multiple tracks, 150\u2013400 Hz",
+        "zone": "low-mid buildup across multiple tracks, 150–400 Hz",
         "add_when": "intentional lo-fi, dense, or warm full-mix texture",
         "add_move": "remove high-pass filters from elements you want to be warm; add subtle low-shelf boost on a group bus",
         "remove_when": "the mix sounds congested, elements are hard to distinguish, or the low-mid is overwhelming",
-        "remove_move": "high-pass filter every element that doesn't need low end \u2014 vocals, guitars, synths, keys; set the cutoff just above each element's lowest meaningful frequency",
+        "remove_move": "high-pass filter every element that doesn't need low end — vocals, guitars, synths, keys; set the cutoff just above each element's lowest meaningful frequency",
         "do_not": "do not reach for the master bus EQ first; fix mud at the individual track level"
       },
       "path": null,
@@ -1564,12 +1564,12 @@
       "name": "harsh vocals",
       "tier": "established",
       "content": {
-        "zone": "presence zone, roughly 2\u20135 kHz",
+        "zone": "presence zone, roughly 2–5 kHz",
         "add_when": "intentionally aggressive, cutting, or gritty vocal tone",
-        "add_move": "bell boost +2\u20133 dB somewhere in 2\u20135 kHz; narrow Q to stay surgical",
+        "add_move": "bell boost +2–3 dB somewhere in 2–5 kHz; narrow Q to stay surgical",
         "remove_when": "vocals are fatiguing, sharp, or feel like they're cutting too hard",
-        "remove_move": "narrow bell cut 2\u20134 dB somewhere in the 2\u20135 kHz range \u2014 sweep slowly because the exact frequency that sounds harsh varies by voice",
-        "do_not": "do not add a broad high-shelf cut \u2014 you'll dull the whole vocal trying to fix one frequency"
+        "remove_move": "narrow bell cut 2–4 dB somewhere in the 2–5 kHz range — sweep slowly because the exact frequency that sounds harsh varies by voice",
+        "do_not": "do not add a broad high-shelf cut — you'll dull the whole vocal trying to fix one frequency"
       },
       "path": null,
       "kind": "diagnosis",
@@ -1579,12 +1579,12 @@
       "name": "harsh hi-hats",
       "tier": "established",
       "content": {
-        "zone": "upper presence/air, 6\u201314 kHz; metallic clang at 3\u20135 kHz",
+        "zone": "upper presence/air, 6–14 kHz; metallic clang at 3–5 kHz",
         "add_when": "intentionally bright, cutting, or aggressive hi-hat sound",
-        "add_move": "high-shelf boost above 10 kHz; or bell boost at 3\u20135 kHz for metallic edge",
+        "add_move": "high-shelf boost above 10 kHz; or bell boost at 3–5 kHz for metallic edge",
         "remove_when": "hi-hats are fatiguing, sizzly, or feel like they're slicing through the mix uncomfortably",
-        "remove_move": "gentle high-shelf cut above 10\u201312 kHz; or narrow bell cut at 3\u20135 kHz for metallic clang specifically",
-        "do_not": "do not low-pass aggressively \u2014 you'll remove all the air and the hat will sound dull and closed"
+        "remove_move": "gentle high-shelf cut above 10–12 kHz; or narrow bell cut at 3–5 kHz for metallic clang specifically",
+        "do_not": "do not low-pass aggressively — you'll remove all the air and the hat will sound dull and closed"
       },
       "path": null,
       "kind": "diagnosis",
@@ -1594,12 +1594,12 @@
       "name": "airy vocals",
       "tier": "preference",
       "content": {
-        "zone": "high shelf, 10\u201314 kHz",
+        "zone": "high shelf, 10–14 kHz",
         "add_when": "vocals feel closed, dull, or lack shimmer and openness",
-        "add_move": "try a gentle high-shelf boost starting around +2 dB at 10\u201312 kHz \u2014 listen carefully after each small adjustment",
+        "add_move": "try a gentle high-shelf boost starting around +2 dB at 10–12 kHz — listen carefully after each small adjustment",
         "remove_when": "vocals sound glassy, harsh in the very top end, or are causing listening fatigue",
-        "remove_move": "gentle high-shelf cut above 10\u201312 kHz, or reduce any existing high-shelf boost",
-        "do_not": "do not go above +4 dB on the shelf without de-essing first \u2014 adding air can expose sibilance"
+        "remove_move": "gentle high-shelf cut above 10–12 kHz, or reduce any existing high-shelf boost",
+        "do_not": "do not go above +4 dB on the shelf without de-essing first — adding air can expose sibilance"
       },
       "path": null,
       "kind": "diagnosis",
@@ -1609,12 +1609,12 @@
       "name": "warm vocals",
       "tier": "preference",
       "content": {
-        "zone": "low-mid body, 150\u2013300 Hz",
+        "zone": "low-mid body, 150–300 Hz",
         "add_when": "vocals sound thin, brittle, or lacking body",
-        "add_move": "gentle low-shelf or bell boost starting at +1\u20132 dB around 200\u2013250 Hz",
+        "add_move": "gentle low-shelf or bell boost starting at +1–2 dB around 200–250 Hz",
         "remove_when": "vocals sound boxy, congested, or are fighting the bass and kick",
-        "remove_move": "narrow bell cut 1\u20133 dB in the 200\u2013350 Hz range",
-        "do_not": "do not boost past +3 dB in this zone without also listening for mud \u2014 warmth and mud share the same frequencies"
+        "remove_move": "narrow bell cut 1–3 dB in the 200–350 Hz range",
+        "do_not": "do not boost past +3 dB in this zone without also listening for mud — warmth and mud share the same frequencies"
       },
       "path": null,
       "kind": "diagnosis",
@@ -1624,12 +1624,12 @@
       "name": "thin vocals",
       "tier": "preference",
       "content": {
-        "zone": "low-mid body, 150\u2013300 Hz; dynamic control",
+        "zone": "low-mid body, 150–300 Hz; dynamic control",
         "add_when": "intentionally transparent, clean, or airy vocal sound with no low-mid weight",
         "add_move": "high-pass filter to remove low-mid weight; ease any compression",
         "remove_when": "vocals lack body, feel weak, or disappear in a dense mix",
-        "remove_move": "gentle bell or low-shelf boost at 150\u2013250 Hz; add gentle compression to bring up the sustained body",
-        "do_not": "do not keep stacking more EQ boosts \u2014 if one approach isn't working, try compression instead"
+        "remove_move": "gentle bell or low-shelf boost at 150–250 Hz; add gentle compression to bring up the sustained body",
+        "do_not": "do not keep stacking more EQ boosts — if one approach isn't working, try compression instead"
       },
       "path": null,
       "kind": "diagnosis",
@@ -1639,12 +1639,12 @@
       "name": "mix lacks punch",
       "tier": "established",
       "content": {
-        "zone": "transient energy \u2014 kick and snare attack, 60\u2013200 Hz (weight) and 2\u20135 kHz (click/crack)",
+        "zone": "transient energy — kick and snare attack, 60–200 Hz (weight) and 2–5 kHz (click/crack)",
         "add_when": "the mix needs more impact, drive, and physical energy",
-        "add_move": "slow down compressor attack times on drums to let transients through before compression engages (try 20\u201340ms); add subtle saturation on the drum bus; boost kick beater click at 3\u20135 kHz",
+        "add_move": "slow down compressor attack times on drums to let transients through before compression engages (try 20–40ms); add subtle saturation on the drum bus; boost kick beater click at 3–5 kHz",
         "remove_when": "intentionally smooth, soft, or lo-fi production where transients should be gentle",
         "remove_move": "faster compressor attack to clamp transients; gentle limiting on individual elements",
-        "do_not": "do not increase the master bus limiter gain to try to add punch \u2014 that compresses transients further and makes the problem worse"
+        "do_not": "do not increase the master bus limiter gain to try to add punch — that compresses transients further and makes the problem worse"
       },
       "path": null,
       "kind": "diagnosis",
@@ -1654,12 +1654,12 @@
       "name": "punchy kick",
       "tier": "established",
       "content": {
-        "zone": "sub weight at 60\u201380 Hz; beater click at 3\u20135 kHz; boxiness at 200\u2013400 Hz",
+        "zone": "sub weight at 60–80 Hz; beater click at 3–5 kHz; boxiness at 200–400 Hz",
         "add_when": "kick needs more impact, weight, or presence",
-        "add_move": "boost 60\u201380 Hz for sub weight; boost 3\u20135 kHz for beater click; cut 200\u2013400 Hz if the kick sounds boxy",
+        "add_move": "boost 60–80 Hz for sub weight; boost 3–5 kHz for beater click; cut 200–400 Hz if the kick sounds boxy",
         "remove_when": "intentionally soft, pillowy, or low-impact kick",
         "remove_move": "reduce sub boost; apply a faster compressor attack to soften the transient",
-        "do_not": "do not boost sub and click without also cutting the boxy 200\u2013400 Hz zone \u2014 that range muddies the low end"
+        "do_not": "do not boost sub and click without also cutting the boxy 200–400 Hz zone — that range muddies the low end"
       },
       "path": null,
       "kind": "diagnosis",
@@ -1669,12 +1669,12 @@
       "name": "thin snare",
       "tier": "preference",
       "content": {
-        "zone": "body at 150\u2013250 Hz; crack at 1\u20133 kHz",
+        "zone": "body at 150–250 Hz; crack at 1–3 kHz",
         "add_when": "intentionally tight, clicky, or high-pitched snare with no low weight",
         "add_move": "high-pass the snare to remove low-mid body; cut the 200 Hz zone",
         "remove_when": "snare sounds weak, papery, or has no thump",
-        "remove_move": "bell boost at 150\u2013200 Hz for body; add compression with a medium attack (30\u201350 ms) to bring up the sustain",
-        "do_not": "do not reach for a sample layer as the first move \u2014 try EQ and compression on the recorded sound first"
+        "remove_move": "bell boost at 150–200 Hz for body; add compression with a medium attack (30–50 ms) to bring up the sustain",
+        "do_not": "do not reach for a sample layer as the first move — try EQ and compression on the recorded sound first"
       },
       "path": null,
       "kind": "diagnosis",
@@ -1684,12 +1684,12 @@
       "name": "boxy mix",
       "tier": "established",
       "content": {
-        "zone": "low-mid boxiness, roughly 250\u2013450 Hz",
+        "zone": "low-mid boxiness, roughly 250–450 Hz",
         "add_when": "intentional lo-fi, vintage telephone, or transistor-radio effect",
-        "add_move": "bell boost at 300\u2013400 Hz; band-pass filter to remove frequencies above and below",
-        "remove_when": "the mix sounds like it's inside a cardboard box \u2014 congested, honky, or unclear in the midrange",
-        "remove_move": "solo each track to find the main offender; narrow bell cut 2\u20134 dB at the culprit frequency in the 250\u2013450 Hz range; high-pass all non-bass tracks above their lowest useful frequency",
-        "do_not": "do not apply a master bus EQ cut to fix boxiness that exists across multiple individual tracks \u2014 fix it at the source tracks"
+        "add_move": "bell boost at 300–400 Hz; band-pass filter to remove frequencies above and below",
+        "remove_when": "the mix sounds like it's inside a cardboard box — congested, honky, or unclear in the midrange",
+        "remove_move": "solo each track to find the main offender; narrow bell cut 2–4 dB at the culprit frequency in the 250–450 Hz range; high-pass all non-bass tracks above their lowest useful frequency",
+        "do_not": "do not apply a master bus EQ cut to fix boxiness that exists across multiple individual tracks — fix it at the source tracks"
       },
       "path": null,
       "kind": "diagnosis",
@@ -1700,11 +1700,11 @@
       "tier": "preference",
       "content": {
         "zone": "reverb wash across the full frequency spectrum",
-        "add_when": "intentionally atmospheric, dreamy, or ambient \u2014 shoegaze, ambient, certain pop productions",
-        "add_move": "increase send levels to reverb Aux buses; use longer decay times (2\u20134 seconds); reduce pre-delay so reverb starts immediately after the source",
+        "add_when": "intentionally atmospheric, dreamy, or ambient — shoegaze, ambient, certain pop productions",
+        "add_move": "increase send levels to reverb Aux buses; use longer decay times (2–4 seconds); reduce pre-delay so reverb starts immediately after the source",
         "remove_when": "the mix sounds distant, unfocused, or all elements blur together in reverb",
-        "remove_move": "reduce send levels to the reverb Aux first; add a high-pass filter on the reverb Aux to remove muddy low-mid reverb; increase pre-delay to 20\u201340ms to create space between the dry signal and reverb tail; try a shorter room preset instead of a hall",
-        "do_not": "do not add more compression to try to bring elements forward out of the wash \u2014 reduce the reverb level instead"
+        "remove_move": "reduce send levels to the reverb Aux first; add a high-pass filter on the reverb Aux to remove muddy low-mid reverb; increase pre-delay to 20–40ms to create space between the dry signal and reverb tail; try a shorter room preset instead of a hall",
+        "do_not": "do not add more compression to try to bring elements forward out of the wash — reduce the reverb level instead"
       },
       "path": null,
       "kind": "diagnosis",
@@ -1714,12 +1714,12 @@
       "name": "vocals buried in mix",
       "tier": "established",
       "content": {
-        "zone": "presence and clarity zone, 1\u20135 kHz; also level relative to drums and instruments",
+        "zone": "presence and clarity zone, 1–5 kHz; also level relative to drums and instruments",
         "add_when": "intentionally recessed, background, or atmospheric vocal treatment",
-        "add_move": "reduce vocal fader; add more reverb send; cut presence at 2\u20134 kHz",
+        "add_move": "reduce vocal fader; add more reverb send; cut presence at 2–4 kHz",
         "remove_when": "the vocal exists in the mix but is hard to hear, masked by instruments, or disappears during the chorus",
-        "remove_move": "cut the competing instruments in the 1\u20135 kHz presence zone where the vocal lives; add a gentle bell boost at 2\u20134 kHz on the vocal; verify reverb is on a send (not a 50% wet insert which pushes vocals back); check the vocal fader level relative to the drum overhead level",
-        "do_not": "do not just raise the vocal fader without also carving space in the competing instruments \u2014 a louder vocal without frequency carving still sounds buried"
+        "remove_move": "cut the competing instruments in the 1–5 kHz presence zone where the vocal lives; add a gentle bell boost at 2–4 kHz on the vocal; verify reverb is on a send (not a 50% wet insert which pushes vocals back); check the vocal fader level relative to the drum overhead level",
+        "do_not": "do not just raise the vocal fader without also carving space in the competing instruments — a louder vocal without frequency carving still sounds buried"
       },
       "path": null,
       "kind": "diagnosis",
@@ -1729,12 +1729,12 @@
       "name": "nasal vocals",
       "tier": "established",
       "content": {
-        "zone": "upper low-mid, roughly 500\u20131000 Hz",
+        "zone": "upper low-mid, roughly 500–1000 Hz",
         "add_when": "intentional nasal or telephone-filter character (certain retro or stylized effects)",
-        "add_move": "bell boost at 500\u2013800 Hz; narrow Q; pair with a low-pass filter to enhance the telephone effect",
+        "add_move": "bell boost at 500–800 Hz; narrow Q; pair with a low-pass filter to enhance the telephone effect",
         "remove_when": "vocals sound honky, nasal, or like they're coming through a cardboard tube",
-        "remove_move": "narrow bell cut 2\u20134 dB somewhere in the 500\u20131000 Hz range \u2014 sweep slowly to find the exact frequency that sounds most honky on this specific voice while it plays",
-        "do_not": "do not boost high frequencies to try to mask the nasal quality \u2014 remove the problem frequency first, then assess"
+        "remove_move": "narrow bell cut 2–4 dB somewhere in the 500–1000 Hz range — sweep slowly to find the exact frequency that sounds most honky on this specific voice while it plays",
+        "do_not": "do not boost high frequencies to try to mask the nasal quality — remove the problem frequency first, then assess"
       },
       "path": null,
       "kind": "diagnosis",
@@ -1747,7 +1747,7 @@
         "symptom": "red clip indicators on the channel; audible crackle or distortion",
         "cause": "signal level peaks above 0 dBFS",
         "fix": "reduce the track's clip gain (right-click the region) or the channel fader until peaks stay below 0 dBFS; then add a Compressor (fast attack around 5ms, ratio around 8:1) to catch fast peaks before they clip again",
-        "do_not": "do not apply EQ or effects to a clipping signal \u2014 fix the gain first, then shape the sound"
+        "do_not": "do not apply EQ or effects to a clipping signal — fix the gain first, then shape the sound"
       },
       "path": null,
       "kind": "diagnosis",
@@ -1758,9 +1758,9 @@
       "tier": "established",
       "content": {
         "symptom": "sharp, hissing 's' and 'sh' sounds that stick out above the rest of the vocal",
-        "cause": "peaks of energy in the 6\u201310 kHz range on fricative consonants",
-        "fix": "insert a DeEsser plugin and set the detection frequency to 6\u201310 kHz; reduce the amount until the 's' sounds are tamed but not completely removed",
-        "do_not": "do not apply a static high-shelf cut to fix sibilance \u2014 it dulls the entire vocal, not just the problem moments"
+        "cause": "peaks of energy in the 6–10 kHz range on fricative consonants",
+        "fix": "insert a DeEsser plugin and set the detection frequency to 6–10 kHz; reduce the amount until the 's' sounds are tamed but not completely removed",
+        "do_not": "do not apply a static high-shelf cut to fix sibilance — it dulls the entire vocal, not just the problem moments"
       },
       "path": null,
       "kind": "diagnosis",
@@ -1772,8 +1772,8 @@
       "content": {
         "symptom": "low-frequency thump or pop on 'p' and 'b' sounds",
         "cause": "air burst from the singer's mouth hitting the microphone capsule directly",
-        "fix": "apply a steep high-pass filter (around 18 dB/oct) at 80\u2013120 Hz on the vocal channel; for very severe plosives, automate the volume down on the specific syllable instead",
-        "do_not": "do not boost the high end to try to mask the thump \u2014 the pop is a low-frequency problem and must be removed, not covered"
+        "fix": "apply a steep high-pass filter (around 18 dB/oct) at 80–120 Hz on the vocal channel; for very severe plosives, automate the volume down on the specific syllable instead",
+        "do_not": "do not boost the high end to try to mask the thump — the pop is a low-frequency problem and must be removed, not covered"
       },
       "path": null,
       "kind": "diagnosis",
@@ -1783,10 +1783,10 @@
       "name": "resonant snare ring",
       "tier": "established",
       "content": {
-        "symptom": "a sustained, pitched ringing sound after the snare hit \u2014 often metallic or tonal",
-        "cause": "a narrow resonance peak at a specific frequency, usually in the 200\u2013800 Hz range",
-        "fix": "use a narrow bell notch cut (high Q) and slowly sweep between 200 and 800 Hz while the track plays until the ring is reduced; cut 4\u20138 dB at that frequency",
-        "do_not": "do not gate the snare to cut the ring \u2014 gating changes the feel and timing of the snare; a notch cut removes the ring while keeping the natural decay"
+        "symptom": "a sustained, pitched ringing sound after the snare hit — often metallic or tonal",
+        "cause": "a narrow resonance peak at a specific frequency, usually in the 200–800 Hz range",
+        "fix": "use a narrow bell notch cut (high Q) and slowly sweep between 200 and 800 Hz while the track plays until the ring is reduced; cut 4–8 dB at that frequency",
+        "do_not": "do not gate the snare to cut the ring — gating changes the feel and timing of the snare; a notch cut removes the ring while keeping the natural decay"
       },
       "path": null,
       "kind": "diagnosis",
@@ -1797,9 +1797,9 @@
       "tier": "established",
       "content": {
         "symptom": "a third-party plugin doesn't appear in Logic's plugin picker, or shows as 'Crashed' or 'Failed' in the Plugin Manager even after reinstalling",
-        "cause": "corrupted Audio Unit cache \u2014 Logic's cached validation results are stale or corrupt after a macOS update, Logic update, or plugin update",
-        "fix": "Step 1: Quit Logic. Step 2: Delete the AU cache file at ~/Library/Caches/com.apple.audiounits.cache \u2014 Logic rebuilds it on next launch and rescans all plugins fresh. Step 3: Relaunch Logic and open the Plugin Manager to check the status. If still failing, reinstall the plugin from the developer's full installer.",
-        "do_not": "do not keep clicking 'Recover' in the crash dialog \u2014 it loops back to the same result; deleting the cache is the actual fix"
+        "cause": "corrupted Audio Unit cache — Logic's cached validation results are stale or corrupt after a macOS update, Logic update, or plugin update",
+        "fix": "Step 1: Quit Logic. Step 2: Delete the AU cache file at ~/Library/Caches/com.apple.audiounits.cache — Logic rebuilds it on next launch and rescans all plugins fresh. Step 3: Relaunch Logic and open the Plugin Manager to check the status. If still failing, reinstall the plugin from the developer's full installer.",
+        "do_not": "do not keep clicking 'Recover' in the crash dialog — it loops back to the same result; deleting the cache is the actual fix"
       },
       "path": null,
       "kind": "diagnosis",
@@ -1812,7 +1812,7 @@
       "content": {
         "symptom": "playing the keyboard produces no notes in Logic; the keyboard works in other apps or in macOS Audio MIDI Setup but not in Logic; or the keyboard worked before and suddenly stopped",
         "cause": "Logic has registered the controller as a control surface instead of a MIDI instrument, a macOS driver issue, or a USB power problem",
-        "fix": "Step 1: Try Logic Pro > Control Surfaces > Bypass All Control Surfaces \u2014 some keyboards are detected as control surfaces which prevents them from sending MIDI notes to tracks. Step 2: Confirm the keyboard appears in macOS Audio MIDI Setup. Step 3: Plug the keyboard directly into the Mac rather than through a USB hub. Step 4: Create a new empty project and test \u2014 the issue may be project-specific routing.",
+        "fix": "Step 1: Try Logic Pro > Control Surfaces > Bypass All Control Surfaces — some keyboards are detected as control surfaces which prevents them from sending MIDI notes to tracks. Step 2: Confirm the keyboard appears in macOS Audio MIDI Setup. Step 3: Plug the keyboard directly into the Mac rather than through a USB hub. Step 4: Create a new empty project and test — the issue may be project-specific routing.",
         "do_not": "do not spend time adjusting Logic's MIDI settings before confirming the keyboard appears in macOS Audio MIDI Setup"
       },
       "path": null,
@@ -1825,9 +1825,9 @@
       "tier": "established",
       "content": {
         "symptom": "a Logic project stored on iCloud opens empty, shows 'Audio Files Not Found' errors for all regions, or audio regions appear grayed out; the project worked locally but broke when opened on another Mac or after iCloud synced",
-        "cause": "iCloud's file-on-demand system converts files inside the Logic project bundle to '.icloud' placeholder stubs to save local space \u2014 Logic cannot read these placeholders and treats them as missing audio",
+        "cause": "iCloud's file-on-demand system converts files inside the Logic project bundle to '.icloud' placeholder stubs to save local space — Logic cannot read these placeholders and treats them as missing audio",
         "fix": "Move the project off iCloud to a local folder. To recover: in Finder, navigate inside the project bundle (right-click > Show Package Contents), find any .icloud placeholder files, right-click each and choose 'Download Now'. After all files download, move the whole project to a local drive before opening.",
-        "do_not": "do not store active Logic project bundles directly inside iCloud Drive \u2014 the .logicx bundle contains many small files that iCloud aggressively offloads to the cloud"
+        "do_not": "do not store active Logic project bundles directly inside iCloud Drive — the .logicx bundle contains many small files that iCloud aggressively offloads to the cloud"
       },
       "path": null,
       "kind": "diagnosis",
@@ -1839,8 +1839,8 @@
       "content": {
         "symptom": "Logic quits immediately after the splash screen before loading a project; the crash report mentions CoreML, EXC_CRASH, SIGABRT, or references com.apple.coreml",
         "cause": "corrupted Logic Pro application cache, typically triggered by a failed or interrupted update; the CoreML crash specifically affects Logic 11.1.x",
-        "fix": "Delete Logic Pro from the Applications folder, then reinstall it from the App Store. Your projects, settings, and sound library are completely unaffected \u2014 only the application binary is removed. If the crash persists, also delete ~/Library/Caches/com.apple.logic.pro and relaunch.",
-        "do_not": "do not attempt to repair the application by replacing individual files \u2014 a clean reinstall from the App Store is faster and more reliable than any partial fix"
+        "fix": "Delete Logic Pro from the Applications folder, then reinstall it from the App Store. Your projects, settings, and sound library are completely unaffected — only the application binary is removed. If the crash persists, also delete ~/Library/Caches/com.apple.logic.pro and relaunch.",
+        "do_not": "do not attempt to repair the application by replacing individual files — a clean reinstall from the App Store is faster and more reliable than any partial fix"
       },
       "path": null,
       "kind": "diagnosis",
@@ -1851,9 +1851,9 @@
       "tier": "established",
       "content": {
         "symptom": "Mastering Assistant, Stem Splitter, or other AI-powered features appear grayed out or unavailable on an M1/M2/M3/M4 Mac",
-        "cause": "Logic Pro is running under Rosetta 2 Intel emulation mode instead of natively on Apple Silicon \u2014 these features require the native ARM build and Apple's Neural Engine",
+        "cause": "Logic Pro is running under Rosetta 2 Intel emulation mode instead of natively on Apple Silicon — these features require the native ARM build and Apple's Neural Engine",
         "fix": "In Finder, navigate to Applications, right-click Logic Pro > Get Info. If 'Open using Rosetta' is checked, uncheck it, close Get Info, and relaunch Logic. The AI features will be available after relaunching natively.",
-        "do_not": "do not reinstall Logic expecting this to fix itself \u2014 the Rosetta checkbox persists across reinstalls if not explicitly unchecked in Get Info"
+        "do_not": "do not reinstall Logic expecting this to fix itself — the Rosetta checkbox persists across reinstalls if not explicitly unchecked in Get Info"
       },
       "path": null,
       "kind": "diagnosis",
@@ -1865,8 +1865,8 @@
       "content": {
         "symptom": "patches, loops, or instrument sounds are missing after a Logic update; downloads fail with 'Check your Internet connection' even on a fast connection; or downloads appear to complete but content is still absent",
         "cause": "the Logic update requires a new version of the Sound Library, or the Sound Library was relocated to an external drive that Logic can no longer find",
-        "fix": "Step 1: Logic Pro > Sound Library > Download All Available Sounds. Step 2: If downloads fail, update Logic Pro to the latest version first (App Store > Updates), then retry \u2014 some library versions only work with specific Logic versions. Step 3: If the library was moved to an external drive, reconnect the drive and confirm its name hasn't changed since Logic configured the path.",
-        "do_not": "do not delete and reinstall Logic to fix missing sounds \u2014 the application and the Sound Library are stored separately; reinstalling Logic does not restore downloaded content"
+        "fix": "Step 1: Logic Pro > Sound Library > Download All Available Sounds. Step 2: If downloads fail, update Logic Pro to the latest version first (App Store > Updates), then retry — some library versions only work with specific Logic versions. Step 3: If the library was moved to an external drive, reconnect the drive and confirm its name hasn't changed since Logic configured the path.",
+        "do_not": "do not delete and reinstall Logic to fix missing sounds — the application and the Sound Library are stored separately; reinstalling Logic does not restore downloaded content"
       },
       "path": null,
       "kind": "diagnosis",
@@ -1877,9 +1877,9 @@
       "tier": "established",
       "content": {
         "symptom": "when you start playback from the middle of a section, held chords or sustained notes that should already be playing are silent until a new Note On event arrives in the timeline",
-        "cause": "MIDI Chase is disabled \u2014 Logic is not re-triggering Note On messages whose start position is earlier than the current playhead",
+        "cause": "MIDI Chase is disabled — Logic is not re-triggering Note On messages whose start position is earlier than the current playhead",
         "fix": "Enable MIDI Chase: File > Project Settings > MIDI > Chase tab > check 'Notes'. You can also enable chase for Program Changes, Pitch Bend, and Controllers in the same panel for complete chase behavior.",
-        "do_not": "do not move the MIDI notes forward in the Piano Roll as a workaround \u2014 enable Chase instead; moving notes changes the musical timing"
+        "do_not": "do not move the MIDI notes forward in the Piano Roll as a workaround — enable Chase instead; moving notes changes the musical timing"
       },
       "path": null,
       "kind": "diagnosis",
@@ -1891,9 +1891,9 @@
       "tier": "established",
       "content": {
         "symptom": "after comping takes in a Take Folder, there are audible clicks or pops at the boundaries where the comp switches from one take to another",
-        "cause": "the edit points between takes have no crossfade \u2014 the audio waveform is cut abruptly, creating a discontinuity in the waveform",
-        "fix": "Select the Crossfade tool (press X with the pointer tool active in the Tracks Area) and drag across the edit point to create a 5\u201310ms crossfade. Alternatively, after comping, select the Take Folder, use Edit > Select All to select all comp regions, then apply crossfades via the Crossfade tool across all boundaries at once.",
-        "do_not": "do not re-record takes to eliminate clicks \u2014 crossfades at edit points are the standard fix for this in any DAW"
+        "cause": "the edit points between takes have no crossfade — the audio waveform is cut abruptly, creating a discontinuity in the waveform",
+        "fix": "Select the Crossfade tool (press X with the pointer tool active in the Tracks Area) and drag across the edit point to create a 5–10ms crossfade. Alternatively, after comping, select the Take Folder, use Edit > Select All to select all comp regions, then apply crossfades via the Crossfade tool across all boundaries at once.",
+        "do_not": "do not re-record takes to eliminate clicks — crossfades at edit points are the standard fix for this in any DAW"
       },
       "path": null,
       "kind": "diagnosis",
@@ -1905,8 +1905,8 @@
       "content": {
         "symptom": "recorded MIDI notes sound slightly sharp or flat, or pitch bends unexpectedly during playback; the Event List shows pitch bend (PBND) events you did not intentionally play",
         "cause": "the pitch bend wheel or joystick on the MIDI controller was slightly off-center when recording started, sending a continuous pitch bend offset throughout the recording",
-        "fix": "Open the Piano Roll for the affected region, switch to the Event List (Cmd+7), filter to show Pitch Bend events (click the filter button and select Controller/Pitch Bend), select all pitch bend events, and delete them. Before your next recording, ensure the pitch wheel returns fully to center \u2014 some controllers have a spring mechanism that can stick slightly off-center.",
-        "do_not": "do not try to fix pitch bend artifacts with Flex Pitch \u2014 the root cause is MIDI controller data that must be removed from the MIDI region itself"
+        "fix": "Open the Piano Roll for the affected region, switch to the Event List (Cmd+7), filter to show Pitch Bend events (click the filter button and select Controller/Pitch Bend), select all pitch bend events, and delete them. Before your next recording, ensure the pitch wheel returns fully to center — some controllers have a spring mechanism that can stick slightly off-center.",
+        "do_not": "do not try to fix pitch bend artifacts with Flex Pitch — the root cause is MIDI controller data that must be removed from the MIDI region itself"
       },
       "path": null,
       "kind": "diagnosis",
@@ -1917,8 +1917,8 @@
       "name": "sidechaining",
       "tier": "established",
       "content": {
-        "fix": "Add a Compressor to the bass (or target) track. In the plugin's top-right corner, find the Sidechain Input dropdown (easy to miss) and set it to the kick track or bus \u2014 this is the step most people can't find. Lower the threshold until the kick reliably triggers ducking. Ratio 4:1 to 8:1 for a subtle duck (20:1+ for an exaggerated EDM pump). Fast attack (1-3ms) for a tight duck on every hit; release around 80-150ms, matched loosely to the kick's decay.",
-        "do_not": "third-party plugins may not expose a sidechain input \u2014 use Logic's stock Compressor if yours doesn't have one"
+        "fix": "Add a Compressor to the bass (or target) track. In the plugin's top-right corner, find the Sidechain Input dropdown (easy to miss) and set it to the kick track or bus — this is the step most people can't find. Lower the threshold until the kick reliably triggers ducking. Ratio 4:1 to 8:1 for a subtle duck (20:1+ for an exaggerated EDM pump). Fast attack (1-3ms) for a tight duck on every hit; release around 80-150ms, matched loosely to the kick's decay.",
+        "do_not": "third-party plugins may not expose a sidechain input — use Logic's stock Compressor if yours doesn't have one"
       },
       "path": null,
       "kind": "diagnosis",
@@ -1928,8 +1928,8 @@
       "name": "parallel compression",
       "tier": "established",
       "content": {
-        "fix": "Send the track (or drum bus) to an Aux via a Send, add a Compressor to the Aux with aggressive settings (high ratio, low threshold), then blend the Aux return in under the dry signal \u2014 subtle blending usually sounds most natural. The dry signal preserves the transient snap while the compressed copy adds sustain and density.",
-        "do_not": "do not replace the dry signal \u2014 parallel compression only works because the uncompressed original is still present alongside the compressed copy"
+        "fix": "Send the track (or drum bus) to an Aux via a Send, add a Compressor to the Aux with aggressive settings (high ratio, low threshold), then blend the Aux return in under the dry signal — subtle blending usually sounds most natural. The dry signal preserves the transient snap while the compressed copy adds sustain and density.",
+        "do_not": "do not replace the dry signal — parallel compression only works because the uncompressed original is still present alongside the compressed copy"
       },
       "path": null,
       "kind": "diagnosis",
@@ -1939,8 +1939,8 @@
       "name": "saturation",
       "tier": "preference",
       "content": {
-        "fix": "Add a saturation plugin (Phat FX's Distortion module for subtle-to-moderate character, Bitcrusher for heavier digital grit) and start with the drive very low \u2014 bring it up until the tone changes slightly. Saturation adds harmonic overtones that make a thin or digital-sounding vocal feel richer and more present without necessarily raising its measured level.",
-        "do_not": "do not push the drive until the effect is obviously audible \u2014 it usually works best when you can't quite tell it's there"
+        "fix": "Add a saturation plugin (Phat FX's Distortion module for subtle-to-moderate character, Bitcrusher for heavier digital grit) and start with the drive very low — bring it up until the tone changes slightly. Saturation adds harmonic overtones that make a thin or digital-sounding vocal feel richer and more present without necessarily raising its measured level.",
+        "do_not": "do not push the drive until the effect is obviously audible — it usually works best when you can't quite tell it's there"
       },
       "path": null,
       "kind": "diagnosis",
@@ -1950,8 +1950,8 @@
       "name": "gain staging",
       "tier": "established",
       "content": {
-        "fix": "Set each track to peak around -12 dBFS before any plugins (adjust with clip gain \u2014 right-click the region \u2014 rather than the fader, which should stay near 0 dB). Leave 3-6 dB of headroom on the master bus, aiming for peaks around -6 dBFS on the Stereo Out before the limiter. Set the Adaptive Limiter's Out Ceiling to -0.1 dB, not 0 dB, to avoid inter-sample clipping on streaming platforms.",
-        "do_not": "do not rely on the mixer alone to protect you \u2014 Logic's mixer is 32-bit float and won't clip internally, but third-party plugins and your interface's analog outputs will"
+        "fix": "Set each track to peak around -12 dBFS before any plugins (adjust with clip gain — right-click the region — rather than the fader, which should stay near 0 dB). Leave 3-6 dB of headroom on the master bus, aiming for peaks around -6 dBFS on the Stereo Out before the limiter. Set the Adaptive Limiter's Out Ceiling to -0.1 dB, not 0 dB, to avoid inter-sample clipping on streaming platforms.",
+        "do_not": "do not rely on the mixer alone to protect you — Logic's mixer is 32-bit float and won't clip internally, but third-party plugins and your interface's analog outputs will"
       },
       "path": null,
       "kind": "diagnosis",
@@ -1961,8 +1961,8 @@
       "name": "take folders and comping",
       "tier": "established",
       "content": {
-        "fix": "Click the disclosure triangle on the Take Folder region to expand it and see individual takes stacked below. Use Quick Swipe Comping \u2014 drag across the portion of a take you want; drag a different take's lane to switch takes for that section. Once satisfied, use Flatten and Merge to create one continuous audio file (Flatten alone keeps separate regions); both preserve the original takes inside the folder until explicitly deleted.",
-        "do_not": "do not add heavy processing before flattening \u2014 apply plugins to the single clean flattened file, not across the raw take boundaries"
+        "fix": "Click the disclosure triangle on the Take Folder region to expand it and see individual takes stacked below. Use Quick Swipe Comping — drag across the portion of a take you want; drag a different take's lane to switch takes for that section. Once satisfied, use Flatten and Merge to create one continuous audio file (Flatten alone keeps separate regions); both preserve the original takes inside the folder until explicitly deleted.",
+        "do_not": "do not add heavy processing before flattening — apply plugins to the single clean flattened file, not across the raw take boundaries"
       },
       "path": null,
       "kind": "diagnosis",
@@ -1972,7 +1972,7 @@
       "name": "track freeze (technique)",
       "tier": "established",
       "content": {
-        "fix": "Freeze CPU-heavy tracks \u2014 especially virtual instruments with large sample sets and tracks with convolution reverb or linear-phase EQ. A frozen track renders to a temporary file and disables its plugins, using almost no CPU while sounding identical. Freeze early and often when building a dense session; just remember to unfreeze a track before editing it."
+        "fix": "Freeze CPU-heavy tracks — especially virtual instruments with large sample sets and tracks with convolution reverb or linear-phase EQ. A frozen track renders to a temporary file and disables its plugins, using almost no CPU while sounding identical. Freeze early and often when building a dense session; just remember to unfreeze a track before editing it."
       },
       "path": null,
       "kind": "diagnosis",
@@ -1983,8 +1983,8 @@
       "name": "vocal doubling",
       "tier": "preference",
       "content": {
-        "fix": "Have the singer perform the same part again on a new take (a real double always sounds more authentic than a simulated one). Pan the main vocal center and the double to one side (or spread doubles hard left/right for backing vocals); set the double 3-6 dB quieter than the main vocal so it thickens without competing. If a real double isn't available, a Chorus plugin or a slight pitch shift (\u00b17-15 cents) can approximate it, though less naturally.",
-        "do_not": "do not rely on a pitch-shifted simulated double as your first choice \u2014 the pitch/timing variation of a real second take always sounds better and avoids comb filtering"
+        "fix": "Have the singer perform the same part again on a new take (a real double always sounds more authentic than a simulated one). Pan the main vocal center and the double to one side (or spread doubles hard left/right for backing vocals); set the double 3-6 dB quieter than the main vocal so it thickens without competing. If a real double isn't available, a Chorus plugin or a slight pitch shift (±7-15 cents) can approximate it, though less naturally.",
+        "do_not": "do not rely on a pitch-shifted simulated double as your first choice — the pitch/timing variation of a real second take always sounds better and avoids comb filtering"
       },
       "path": null,
       "kind": "diagnosis",
@@ -1994,8 +1994,8 @@
       "name": "limiting and mastering chain",
       "tier": "established",
       "content": {
-        "fix": "Build a mastering chain on the Stereo Out (or a dedicated Mastering Aux): Linear Phase EQ first to correct tonal balance, then a Compressor (low ratio 1.5:1-2:1, slow attack 30-60ms, auto release, 1-3 dB gain reduction) for glue, then the Adaptive Limiter last. Set the Limiter's Out Ceiling to -0.1 dB (not 0 dB) to avoid inter-sample clipping after streaming platforms re-encode, and raise Gain until loudness is competitive without audibly squashing transients \u2014 most platforms target around -14 LUFS integrated.",
-        "do_not": "do not set the limiter's Out Ceiling to 0 dB \u2014 it causes inter-sample peaks that distort after streaming platform encoding"
+        "fix": "Build a mastering chain on the Stereo Out (or a dedicated Mastering Aux): Linear Phase EQ first to correct tonal balance, then a Compressor (low ratio 1.5:1-2:1, slow attack 30-60ms, auto release, 1-3 dB gain reduction) for glue, then the Adaptive Limiter last. Set the Limiter's Out Ceiling to -0.1 dB (not 0 dB) to avoid inter-sample clipping after streaming platforms re-encode, and raise Gain until loudness is competitive without audibly squashing transients — most platforms target around -14 LUFS integrated.",
+        "do_not": "do not set the limiter's Out Ceiling to 0 dB — it causes inter-sample peaks that distort after streaming platform encoding"
       },
       "path": null,
       "kind": "diagnosis",
@@ -2005,8 +2005,8 @@
       "name": "vocal processing chain",
       "tier": "established",
       "content": {
-        "fix": "Standard order: 1) High-Pass Filter around 80-100 Hz to remove rumble and proximity effect. 2) Noise Gate (optional) if there's background noise between phrases. 3) EQ to fix tonal problems \u2014 cut mud at 200-400 Hz, cut harshness at 2-5 kHz \u2014 before compression reacts to them. 4) Compressor, 3:1 to 5:1 ratio, medium attack (10-20ms) to let consonants through. 5) De-Esser (6-10 kHz) after compression, since compression can bring sibilance up. 6) Reverb and delay on Aux sends only, never as inserts at 50% wet \u2014 keep the send return at 100% wet.",
-        "do_not": "do not de-ess before compression \u2014 compression brings up quiet moments and can make sibilance worse after the de-esser already ran"
+        "fix": "Standard order: 1) High-Pass Filter around 80-100 Hz to remove rumble and proximity effect. 2) Noise Gate (optional) if there's background noise between phrases. 3) EQ to fix tonal problems — cut mud at 200-400 Hz, cut harshness at 2-5 kHz — before compression reacts to them. 4) Compressor, 3:1 to 5:1 ratio, medium attack (10-20ms) to let consonants through. 5) De-Esser (6-10 kHz) after compression, since compression can bring sibilance up. 6) Reverb and delay on Aux sends only, never as inserts at 50% wet — keep the send return at 100% wet.",
+        "do_not": "do not de-ess before compression — compression brings up quiet moments and can make sibilance worse after the de-esser already ran"
       },
       "path": null,
       "kind": "diagnosis",
@@ -2017,7 +2017,7 @@
       "tier": "established",
       "content": {
         "fix": "Open Flex Pitch on the vocal region, then work note-by-note using its six hotspots per block: drag the top-center to move a note to a new pitch, top-left/right to fix pitch drift at the start/end of a note, bottom-left for vibrato depth, bottom-right for fine pitch and formant. When shifting a note more than 2-3 semitones, drag the formant hotspot to avoid a chipmunk effect. To snap everything to the nearest semitone (a heavy auto-tune effect), select all notes (Cmd+A) and drag any note's Fine Pitch hotspot to 0.",
-        "do_not": "do not change the Flex algorithm after editing \u2014 it destroys all edits already made on that track; if Logic splits one word into many tiny fragments, bounce the region in place first (Ctrl+B) so the algorithm has a clean file to analyze"
+        "do_not": "do not change the Flex algorithm after editing — it destroys all edits already made on that track; if Logic splits one word into many tiny fragments, bounce the region in place first (Ctrl+B) so the algorithm has a clean file to analyze"
       },
       "path": null,
       "kind": "diagnosis",
@@ -2028,13 +2028,77 @@
       "name": "flex time (technique)",
       "tier": "established",
       "content": {
-        "fix": "Enable Flex Time on the track, then choose the right algorithm for the material: Rhythmic for most drums and percussive material (adds crossfades at edit points, the best all-around choice); Slicing also works for drums with distinct hits but can click without crossfades; Monophonic for a single-note instrument like bass or solo vocal; Polyphonic only for chord-playing instruments like guitar or piano \u2014 never use it on drums, it smears cymbals.",
-        "do_not": "do not change the algorithm after placing flex markers \u2014 it deletes all the markers and you'll have to redo the edits"
+        "fix": "Enable Flex Time on the track, then choose the right algorithm for the material: Rhythmic for most drums and percussive material (adds crossfades at edit points, the best all-around choice); Slicing also works for drums with distinct hits but can click without crossfades; Monophonic for a single-note instrument like bass or solo vocal; Polyphonic only for chord-playing instruments like guitar or piano — never use it on drums, it smears cymbals.",
+        "do_not": "do not change the algorithm after placing flex markers — it deletes all the markers and you'll have to redo the edits"
       },
       "path": null,
       "kind": "diagnosis",
       "aliases": [],
       "extends_to": "flex time"
+    },
+    {
+      "name": "open plugin",
+      "tier": "established",
+      "kind": "destination",
+      "aliases": [
+        "add a plugin",
+        "insert a plugin",
+        "load a plugin",
+        "put a plugin on this track",
+        "add an effect to the track",
+        "open a plugin window",
+        "add reverb plugin",
+        "add compressor plugin",
+        "insert an audio effect",
+        "use a third-party plugin"
+      ],
+      "content": {
+        "opens": "Adds any audio effect plugin by name to the selected track's next empty Audio FX slot via Search and Add Plug-in, then opens its window. Works for every installed plugin, Apple or third-party, whether or not it has its own KB entry. If the plugin is already loaded on the selected track, this opens its existing window instead of adding a second instance; pass new=true to add another. Requires the exact plugin name as Logic lists it (e.g. Channel EQ, Compressor, Space Designer, Phat FX, ValhallaSupermassive)."
+      },
+      "args": {
+        "plugin": "exact plugin name as Logic lists it",
+        "new": "optional, true only if the user explicitly wants another instance"
+      },
+      "path": [
+        {
+          "type": "ax_open_plugin",
+          "value": "{plugin}"
+        }
+      ]
+    },
+    {
+      "name": "set plugin parameter",
+      "tier": "established",
+      "kind": "destination",
+      "aliases": [
+        "change a plugin setting",
+        "adjust a plugin knob",
+        "set the low cut",
+        "set the threshold",
+        "turn the ratio up",
+        "change the frequency on the eq",
+        "set a plugin control to a value",
+        "dial in a plugin parameter",
+        "edit plugin value"
+      ],
+      "content": {
+        "opens": "Sets one parameter of a plugin loaded on the selected track to an exact value, e.g. Channel EQ Low Cut Frequency to 80 (Hz), Compressor Threshold to -18 (dB), Tape Delay Feedback to 40 (%). Opens the plugin window if needed, writes the value directly through Logic's Controls view (works on every plugin incl. third-party), and reverts on request. The parameter name must be the control's label as Logic shows it in the plugin's Controls view (Low Cut Frequency, Peak 1 Gain, Threshold, Ratio, Feedback, Mix ...); the value is a plain number in the control's displayed unit. If the plugin is not on the track yet, use 'open plugin' first in the same turn."
+      },
+      "args": {
+        "plugin": "exact plugin name",
+        "param": "control label as shown in Logic",
+        "value": "number in the control's displayed unit"
+      },
+      "path": [
+        {
+          "type": "ax_set_param",
+          "value": {
+            "plugin": "{plugin}",
+            "param": "{param}",
+            "value": "{value}"
+          }
+        }
+      ]
     }
   ],
   "problems": [
@@ -2049,17 +2113,17 @@
         "song plays back wrong speed",
         "beat sounds warped"
       ],
-      "note": "seed_weight is a population prior, not a ranking to execute \u2014 override it whenever on-screen or AX evidence points elsewhere.",
+      "note": "seed_weight is a population prior, not a ranking to execute — override it whenever on-screen or AX evidence points elsewhere.",
       "solutions": [
         {
           "ref": "sample rate mismatch",
           "seed_weight": 100,
-          "distinguisher": "if speed and pitch are both off together, it's the sample rate, not the tempo \u2014 tempo changes preserve pitch, a true sample-rate mismatch does not"
+          "distinguisher": "if speed and pitch are both off together, it's the sample rate, not the tempo — tempo changes preserve pitch, a true sample-rate mismatch does not"
         },
         {
           "ref": "Smart Tempo stretching imported audio",
           "seed_weight": 30,
-          "distinguisher": "affects one imported region specifically, and pitch stays correct (it's time-stretching) \u2014 not a project-wide speed+pitch shift"
+          "distinguisher": "affects one imported region specifically, and pitch stays correct (it's time-stretching) — not a project-wide speed+pitch shift"
         }
       ]
     },
@@ -2073,17 +2137,17 @@
         "mix feels congested",
         "guitars sound muddy"
       ],
-      "note": "ask which element (bass, vocals, guitars, or kick-vs-bass specifically) if the query doesn't say \u2014 if no element stands out, it may be a general multi-track issue.",
+      "note": "ask which element (bass, vocals, guitars, or kick-vs-bass specifically) if the query doesn't say — if no element stands out, it may be a general multi-track issue.",
       "solutions": [
         {
           "ref": "muddy bass",
           "seed_weight": 50,
-          "distinguisher": "the low end specifically (bass) sounds unclear or soupy \u2014 not the vocals, not the overall mix"
+          "distinguisher": "the low end specifically (bass) sounds unclear or soupy — not the vocals, not the overall mix"
         },
         {
           "ref": "muddy vocals",
           "seed_weight": 50,
-          "distinguisher": "vocals specifically sound masked or hard to hear \u2014 not the low end"
+          "distinguisher": "vocals specifically sound masked or hard to hear — not the low end"
         },
         {
           "ref": "kick and bass clash",
@@ -2093,12 +2157,12 @@
         {
           "ref": "muddy guitars",
           "seed_weight": 50,
-          "distinguisher": "specifically the guitars sound thick, boomy, or are cluttering the low end \u2014 not the bass or vocals"
+          "distinguisher": "specifically the guitars sound thick, boomy, or are cluttering the low end — not the bass or vocals"
         },
         {
           "ref": "muddy mix",
           "seed_weight": 15,
-          "distinguisher": "the mud isn't isolated to one element \u2014 general congestion across many tracks with no clear single culprit"
+          "distinguisher": "the mud isn't isolated to one element — general congestion across many tracks with no clear single culprit"
         },
         {
           "ref": "sidechaining",
@@ -2116,12 +2180,12 @@
         "no low end weight",
         "sounds narrow and weak"
       ],
-      "note": "genuinely three-way ambiguous without more information \u2014 ask which listening context and whether it's the low end or the stereo width that feels missing.",
+      "note": "genuinely three-way ambiguous without more information — ask which listening context and whether it's the low end or the stereo width that feels missing.",
       "solutions": [
         {
           "ref": "deep bass",
           "seed_weight": 40,
-          "distinguisher": "thinness is about missing sub weight \u2014 check if it's specifically the low end that feels absent"
+          "distinguisher": "thinness is about missing sub weight — check if it's specifically the low end that feels absent"
         },
         {
           "ref": "wide mix",
@@ -2131,7 +2195,7 @@
         {
           "ref": "mix collapses in mono",
           "seed_weight": 30,
-          "distinguisher": "thinness only shows up on mono/small-speaker playback specifically but sounds fine and full in stereo \u2014 a phase-cancellation signature"
+          "distinguisher": "thinness only shows up on mono/small-speaker playback specifically but sounds fine and full in stereo — a phase-cancellation signature"
         }
       ]
     },
@@ -2149,12 +2213,12 @@
         {
           "ref": "no sound output",
           "seed_weight": 60,
-          "distinguisher": "only Logic is silent \u2014 other apps make sound fine, and it's a routing/mute issue inside Logic itself"
+          "distinguisher": "only Logic is silent — other apps make sound fine, and it's a routing/mute issue inside Logic itself"
         },
         {
           "ref": "Core Audio goes silent mid-session",
           "seed_weight": 25,
-          "distinguisher": "other apps go silent at the same time, or it happened suddenly mid-session with no setting changed \u2014 a macOS-level issue, not a Logic setting"
+          "distinguisher": "other apps go silent at the same time, or it happened suddenly mid-session with no setting changed — a macOS-level issue, not a Logic setting"
         },
         {
           "ref": "audio interface not recognized in Logic",
@@ -2176,12 +2240,12 @@
         {
           "ref": "sample rate mismatch",
           "seed_weight": 30,
-          "distinguisher": "causes a full pitch+speed shift, not just crackle/pops \u2014 a red flag if speed or pitch also sound wrong, not just glitchy"
+          "distinguisher": "causes a full pitch+speed shift, not just crackle/pops — a red flag if speed or pitch also sound wrong, not just glitchy"
         },
         {
           "ref": "CPU overload",
           "seed_weight": 70,
-          "distinguisher": "gets worse as you add more tracks/plugins, or Logic shows a System Overload message \u2014 a load problem, not a rate problem"
+          "distinguisher": "gets worse as you add more tracks/plugins, or Logic shows a System Overload message — a load problem, not a rate problem"
         }
       ]
     },
@@ -2197,7 +2261,7 @@
         {
           "ref": "microphone permissions",
           "seed_weight": 60,
-          "distinguisher": "meters don't move at all, even with a known-working interface \u2014 a macOS-level permission block"
+          "distinguisher": "meters don't move at all, even with a known-working interface — a macOS-level permission block"
         },
         {
           "ref": "audio interface not recognized in Logic",
@@ -2214,7 +2278,7 @@
         "theres a delay when i play through logic",
         "input latency too high"
       ],
-      "note": "only one common cause for this exact symptom \u2014 no need to ask which one, just confirm buffer size/low latency mode weren't already tried.",
+      "note": "only one common cause for this exact symptom — no need to ask which one, just confirm buffer size/low latency mode weren't already tried.",
       "solutions": [
         {
           "ref": "recording latency and monitoring delay",
@@ -2235,7 +2299,7 @@
         {
           "ref": "CPU overload",
           "seed_weight": 60,
-          "distinguisher": "a general overload \u2014 happens on any Mac when plugin/track load exceeds the buffer"
+          "distinguisher": "a general overload — happens on any Mac when plugin/track load exceeds the buffer"
         },
         {
           "ref": "system overload on Apple Silicon Mac",
@@ -2260,17 +2324,17 @@
         "cymbals too sharp",
         "sound is piercing"
       ],
-      "note": "ask which element if the query doesn't say \u2014 vocals and hi-hats harshness live in very different frequency zones (2-5 kHz vs 6-14 kHz).",
+      "note": "ask which element if the query doesn't say — vocals and hi-hats harshness live in very different frequency zones (2-5 kHz vs 6-14 kHz).",
       "solutions": [
         {
           "ref": "harsh vocals",
           "seed_weight": 60,
-          "distinguisher": "specifically the vocals sound fatiguing or sharp \u2014 presence-zone (2-5 kHz) issue"
+          "distinguisher": "specifically the vocals sound fatiguing or sharp — presence-zone (2-5 kHz) issue"
         },
         {
           "ref": "harsh hi-hats",
           "seed_weight": 40,
-          "distinguisher": "specifically the hi-hats/cymbals sound sizzly or metallic \u2014 a much higher zone (6-14 kHz) or metallic clang at 3-5 kHz"
+          "distinguisher": "specifically the hi-hats/cymbals sound sizzly or metallic — a much higher zone (6-14 kHz) or metallic clang at 3-5 kHz"
         }
       ]
     },
@@ -2284,22 +2348,22 @@
         "vocals lack body",
         "how do i improve vocal tone"
       ],
-      "note": "three distinct directions \u2014 ask whether they want more air/brightness, more warmth/body, or are specifically complaining the vocals sound thin/weak.",
+      "note": "three distinct directions — ask whether they want more air/brightness, more warmth/body, or are specifically complaining the vocals sound thin/weak.",
       "solutions": [
         {
           "ref": "airy vocals",
           "seed_weight": 40,
-          "distinguisher": "wants more shimmer, openness, or brightness \u2014 high-shelf territory (10-14 kHz)"
+          "distinguisher": "wants more shimmer, openness, or brightness — high-shelf territory (10-14 kHz)"
         },
         {
           "ref": "warm vocals",
           "seed_weight": 30,
-          "distinguisher": "wants more warmth, fullness, or body \u2014 low-mid boost territory (150-300 Hz)"
+          "distinguisher": "wants more warmth, fullness, or body — low-mid boost territory (150-300 Hz)"
         },
         {
           "ref": "thin vocals",
           "seed_weight": 30,
-          "distinguisher": "vocals actively sound weak or thin or disappear in the mix \u2014 needs low-mid boost plus compression, not just an EQ boost"
+          "distinguisher": "vocals actively sound weak or thin or disappear in the mix — needs low-mid boost plus compression, not just an EQ boost"
         },
         {
           "ref": "saturation",
@@ -2323,17 +2387,17 @@
         {
           "ref": "mix lacks punch",
           "seed_weight": 60,
-          "distinguisher": "the whole mix or drum bus lacks impact \u2014 not specifically the kick"
+          "distinguisher": "the whole mix or drum bus lacks impact — not specifically the kick"
         },
         {
           "ref": "punchy kick",
           "seed_weight": 40,
-          "distinguisher": "specifically the kick lacks impact, weight, or click \u2014 not the whole mix"
+          "distinguisher": "specifically the kick lacks impact, weight, or click — not the whole mix"
         },
         {
           "ref": "parallel compression",
           "seed_weight": 25,
-          "distinguisher": "wants the parallel-compression technique specifically \u2014 blending a heavily compressed copy with the dry signal for density without losing transient snap"
+          "distinguisher": "wants the parallel-compression technique specifically — blending a heavily compressed copy with the dry signal for density without losing transient snap"
         }
       ]
     },
@@ -2345,7 +2409,7 @@
         "snare sounds papery",
         "snare lacks thump"
       ],
-      "note": "only one common cause for this exact symptom \u2014 no need to ask which, just confirm it's the snare and not another element.",
+      "note": "only one common cause for this exact symptom — no need to ask which, just confirm it's the snare and not another element.",
       "solutions": [
         {
           "ref": "thin snare",
@@ -2362,7 +2426,7 @@
         "congested midrange",
         "cardboard sound"
       ],
-      "note": "single common cause \u2014 congested low-mid buildup, usually from not high-passing individual tracks.",
+      "note": "single common cause — congested low-mid buildup, usually from not high-passing individual tracks.",
       "solutions": [
         {
           "ref": "boxy mix",
@@ -2379,7 +2443,7 @@
         "elements blur together",
         "mix sounds unfocused"
       ],
-      "note": "single common cause \u2014 reverb send levels or insufficient pre-delay.",
+      "note": "single common cause — reverb send levels or insufficient pre-delay.",
       "solutions": [
         {
           "ref": "washy mix",
@@ -2396,7 +2460,7 @@
         "vocals disappear during the chorus",
         "vocals too quiet in the mix"
       ],
-      "note": "single common cause \u2014 competing instruments occupying the same presence zone as the vocal.",
+      "note": "single common cause — competing instruments occupying the same presence zone as the vocal.",
       "solutions": [
         {
           "ref": "vocals buried in mix",
@@ -2412,7 +2476,7 @@
         "vocals sound like a cardboard tube",
         "nasal vocal tone"
       ],
-      "note": "single common cause \u2014 resonance in the 500-1000 Hz zone, exact frequency varies by voice.",
+      "note": "single common cause — resonance in the 500-1000 Hz zone, exact frequency varies by voice.",
       "solutions": [
         {
           "ref": "nasal vocals",
@@ -2429,7 +2493,7 @@
         "vocal crackling or distortion",
         "clipping indicator on channel"
       ],
-      "note": "single common cause \u2014 signal peaking above 0 dBFS.",
+      "note": "single common cause — signal peaking above 0 dBFS.",
       "solutions": [
         {
           "ref": "clipping vocals",
@@ -2451,7 +2515,7 @@
         "essing sounds too loud",
         "sharp s and sh sounds"
       ],
-      "note": "single common cause \u2014 energy peak in the 6-10 kHz fricative range.",
+      "note": "single common cause — energy peak in the 6-10 kHz fricative range.",
       "solutions": [
         {
           "ref": "sibilant vocals",
@@ -2468,7 +2532,7 @@
         "thump on p sounds",
         "mic popping during vocals"
       ],
-      "note": "single common cause \u2014 air burst hitting the mic capsule on p/b sounds.",
+      "note": "single common cause — air burst hitting the mic capsule on p/b sounds.",
       "solutions": [
         {
           "ref": "plosives on vocals",
@@ -2485,7 +2549,7 @@
         "snare rings out too long",
         "snare has an overtone"
       ],
-      "note": "single common cause \u2014 narrow resonance peak, exact frequency varies by drum/tuning.",
+      "note": "single common cause — narrow resonance peak, exact frequency varies by drum/tuning.",
       "solutions": [
         {
           "ref": "resonant snare ring",
@@ -2502,7 +2566,7 @@
         "third party plugin missing from list",
         "AU validation failed"
       ],
-      "note": "single common cause \u2014 corrupted Audio Unit cache.",
+      "note": "single common cause — corrupted Audio Unit cache.",
       "solutions": [
         {
           "ref": "AU plugin not showing up in Logic",
@@ -2519,7 +2583,7 @@
         "controller not sending notes to track",
         "midi keyboard stopped working"
       ],
-      "note": "single common cause \u2014 most likely a Control Surfaces misdetection; check macOS MIDI setup first.",
+      "note": "single common cause — most likely a Control Surfaces misdetection; check macOS MIDI setup first.",
       "solutions": [
         {
           "ref": "MIDI keyboard not triggering notes in Logic",
@@ -2536,7 +2600,7 @@
         "logic project opens empty from icloud",
         "icloud logic project broken"
       ],
-      "note": "single common cause \u2014 iCloud offloads files inside the project bundle to placeholder stubs Logic can't read.",
+      "note": "single common cause — iCloud offloads files inside the project bundle to placeholder stubs Logic can't read.",
       "solutions": [
         {
           "ref": "iCloud corrupting or losing Logic project files",
@@ -2553,7 +2617,7 @@
         "logic wont open",
         "coreml crash on launch"
       ],
-      "note": "single common cause \u2014 corrupted application cache, usually from an interrupted update.",
+      "note": "single common cause — corrupted application cache, usually from an interrupted update.",
       "solutions": [
         {
           "ref": "Logic crashes on launch",
@@ -2570,7 +2634,7 @@
         "AI features disabled on M1 M2 M3",
         "logic running under rosetta"
       ],
-      "note": "single common cause \u2014 Logic running under Rosetta instead of natively.",
+      "note": "single common cause — Logic running under Rosetta instead of natively.",
       "solutions": [
         {
           "ref": "Logic AI features grayed out on Apple Silicon",
@@ -2587,7 +2651,7 @@
         "check your internet connection error logic",
         "content missing after update"
       ],
-      "note": "single common cause \u2014 a required Sound Library version update, or a relocated external drive Logic can't find.",
+      "note": "single common cause — a required Sound Library version update, or a relocated external drive Logic can't find.",
       "solutions": [
         {
           "ref": "Sound Library missing or not downloading after Logic update",
@@ -2604,7 +2668,7 @@
         "midi chase issue",
         "notes dont sound until next note event"
       ],
-      "note": "single common cause \u2014 MIDI Chase disabled.",
+      "note": "single common cause — MIDI Chase disabled.",
       "solutions": [
         {
           "ref": "MIDI notes silent when starting playback mid-section",
@@ -2621,7 +2685,7 @@
         "audible click between takes",
         "take folder edit sounds bad"
       ],
-      "note": "single common cause \u2014 no crossfade at the edit point.",
+      "note": "single common cause — no crossfade at the edit point.",
       "solutions": [
         {
           "ref": "clicks and pops at take folder edit points",
@@ -2643,7 +2707,7 @@
         "pitch bend wheel stuck slightly off",
         "PBND events in event list"
       ],
-      "note": "single common cause \u2014 the pitch wheel was slightly off-center when recording started.",
+      "note": "single common cause — the pitch wheel was slightly off-center when recording started.",
       "solutions": [
         {
           "ref": "unwanted pitch bend data on MIDI recordings",
@@ -2660,7 +2724,7 @@
         "double a vocal track",
         "vocal doubling technique"
       ],
-      "note": "single common cause \u2014 layering two performances (or a simulated double) creates natural timing/pitch variation that a single track can't.",
+      "note": "single common cause — layering two performances (or a simulated double) creates natural timing/pitch variation that a single track can't.",
       "solutions": [
         {
           "ref": "vocal doubling",
@@ -2677,7 +2741,7 @@
         "make my mix louder",
         "mastering chain for logic"
       ],
-      "note": "single common cause \u2014 no limiting/mastering chain has been applied yet; a finished mix is not automatically at streaming loudness.",
+      "note": "single common cause — no limiting/mastering chain has been applied yet; a finished mix is not automatically at streaming loudness.",
       "solutions": [
         {
           "ref": "limiting and mastering chain",
@@ -2694,7 +2758,7 @@
         "how do i process vocals",
         "vocal plugin chain order"
       ],
-      "note": "single common cause \u2014 a wrong processing order (e.g. de-essing before compression) makes each later plugin react to the wrong thing.",
+      "note": "single common cause — a wrong processing order (e.g. de-essing before compression) makes each later plugin react to the wrong thing.",
       "solutions": [
         {
           "ref": "vocal processing chain",
@@ -2711,7 +2775,7 @@
         "pitch correct a vocal recording",
         "fix a wrong note in a vocal take"
       ],
-      "note": "single common cause \u2014 individual notes need pitch-by-pitch correction; Flex Pitch handles this without re-recording.",
+      "note": "single common cause — individual notes need pitch-by-pitch correction; Flex Pitch handles this without re-recording.",
       "solutions": [
         {
           "ref": "flex pitch vocal tuning",
@@ -2728,7 +2792,7 @@
         "quantize audio not midi",
         "fix timing on a recorded take"
       ],
-      "note": "single common cause \u2014 picking the wrong Flex Time algorithm for the material is the most common mistake.",
+      "note": "single common cause — picking the wrong Flex Time algorithm for the material is the most common mistake.",
       "solutions": [
         {
           "ref": "flex time (technique)",

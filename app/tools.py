@@ -18,7 +18,7 @@ import json
 
 from app import db
 from app.embed import embed
-from app.walkthrough import path_to_walkthrough_steps
+from app.walkthrough import MissingArgs, path_to_walkthrough_steps
 
 # Distance bands are advisory only — informing the model's own judgment, not a
 # hard filter. The old hard `RELEVANCE_FLOOR` SQL cutoff was a leftover from v1,
@@ -115,6 +115,18 @@ GET_WALKTHROUGH_SCHEMA = {
             "solution": {
                 "type": "string",
                 "description": "The exact solution name from a lookup_concept result.",
+            },
+            "args": {
+                "type": "object",
+                "description": (
+                    "Only for template solutions whose content names arguments (currently "
+                    "'open plugin': plugin[, new]; 'set plugin parameter': plugin, param, value). "
+                    "Take them from the user's words and the live state: plugin = the exact "
+                    "plugin name as Logic lists it, param = the control's label as Logic shows "
+                    "it, value = a plain number in the displayed unit. Omit for ordinary "
+                    "solutions."
+                ),
+                "additionalProperties": True,
             }
         },
         "required": ["solution"],
@@ -330,7 +342,8 @@ def _is_truthy(value) -> bool:
     return False
 
 
-async def get_walkthrough(solution: str, ax_fixture: dict | None = None) -> dict:
+async def get_walkthrough(solution: str, ax_fixture: dict | None = None,
+                          args: dict | None = None) -> dict:
     row = await db.pool().fetchrow(
         "select path, extends_to, toggle_ax_key, value_ax_key from solutions where name = $1",
         solution,
@@ -387,7 +400,12 @@ async def get_walkthrough(solution: str, ax_fixture: dict | None = None) -> dict
 
     if not path:
         return {"attached": False, "reason": "no executable path for this solution"}
-    steps = path_to_walkthrough_steps(path)
+    try:
+        steps = path_to_walkthrough_steps(path, args=args)
+    except MissingArgs as exc:
+        return {"attached": False,
+                "reason": f"this solution needs args {exc.missing} -- call again with "
+                          f"args filled from the user's request and the live state"}
     if not steps:
         return {"attached": False, "reason": "path present but produced no executable steps"}
     return {"attached": True, "destination": resolved_name, "steps": steps}

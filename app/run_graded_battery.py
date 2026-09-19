@@ -76,11 +76,16 @@ def _actual_outcome(trace: list[dict], response_text: str = "", confidence_tier:
         c["input"]["solution"] for c in walkthrough_calls if c["output"].get("attached")
     ]
 
+    # args passed to the first SUCCESSFUL get_walkthrough (template solutions, 2026-09-18)
+    attached_args = next(
+        (c["input"].get("args") or {} for c in walkthrough_calls if c["output"].get("attached")), None)
+
     return {
         "match": match,
         "resolved_problem": resolved_problem,
         "attached_destinations": attached_destinations,
         "attached_solutions": attached_solutions,
+        "attached_args": attached_args,
         "no_tool_calls": len(trace) == 0,
         "response_text": response_text,
         "web_research_called": len(research_calls) > 0,
@@ -118,6 +123,12 @@ def _grade(expect: dict, actual: dict) -> list[dict]:
         elif key == "walkthrough_solution":
             got = actual["attached_solutions"]
             ok = _membership_pass(expected, got)
+        elif key == "walkthrough_args":
+            # expected: dict of arg -> value; case/space-insensitive substring match per arg
+            got = actual.get("attached_args")
+            norm = lambda v: str(v).lower().replace(" ", "")
+            ok = got is not None and all(
+                k in got and norm(v) in norm(got[k]) for k, v in expected.items())
         elif key in ("response_contains", "response_not_contains", "response_contains_any"):
             text = (actual.get("response_text") or "").lower()
             hits = [term for term in expected if term.lower() in text]

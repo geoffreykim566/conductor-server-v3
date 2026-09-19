@@ -103,7 +103,8 @@ async def _ack_clarifying_question() -> dict:
 
 _EXECUTORS = {
     "lookup_concept": lambda inp, fixture: tools.lookup_concept(inp["problem"]),
-    "get_walkthrough": lambda inp, fixture: tools.get_walkthrough(inp["solution"], ax_fixture=fixture),
+    "get_walkthrough": lambda inp, fixture: tools.get_walkthrough(
+        inp["solution"], ax_fixture=fixture, args=inp.get("args")),
     "ask_clarifying_question": lambda inp, fixture: _ack_clarifying_question(),
     "web_research": lambda inp, fixture: research.web_research(inp["query"]),
 }
