@@ -238,7 +238,9 @@ SET_PARAM_SCHEMA = {
         "Queue an action that sets one control of a plugin on a track to an exact value. It runs "
         "on the user's Mac after your reply, when they press Run -- it has NOT happened when you "
         "write your reply. The plugin must be on the track: if the live state doesn't show it, "
-        "call open_plugin for it first in the same reply."
+        "call open_plugin for it first in the same reply. Setting a value on a band that's "
+        "switched off (an EQ's Low Cut, say) switches the band on as part of the same action -- "
+        "no separate call or question needed."
     ),
     "strict": True,
     "input_schema": {
