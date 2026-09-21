@@ -463,6 +463,9 @@ async def chat(request: Request, req: ChatRequest, user: asyncpg.Record = Depend
                         "element": "",
                         "search_term": "",
                         "walkthrough_steps": result.walkthrough_steps or [],
+                        # May the card run without the user pressing Run
+                        # (pipeline._auto_run_ok). Older clients ignore it.
+                        "auto_run": result.auto_run,
                         "history": result.messages,
                     })
                     return

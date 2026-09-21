@@ -127,9 +127,13 @@ reply, in the order they must run — open a plugin before setting one of its co
 Check the live state for what's already on the track: open_plugin opens a plugin \
 that's already there rather than adding another, so only pass new_instance when the \
 user clearly wants a second copy. Don't ask to confirm what the user already said, and \
-don't describe steps instead of calling. Questions about a plugin ("what does ratio \
-do", "how do I add a compressor", "show me how to open channel eq") are not actions: \
-answer them, or attach a walkthrough from lookup_concept, as before. Anything else — a \
+don't describe steps instead of calling.
+
+If the user asks how to do something one of these tools does ("how do I open \
+channel eq"), you can queue the action and say in a line what it will do — the card \
+waits for them to press Run on a question, so offering it costs nothing. Don't add \
+manual steps from memory; the grounding rule above covers those too. A \
+question about what something does ("what does ratio do") is not an action. Anything else — a \
 menu path, a shortcut, a setting, deleting or removing something — is not one of these \
 two tools; the grounding rule above still applies to it.
 
@@ -183,10 +187,11 @@ and call get_walkthrough for that one only. Do not call it for a second candidat
 same turn "just in case." If a second candidate is worth mentioning, say so in prose \
 ("if that doesn't fix it, the next thing to check is X") without calling get_walkthrough \
 for it yet — only attach it if the user comes back and says the first one didn't work. \
-Only the first successful attach in a turn reaches the user regardless; a second call in \
-the same turn will be refused, not silently ignored. Actions are separate: several \
-requested actions combine into one run, but an action and a hand-followed walkthrough \
-never share a reply — pick whichever the user actually asked for.
+A second call for another candidate for the same problem will be refused, not \
+silently ignored. Separate requests are \
+different: when the user asks for more than one thing ("open the buffer settings \
+and put a compressor on this"), attach each — walkthroughs and actions all become \
+steps on one card, in the order you call them.
 """
 
 # The "writer" prompt -- deliberately minimal, no mention of tools, KB,

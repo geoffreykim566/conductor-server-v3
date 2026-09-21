@@ -2,11 +2,11 @@
 2026-09-21) and the lookup-cap change that came with them.
 
 Covers: action calls concatenating into one card in call order (same response
-and across iterations), the per-turn cap, duplicate refusal, actions and a
-hand-followed walkthrough never sharing a card, the first call being
+and across iterations), the per-turn cap, duplicate refusal, the first call being
 tool_choice "any" rather than a forced lookup_concept, the cap counting only
-unproductive lookups, the resume path restoring queued actions, and the
-executors' own argument validation.
+unproductive lookups, the resume path restoring queued actions, the
+executors' own argument validation, and (2026-09-21) one card per turn for
+walkthroughs and actions alike plus the auto-run rule.
 
 No DB, no Voyage: model responses are scripted, and lookup_concept /
 get_walkthrough are stubbed in pipeline._EXECUTORS. Run inside the app container:
@@ -110,40 +110,92 @@ async def test_actions_combine_across_iterations() -> None:
 
 
 async def test_action_cap() -> None:
-    calls = [_open(f"Plugin {n}", f"a{n}") for n in range(1, pipeline.MAX_ACTIONS_PER_TURN + 2)]
+    calls = [_open(f"Plugin {n}", f"a{n}") for n in range(1, pipeline.MAX_ATTACHES_PER_TURN + 2)]
     result, _ = await _run([_resp(*calls), _resp(_text("done"))])
     outs = [c["output"] for c in result.trace if c["tool"] == "open_plugin"]
-    assert sum(o["attached"] for o in outs) == pipeline.MAX_ACTIONS_PER_TURN, outs
-    assert outs[-1] == {"attached": False, "reason": pipeline._ACTION_CAP_REFUSAL}, outs[-1]
-    assert len(result.walkthrough_steps) == pipeline.MAX_ACTIONS_PER_TURN
-    print(f"PASS: action {pipeline.MAX_ACTIONS_PER_TURN + 1} refused at the cap.")
+    assert sum(o["attached"] for o in outs) == pipeline.MAX_ATTACHES_PER_TURN, outs
+    assert outs[-1] == {"attached": False, "reason": pipeline._ATTACH_CAP_REFUSAL}, outs[-1]
+    assert len(result.walkthrough_steps) == pipeline.MAX_ATTACHES_PER_TURN
+    print(f"PASS: action {pipeline.MAX_ATTACHES_PER_TURN + 1} refused at the cap.")
 
 
 async def test_duplicate_action_refused() -> None:
     result, _ = await _run([_resp(_open("Compressor", "a1"), _open("Compressor", "a2")), _resp(_text("done"))])
     outs = [c["output"] for c in result.trace if c["tool"] == "open_plugin"]
-    assert outs[0]["attached"] and outs[1] == {"attached": False, "reason": pipeline._DUPLICATE_ACTION_REFUSAL}, outs
+    assert outs[0]["attached"] and outs[1] == {"attached": False, "reason": pipeline._DUPLICATE_ATTACH_REFUSAL}, outs
     assert result.walkthrough_steps == [{"ax_open_plugin": "Compressor"}]
     print("PASS: an exact duplicate action is refused; it runs once.")
 
 
-async def test_action_and_walkthrough_exclusive() -> None:
-    result, _ = await _run([
-        _resp(_open("Compressor", "a1"), _tool_use("get_walkthrough", {"solution": "buffer size"}, "w1")),
-        _resp(_text("done")),
-    ])
-    wt = next(c["output"] for c in result.trace if c["tool"] == "get_walkthrough")
-    assert wt == {"attached": False, "reason": pipeline._ACTION_VS_WALKTHROUGH_REFUSAL}, wt
-    assert result.walkthrough_steps == [{"ax_open_plugin": "Compressor"}]
-
+async def test_action_and_walkthrough_share_the_card() -> None:
+    # One card per turn: a KB route and an action are both steps, call order.
     result, _ = await _run([
         _resp(_tool_use("get_walkthrough", {"solution": "buffer size"}, "w1"), _open("Compressor", "a1")),
         _resp(_text("done")),
     ])
-    act = next(c["output"] for c in result.trace if c["tool"] == "open_plugin")
-    assert act == {"attached": False, "reason": pipeline._ACTION_VS_WALKTHROUGH_REFUSAL}, act
-    assert result.walkthrough_steps == [{"menu_path": ["File", "buffer size"]}]
-    print("PASS: whichever kind attaches first wins; the other kind is refused with a reason.")
+    assert result.walkthrough_steps == [{"menu_path": ["File", "buffer size"]}, {"ax_open_plugin": "Compressor"}], \
+        result.walkthrough_steps
+    print("PASS: a walkthrough and an action share one card, in call order.")
+
+
+async def test_fallback_refused_separate_request_joins() -> None:
+    # Two solutions from the SAME problem -> the second is an alternative, refused.
+    same = [{"match": "problem", "problem": "crackling", "match_confidence": "strong",
+             "solutions": [{"name": "buffer size"}, {"name": "sample rate"}]}]
+    result, _ = await _run([
+        _resp(_tool_use("lookup_concept", {"problem": "crackling"}, "l1")),
+        _resp(_tool_use("get_walkthrough", {"solution": "buffer size"}, "w1"),
+              _tool_use("get_walkthrough", {"solution": "sample rate"}, "w2")),
+        _resp(_text("done")),
+    ], lookups=same)
+    outs = [c["output"] for c in result.trace if c["tool"] == "get_walkthrough"]
+    assert outs[0]["attached"] and outs[1] == {"attached": False, "reason": pipeline._FALLBACK_REFUSAL}, outs
+    # Solutions from DIFFERENT problems -> two requests, both on the card.
+    two = [{"match": "problem", "problem": "crackling", "match_confidence": "strong", "solutions": [{"name": "buffer size"}]},
+           {"match": "problem", "problem": "freezing", "match_confidence": "strong", "solutions": [{"name": "freeze track"}]}]
+    result, _ = await _run([
+        _resp(_tool_use("lookup_concept", {"problem": "crackling"}, "l1"), _tool_use("lookup_concept", {"problem": "freeze"}, "l2")),
+        _resp(_tool_use("get_walkthrough", {"solution": "buffer size"}, "w1"),
+              _tool_use("get_walkthrough", {"solution": "freeze track"}, "w2")),
+        _resp(_text("done")),
+    ], lookups=two)
+    assert result.walkthrough_steps == [{"menu_path": ["File", "buffer size"]}, {"menu_path": ["File", "freeze track"]}], \
+        result.walkthrough_steps
+    print("PASS: an alternative for the same problem is refused; a separate request joins the card.")
+
+
+async def test_auto_run() -> None:
+    card = [_resp(_open("Compressor", "a1")), _resp(_text("done"))]
+    cases = {
+        "put a compressor on this": True,
+        "my vocal sounds muddy, fix it": True,
+        "can you add a compressor to this track": True,
+        "how do i add a compressor": False,
+        "explain what a compressor does and put one on this": False,
+        "channel eq?": False,
+        "put a compressor on every track": False,
+    }
+    for text, want in cases.items():
+        result, _ = await _run(card, messages=[{"role": "user", "content": text}])
+        assert result.auto_run is want, (text, result.auto_run)
+    result, _ = await _run([_resp(_text("hi there"))], messages=[{"role": "user", "content": "put a compressor on this"}])
+    assert result.walkthrough_steps is None and result.auto_run is False
+    print("PASS: auto_run follows the message (instruction vs question vs bulk) and needs a card.")
+
+
+def test_is_question() -> None:
+    questions = ["how do i open channel eq", "what does ratio do", "why is my mix harsh, add something",
+                 "channel eq?", "show me how to open channel eq", "can i add a compressor here",
+                 "can you explain what a compressor does", "hey, how do i mute a track", "wheres the buffer size",
+                 "do i need a limiter", "is my vocal too loud"]
+    instructions = ["open channel eq", "put valhalla on the vocal", "my vocal sounds muddy, fix it",
+                    "can you add a compressor", "could you set the low cut to 80?", "please add an eq",
+                    "yes please, do it for me", "do it", "set the threshold to -18"]
+    for t in questions:
+        assert pipeline._is_question(pipeline._last_user_text([{"role": "user", "content": t}])), t
+    for t in instructions:
+        assert not pipeline._is_question(pipeline._last_user_text([{"role": "user", "content": t}])), t
+    print(f"PASS: _is_question on {len(questions)} questions and {len(instructions)} instructions.")
 
 
 async def test_first_call_is_any() -> None:
@@ -230,11 +282,14 @@ def test_executor_validation() -> None:
 
 async def main() -> None:
     test_executor_validation()
+    test_is_question()
     await test_actions_combine_same_response()
     await test_actions_combine_across_iterations()
     await test_action_cap()
     await test_duplicate_action_refused()
-    await test_action_and_walkthrough_exclusive()
+    await test_action_and_walkthrough_share_the_card()
+    await test_fallback_refused_separate_request_joins()
+    await test_auto_run()
     await test_first_call_is_any()
     await test_cap_counts_only_unproductive()
     await test_resume_restores_actions()

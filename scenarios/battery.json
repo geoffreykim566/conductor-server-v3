@@ -911,7 +911,8 @@
         }
       ],
       "no_refused_actions": true,
-      "no_completion_claims": true
+      "no_completion_claims": true,
+      "auto_run": true
     },
     "turns": [
       {
@@ -921,11 +922,10 @@
   },
   {
     "name": "mode_pair_channel_eq_q",
-    "note": "2026-09-18 Track B mode-experiment addition -- question-phrasing half of the channel-eq pair, compare with mode_pair_channel_eq_cmd. Same expected walkthrough_destination -- baseline for whether phrasing alone changes what attaches.",
+    "note": "2026-09-18 Track B mode-experiment addition -- question-phrasing half of the channel-eq pair, compare with mode_pair_channel_eq_cmd. Same expected walkthrough_destination -- baseline for whether phrasing alone changes what attaches. 2026-09-21 (one card + auto-run rule): the plugin row no longer carries a path (open_plugin is the only way to open a plugin), so queuing the action is allowed; the question shape means the card must wait for Run.",
     "expect": {
-      "match": "single",
-      "walkthrough_destination": "channel eq",
-      "no_action_calls": true
+      "auto_run": false,
+      "no_completion_claims": true
     },
     "turns": [
       {
@@ -946,7 +946,8 @@
         }
       ],
       "no_refused_actions": true,
-      "no_completion_claims": true
+      "no_completion_claims": true,
+      "auto_run": true
     },
     "turns": [
       {
@@ -956,11 +957,10 @@
   },
   {
     "name": "mode_pair_compressor_q",
-    "note": "2026-09-18 Track B mode-experiment addition -- question-phrasing half of the compressor pair, compare with mode_pair_compressor_cmd.",
+    "note": "2026-09-18 Track B mode-experiment addition -- question-phrasing half of the compressor pair, compare with mode_pair_compressor_cmd. 2026-09-21 (one card + auto-run rule): the plugin row no longer carries a path (open_plugin is the only way to open a plugin), so queuing the action is allowed; the question shape means the card must wait for Run.",
     "expect": {
-      "match": "single",
-      "walkthrough_destination": "compressor",
-      "no_action_calls": true
+      "auto_run": false,
+      "no_completion_claims": true
     },
     "turns": [
       {
@@ -973,7 +973,8 @@
     "note": "2026-09-18 Track B mode-experiment addition -- command-phrasing half of a command-vs-question pair on the same target (buffer size), a global/consequential setting rather than a per-track plugin. 2026-09-21: global settings are KB rows, not action tools; match assertion dropped (the model may reach the row without a first lookup).",
     "expect": {
       "walkthrough_destination": "buffer size",
-      "no_action_calls": true
+      "no_action_calls": true,
+      "auto_run": true
     },
     "turns": [
       {
@@ -987,7 +988,8 @@
     "expect": {
       "match": "single",
       "walkthrough_destination": "buffer size",
-      "no_action_calls": true
+      "no_action_calls": true,
+      "auto_run": false
     },
     "turns": [
       {
@@ -1000,7 +1002,8 @@
     "note": "2026-09-18 Track B mode-experiment addition -- command-phrasing half of a command-vs-question pair on the same target (sample rate), another global/consequential setting. 2026-09-21: global settings are KB rows, not action tools; match assertion dropped (the model may reach the row without a first lookup).",
     "expect": {
       "walkthrough_destination": "sample rate",
-      "no_action_calls": true
+      "no_action_calls": true,
+      "auto_run": true
     },
     "turns": [
       {
@@ -1014,7 +1017,8 @@
     "expect": {
       "match": "single",
       "walkthrough_destination": "sample rate",
-      "no_action_calls": true
+      "no_action_calls": true,
+      "auto_run": false
     },
     "turns": [
       {
@@ -1038,7 +1042,8 @@
       "response_not_contains": [
         "Channel EQ",
         "Compressor"
-      ]
+      ],
+      "auto_run": true
     },
     "turns": [
       {
@@ -1062,7 +1067,8 @@
       "response_not_contains": [
         "Compressor",
         "Multipressor"
-      ]
+      ],
+      "auto_run": true
     },
     "turns": [
       {
@@ -1086,7 +1092,8 @@
       "response_not_contains": [
         "Space Designer",
         "ChromaVerb"
-      ]
+      ],
+      "auto_run": true
     },
     "turns": [
       {
@@ -1113,7 +1120,8 @@
         }
       ],
       "no_refused_actions": true,
-      "no_completion_claims": true
+      "no_completion_claims": true,
+      "auto_run": true
     }
   },
   {
@@ -1137,7 +1145,8 @@
           ]
         }
       ],
-      "no_completion_claims": true
+      "no_completion_claims": true,
+      "auto_run": true
     }
   },
   {
@@ -1158,7 +1167,8 @@
           }
         }
       ],
-      "no_completion_claims": true
+      "no_completion_claims": true,
+      "auto_run": true
     }
   },
   {
@@ -1182,7 +1192,8 @@
         }
       ],
       "no_refused_actions": true,
-      "no_completion_claims": true
+      "no_completion_claims": true,
+      "auto_run": true
     }
   },
   {
@@ -1212,7 +1223,8 @@
         }
       ],
       "no_refused_actions": true,
-      "no_completion_claims": true
+      "no_completion_claims": true,
+      "auto_run": true
     }
   },
   {
@@ -1236,7 +1248,8 @@
           ]
         }
       ],
-      "no_completion_claims": true
+      "no_completion_claims": true,
+      "auto_run": true
     }
   },
   {
@@ -1249,7 +1262,8 @@
       }
     ],
     "expect": {
-      "no_action_calls": true
+      "no_action_calls": true,
+      "auto_run": false
     }
   },
   {
@@ -1262,7 +1276,8 @@
     ],
     "expect": {
       "no_action_calls": true,
-      "walkthrough_destination": null
+      "walkthrough_destination": null,
+      "auto_run": false
     }
   },
   {
@@ -1275,24 +1290,26 @@
       }
     ],
     "expect": {
-      "no_action_calls": true
+      "no_action_calls": true,
+      "auto_run": false
     }
   },
   {
     "name": "tn_channel_eq_bare",
-    "note": "2026-09-21 true negative: bare noun with a question mark -- a question, not a command.",
+    "note": "2026-09-21 true negative: bare noun with a question mark -- a question, not a command. 2026-09-21 (one card + auto-run rule): the plugin row no longer carries a path (open_plugin is the only way to open a plugin), so queuing the action is allowed; the question shape means the card must wait for Run.",
     "turns": [
       {
         "text": "channel eq?"
       }
     ],
     "expect": {
-      "no_action_calls": true
+      "auto_run": false,
+      "no_completion_claims": true
     }
   },
   {
     "name": "tn_show_me_how_open_eq",
-    "note": "2026-09-21 true negative: 'show me how' wants the hand walkthrough, not the action.",
+    "note": "2026-09-21 true negative: 'show me how' wants the hand walkthrough, not the action. 2026-09-21 (one card + auto-run rule): the plugin row no longer carries a path (open_plugin is the only way to open a plugin), so queuing the action is allowed; the question shape means the card must wait for Run.",
     "turns": [
       {
         "text": "can you show me how to open channel eq",
@@ -1300,8 +1317,8 @@
       }
     ],
     "expect": {
-      "no_action_calls": true,
-      "walkthrough_destination": "channel eq"
+      "auto_run": false,
+      "no_completion_claims": true
     }
   },
   {
@@ -1313,7 +1330,8 @@
       }
     ],
     "expect": {
-      "no_action_calls": true
+      "no_action_calls": true,
+      "auto_run": false
     }
   },
   {
@@ -1326,7 +1344,8 @@
       }
     ],
     "expect": {
-      "no_action_calls": true
+      "no_action_calls": true,
+      "auto_run": false
     }
   },
   {
@@ -1339,7 +1358,123 @@
       }
     ],
     "expect": {
-      "no_action_calls": true
+      "no_action_calls": true,
+      "auto_run": false
+    }
+  },
+  {
+    "name": "multiturn_how_then_yes_do_it",
+    "note": "2026-09-21 option (b): a 'how do I' question gets an explanation + the walkthrough + an offer to do it, with no action queued; the user accepting the offer is what queues the action. 2026-09-21 (one card + auto-run rule): turn 1 may queue the action too (the card waits); the explicit 'do it' is what may auto-run.",
+    "turns": [
+      {
+        "text": "how do i open channel eq",
+        "ax_state": "### Untitled - Tracks\n- AXLayoutItem desc='Audio 1'\n  - AXTextField desc='name' value='Audio 1'\n  - AXButton desc='audio plug-in'\n  - AXButton desc='EQ' value='off'",
+        "expect": {
+          "auto_run": false
+        }
+      },
+      {
+        "text": "yes please, do it for me",
+        "ax_state": "### Untitled - Tracks\n- AXLayoutItem desc='Audio 1'\n  - AXTextField desc='name' value='Audio 1'\n  - AXButton desc='audio plug-in'\n  - AXButton desc='EQ' value='off'"
+      }
+    ],
+    "expect": {
+      "action_calls": [
+        {
+          "tool": "open_plugin",
+          "args": {
+            "plugin": "channel eq"
+          }
+        }
+      ],
+      "no_completion_claims": true,
+      "auto_run": true
+    }
+  },
+  {
+    "name": "hybrid_muddy_vocal_fix_it",
+    "note": "2026-09-21 (one card + auto-run rule): a problem statement plus an instruction: whatever the card holds may auto-run (user decision). A clarifying question instead fails this -- read the transcript before treating that as wrong.",
+    "turns": [
+      {
+        "text": "my vocal sounds muddy, fix it",
+        "ax_state": "### Untitled - Tracks\n- AXLayoutItem desc='Audio 1'\n  - AXTextField desc='name' value='Audio 1'\n  - AXButton desc='audio plug-in'\n  - AXButton desc='EQ' value='off'"
+      }
+    ],
+    "expect": {
+      "auto_run": true,
+      "no_completion_claims": true
+    }
+  },
+  {
+    "name": "hybrid_why_harsh_add_something",
+    "note": "2026-09-21 (one card + auto-run rule): starts as a question, so any card waits for Run even though it also asks for an action.",
+    "turns": [
+      {
+        "text": "why is my mix harsh, add something to tame it",
+        "ax_state": "### Untitled - Tracks\n- AXLayoutItem desc='Audio 1'\n  - AXTextField desc='name' value='Audio 1'\n  - AXButton desc='audio plug-in'\n  - AXButton desc='EQ' value='off'"
+      }
+    ],
+    "expect": {
+      "auto_run": false,
+      "no_completion_claims": true
+    }
+  },
+  {
+    "name": "hybrid_explain_and_add_compressor",
+    "note": "2026-09-21 (one card + auto-run rule): explanation + action in one message: the action is queued, but 'explain' makes the card wait.",
+    "turns": [
+      {
+        "text": "explain what a compressor does and put one on this",
+        "ax_state": "### Untitled - Tracks\n- AXLayoutItem desc='Audio 1'\n  - AXTextField desc='name' value='Audio 1'\n  - AXButton desc='audio plug-in'\n  - AXButton desc='EQ' value='off'"
+      }
+    ],
+    "expect": {
+      "action_calls": [
+        {
+          "tool": "open_plugin",
+          "args": {
+            "plugin": "compressor"
+          }
+        }
+      ],
+      "auto_run": false,
+      "no_completion_claims": true
+    }
+  },
+  {
+    "name": "request_can_you_add_compressor",
+    "note": "2026-09-21 (one card + auto-run rule): 'can you <do X>' is a request, not a question -- auto-run allowed.",
+    "turns": [
+      {
+        "text": "can you add a compressor to this track",
+        "ax_state": "### Untitled - Tracks\n- AXLayoutItem desc='Audio 1'\n  - AXTextField desc='name' value='Audio 1'\n  - AXButton desc='audio plug-in'\n  - AXButton desc='EQ' value='off'"
+      }
+    ],
+    "expect": {
+      "action_calls": [
+        {
+          "tool": "open_plugin",
+          "args": {
+            "plugin": "compressor"
+          }
+        }
+      ],
+      "auto_run": true,
+      "no_completion_claims": true
+    }
+  },
+  {
+    "name": "bulk_compressor_every_track",
+    "note": "2026-09-21 (one card + auto-run rule): bulk scope ('every track') never auto-runs, whatever gets queued.",
+    "turns": [
+      {
+        "text": "put a compressor on every track",
+        "ax_state": "### Untitled - Tracks\n- AXLayoutItem desc='Audio 1'\n  - AXTextField desc='name' value='Audio 1'\n  - AXButton desc='audio plug-in'\n  - AXButton desc='EQ' value='off'"
+      }
+    ],
+    "expect": {
+      "auto_run": false,
+      "no_completion_claims": true
     }
   }
 ]

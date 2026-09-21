@@ -536,29 +536,7 @@
       ],
       "content": {
         "opens": "Channel EQ plugin \u2014 8-band parametric EQ with a real-time frequency analyzer. Opened via Search and Add Plug-in (Ctrl+Cmd+P): type 'cha' to filter, then press Return."
-      },
-      "path": [
-        {
-          "type": "shortcut",
-          "value": "Ctrl+Cmd+P"
-        },
-        {
-          "type": "shortcut",
-          "value": "c"
-        },
-        {
-          "type": "shortcut",
-          "value": "h"
-        },
-        {
-          "type": "shortcut",
-          "value": "a"
-        },
-        {
-          "type": "shortcut",
-          "value": "Return"
-        }
-      ]
+      }
     },
     {
       "name": "compressor",
@@ -570,29 +548,7 @@
       ],
       "content": {
         "opens": "Compressor plugin \u2014 threshold, ratio, attack, release, knee, makeup gain with multiple vintage circuit models. Opened via Search and Add Plug-in (Ctrl+Cmd+P): type 'com' to filter, then press Return. Search also matches Squash Compressor, AUMultibandCompressor, and Multipressor \u2014 Return picks whichever ranks first, which favors whatever was searched most recently, so an unrelated recent search can make this open the wrong one."
-      },
-      "path": [
-        {
-          "type": "shortcut",
-          "value": "Ctrl+Cmd+P"
-        },
-        {
-          "type": "shortcut",
-          "value": "c"
-        },
-        {
-          "type": "shortcut",
-          "value": "o"
-        },
-        {
-          "type": "shortcut",
-          "value": "m"
-        },
-        {
-          "type": "shortcut",
-          "value": "Return"
-        }
-      ]
+      }
     },
     {
       "name": "space designer",

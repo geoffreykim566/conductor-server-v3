@@ -105,7 +105,8 @@ def _ordered_subsequence(expected: list[dict], got: list[dict]) -> bool:
     return i == len(expected)
 
 
-def _actual_outcome(trace: list[dict], response_text: str = "", confidence_tier: str = "", sources: list | None = None) -> dict:
+def _actual_outcome(trace: list[dict], response_text: str = "", confidence_tier: str = "", sources: list | None = None,
+                    auto_run: bool | None = None) -> dict:
     lookup_calls = [c for c in trace if c["tool"] == "lookup_concept"]
     walkthrough_calls = [c for c in trace if c["tool"] == "get_walkthrough"]
     # web_research_called: fire/no-fire grading for the new tool (v3-log.md
@@ -160,6 +161,9 @@ def _actual_outcome(trace: list[dict], response_text: str = "", confidence_tier:
         "action_calls": action_calls,
         "first_tool": trace[0]["tool"] if trace else None,
         "lookup_count": len(lookup_calls),
+        # Whether the card may run without the user pressing Run (v041+;
+        # None on a build that predates it, which fails any auto_run assert).
+        "auto_run": auto_run,
     }
 
 
@@ -236,6 +240,7 @@ async def run_scenario(scenario: dict) -> dict:
 
     messages: list[dict] = []
     trace: list[dict] = []
+    auto_run = None
     response_text: str = ""
     confidence_tier: str = ""
     sources: list = []
@@ -253,6 +258,7 @@ async def run_scenario(scenario: dict) -> dict:
         result = await respond(messages, ax_fixture=ax_fixture, ax_state=ax_state)
         messages = result.messages
         trace = result.trace  # graded against the scenario's top-level 'expect' below
+        auto_run = getattr(result, "auto_run", None)
         response_text = result.text  # ditto, for response_contains/response_not_contains
         confidence_tier = result.confidence_tier
         sources = result.sources
@@ -276,14 +282,16 @@ async def run_scenario(scenario: dict) -> dict:
         print(f"  response: {result.text}")
         print(f"  walkthrough attached: {result.walkthrough_steps is not None}"
               + (f" -> {result.walkthrough_steps}" if result.walkthrough_steps else ""))
-        print(f"  confidence_tier: {result.confidence_tier!r}, sources: {len(result.sources)}")
+        print(f"  confidence_tier: {result.confidence_tier!r}, sources: {len(result.sources)}, "
+              f"auto_run: {getattr(result, 'auto_run', None)!r}")
         acts = _action_calls(result.trace)
         if acts:
             print("  action calls: " + "; ".join(
                 f"{c['tool']}({c['args']}){'' if c['ok'] else ' REFUSED'}" for c in acts))
 
         if "expect" in turn:
-            turn_verdicts = _grade(turn["expect"], _actual_outcome(result.trace, result.text, result.confidence_tier, result.sources))
+            turn_verdicts = _grade(turn["expect"], _actual_outcome(result.trace, result.text, result.confidence_tier, result.sources,
+                                                            getattr(result, "auto_run", None)))
             for v in turn_verdicts:
                 v["turn"] = i
             verdicts.extend(turn_verdicts)
@@ -293,7 +301,7 @@ async def run_scenario(scenario: dict) -> dict:
                 print(f"    [{status}] {v['field']}: expected={v['expected']!r} actual={v['actual']!r}")
 
     if "expect" in scenario:
-        final_verdicts = _grade(scenario["expect"], _actual_outcome(trace, response_text, confidence_tier, sources))
+        final_verdicts = _grade(scenario["expect"], _actual_outcome(trace, response_text, confidence_tier, sources, auto_run))
         for v in final_verdicts:
             v["turn"] = "final"
         verdicts.extend(final_verdicts)

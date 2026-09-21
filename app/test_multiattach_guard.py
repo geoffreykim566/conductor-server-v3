@@ -12,6 +12,12 @@ it, covering the two distinct shapes that hit the same guard condition
   1. two get_walkthrough tool_use blocks in a single model response
   2. an attach in one loop iteration, a retry attempt in a later iteration
 
+Since 2026-09-21 (one card per turn) the guard refuses only an ALTERNATIVE for
+the same problem; a walkthrough for a different problem joins the card
+(test_action_tools covers that). Neither solution here came from a
+lookup_concept result, so neither has a known problem and both count as the
+same one -- the conservative reading, and the one these tests pin.
+
 Run inside the app container:
     docker compose exec app python -m app.test_multiattach_guard
 """
