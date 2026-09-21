@@ -541,6 +541,69 @@ _FALLBACK_REFUSAL = (
 # unrelated second request sharing the same turn. The generic fallback
 # refusal above was found to make the model frame it as "next thing to try,"
 # which consistently crowded out narrating the walkthrough that actually won.
+# How many attaches may combine into one card/run. A compound command tops out
+# at a handful of actions in practice ("eq on track 1 and 2, low cut on both");
+# the cap is here so a confused turn can't queue an unbounded run at the user.
+MAX_ATTACHES_PER_TURN = 3
+
+_ATTACH_CAP_REFUSAL = (
+    f"this turn already has {MAX_ATTACHES_PER_TURN} actions queued, which is the "
+    "limit for one turn. Cover this one in prose and let the user ask for it next."
+)
+
+_NON_ACTION_SECOND_REFUSAL = (
+    "a walkthrough was already attached this turn. Several attaches combine into "
+    "one run only when they are all direct actions (open plugin / set plugin "
+    "parameter); a walkthrough the user follows by hand does not combine with "
+    "anything. Cover this one in prose instead."
+)
+
+
+def _is_action_steps(steps: object) -> bool:
+    """True if every step is an executable AX action (ax_open_plugin /
+    ax_set_param), i.e. something the client runs itself rather than a path the
+    user follows by hand. This is what decides whether a second attach may join
+    the first: commit-to-one exists because two *diagnostic* candidates in one
+    turn meant the last silently won while the prose led with the first
+    (2026-08-05). Queued actions don't have that failure -- each one was
+    explicitly asked for, they run in attach order, and each gets its own
+    ledger entry to revert. Bucket identity can't stand in for this: the two
+    template rows ('open plugin', 'set plugin parameter') belong to no problem
+    at all, so a compound command looks same-bucket to _solution_to_problem."""
+    if not isinstance(steps, list) or not steps:
+        return False
+    return all(
+        isinstance(st, dict) and any(k.startswith("ax_") for k in st)
+        for st in steps
+    )
+
+
+def _second_attach_result(result: dict, attached_steps: list, trace: list[dict],
+                          solution: str | None, attached_solution: str | None) -> dict:
+    """Let a second attach join the first when both are runnable actions, else
+    refuse it the way commit-to-one always has."""
+    if not (_is_action_steps(attached_steps) and _is_action_steps(result.get("steps"))):
+        # Which refusal wording applies depends on whether this is an
+        # alternative candidate for the SAME problem as the winner (a real
+        # fallback) or a solution from a DIFFERENT problem (an unrelated
+        # second request) -- see _solution_to_problem.
+        sol_to_problem = _solution_to_problem(trace)
+        if _is_action_steps(attached_steps) or _is_action_steps(result.get("steps")):
+            reason = _NON_ACTION_SECOND_REFUSAL
+        elif sol_to_problem.get(solution) == sol_to_problem.get(attached_solution):
+            reason = _FALLBACK_REFUSAL
+        else:
+            reason = _UNRELATED_REFUSAL
+        return {"attached": False, "reason": reason}
+    attached_so_far = sum(
+        1 for c in trace
+        if c["tool"] == "get_walkthrough" and c["output"].get("attached")
+    )
+    if attached_so_far >= MAX_ATTACHES_PER_TURN:
+        return {"attached": False, "reason": _ATTACH_CAP_REFUSAL}
+    return {**result, "queued_after": attached_solution}
+
+
 _UNRELATED_REFUSAL = (
     "a walkthrough was already attached this turn for a DIFFERENT, unrelated "
     "request -- only one attaches per turn, but this is not a fallback for "
@@ -1106,24 +1169,6 @@ async def respond(
                         "for this. Do not call lookup_concept again this turn."
                     )
                 }
-            elif tu.name == "get_walkthrough" and walkthrough_steps is not None:
-                # Commit-to-one: only the first successful attach in a turn
-                # reaches the user (found live 2026-08-05 -- multiple attaches
-                # in one turn meant the *last* one silently won, contradicting
-                # whichever candidate the response text actually led with).
-                # Which refusal wording applies depends on whether this is an
-                # alternative candidate for the SAME problem as the winner (a
-                # real fallback) or a solution from a DIFFERENT problem (an
-                # unrelated second request) -- see _solution_to_problem.
-                sol_to_problem = _solution_to_problem(trace)
-                same_bucket = (
-                    sol_to_problem.get(tu.input.get("solution"))
-                    == sol_to_problem.get(attached_solution)
-                )
-                result = {
-                    "attached": False,
-                    "reason": _FALLBACK_REFUSAL if same_bucket else _UNRELATED_REFUSAL,
-                }
             elif tu.name == "web_research" and research_denied:
                 result = dict(_RESEARCH_DECLINED)
             else:
@@ -1139,10 +1184,22 @@ async def respond(
             call_usage = result.pop("_usage", None) if isinstance(result, dict) else None
             if call_usage:
                 usage.append(call_usage)
+            if tu.name == "get_walkthrough" and result.get("attached") and walkthrough_steps is not None:
+                # A second attach in the same turn. get_walkthrough is a pure
+                # KB read (no side effects), so it is cheaper to run it and
+                # judge its steps than to guess from the solution name.
+                result = _second_attach_result(result, walkthrough_steps, trace,
+                                               tu.input.get("solution"), attached_solution)
             trace.append({"tool": tu.name, "input": tu.input, "output": result})
             if tu.name == "get_walkthrough" and result.get("attached"):
-                walkthrough_steps = result.get("steps")
-                attached_solution = tu.input.get("solution")
+                if walkthrough_steps is None:
+                    walkthrough_steps = result.get("steps")
+                    attached_solution = tu.input.get("solution")
+                else:
+                    # Appended, not replaced: the run is one card, one ledger, in
+                    # attach order. attached_solution stays the FIRST action --
+                    # _confidence_tier and the hedge logic are keyed to it.
+                    walkthrough_steps = walkthrough_steps + list(result.get("steps") or [])
             tool_results.append({
                 "type": "tool_result",
                 "tool_use_id": tu.id,

@@ -129,9 +129,13 @@ is enough to attach — don't ask to confirm what the user already said, and don
 describe the steps instead of calling. The action runs on the user's machine after your \
 reply, when they press Run — so say it's about to happen, never that it's done. Use the live state to see what's already loaded: \
 if the plugin is on the track, "open plugin" opens it rather than adding another, so \
-only pass new=true when the user clearly wants a second instance. A request that needs \
-both (the plugin isn't loaded yet and a value should change) attaches "open plugin" \
-first and mentions the value change in prose — one attach per turn still applies.
+only pass new=true when the user clearly wants a second instance. A request that asks \
+for several actions ("add an eq and set the low cut to 80", "put a compressor on tracks \
+1 and 2") attaches each one, in the order they must run — the plugin gets opened before \
+its parameter is set — up to three per turn; they become a single card the user runs \
+once. Attach only the actions the user actually asked for, and narrate all of them. \
+This applies to direct actions only: a walkthrough the user follows by hand still \
+attaches alone.
 
 ## Indirect questions can still get a walkthrough
 
@@ -183,8 +187,9 @@ and call get_walkthrough for that one only. Do not call it for a second candidat
 same turn "just in case." If a second candidate is worth mentioning, say so in prose \
 ("if that doesn't fix it, the next thing to check is X") without calling get_walkthrough \
 for it yet — only attach it if the user comes back and says the first one didn't work. \
-Only the first successful attach in a turn reaches the user regardless; a second call in \
-the same turn will be refused, not silently ignored.
+A second call for a fallback candidate will be refused, not silently ignored. (Direct \
+actions are the exception covered above: several requested actions do combine into one \
+run.)
 """
 
 # The "writer" prompt -- deliberately minimal, no mention of tools, KB,

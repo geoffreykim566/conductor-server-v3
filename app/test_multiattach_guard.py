@@ -114,9 +114,66 @@ async def test_later_iteration_duplicate() -> None:
     print("PASS: guard refused a get_walkthrough retry in a later loop iteration.")
 
 
+async def test_actions_combine() -> None:
+    # The compound-command shape (2026-09-19): two DIRECT ACTIONS in one turn
+    # ("add an eq and set the low cut") are not fallback candidates for each
+    # other -- they are both wanted, they run in attach order, and each gets its
+    # own ledger entry. Commit-to-one deliberately does not apply to these; the
+    # steps concatenate into one card. Guarded by _is_action_steps, not by
+    # problem bucket: both template rows belong to no problem at all.
+    responses = [
+        SimpleNamespace(
+            content=[
+                _tool_use("get_walkthrough",
+                          {"solution": "open plugin",
+                           "args": {"plugin": "Channel EQ", "track": "Audio 1"}}, "call_1"),
+                _tool_use("get_walkthrough",
+                          {"solution": "set plugin parameter",
+                           "args": {"plugin": "Channel EQ", "param": "Low Cut Frequency",
+                                    "value": "80", "track": "Audio 1"}}, "call_2"),
+            ],
+            usage=_usage(),
+        ),
+        SimpleNamespace(content=[_text("done")], usage=_usage()),
+    ]
+    result = await _run_with_responses(responses)
+    calls = [c for c in result.trace if c["tool"] == "get_walkthrough"]
+    assert len(calls) == 2, f"expected 2 get_walkthrough calls, got {len(calls)}"
+    for i, c in enumerate(calls):
+        assert c["output"].get("attached") is True, f"call {i + 1} should have attached: {c['output']}"
+    expected = list(calls[0]["output"]["steps"]) + list(calls[1]["output"]["steps"])
+    assert result.walkthrough_steps == expected, (
+        f"steps should be first + second in attach order, got {result.walkthrough_steps}")
+    print(f"  combined steps: {result.walkthrough_steps}")
+    print("PASS: two direct actions combined into one run, in attach order.")
+
+
+async def test_action_cap() -> None:
+    # Past the cap, a further action is refused rather than queued.
+    action = lambda n: _tool_use(  # noqa: E731
+        "get_walkthrough",
+        {"solution": "open plugin", "args": {"plugin": "Compressor", "track": f"Audio {n}"}},
+        f"call_{n}",
+    )
+    responses = [
+        SimpleNamespace(content=[action(1), action(2), action(3), action(4)], usage=_usage()),
+        SimpleNamespace(content=[_text("done")], usage=_usage()),
+    ]
+    result = await _run_with_responses(responses)
+    calls = [c for c in result.trace if c["tool"] == "get_walkthrough"]
+    attached = [c for c in calls if c["output"].get("attached")]
+    assert len(attached) == pipeline.MAX_ATTACHES_PER_TURN, (
+        f"expected {pipeline.MAX_ATTACHES_PER_TURN} attaches, got {len(attached)}")
+    assert calls[-1]["output"]["attached"] is False, f"4th action should be refused: {calls[-1]['output']}"
+    assert "limit for one turn" in calls[-1]["output"]["reason"], calls[-1]["output"]
+    print(f"PASS: attaches capped at {pipeline.MAX_ATTACHES_PER_TURN} per turn.")
+
+
 async def main() -> None:
     await test_same_response_duplicate()
     await test_later_iteration_duplicate()
+    await test_actions_combine()
+    await test_action_cap()
 
 
 if __name__ == "__main__":
