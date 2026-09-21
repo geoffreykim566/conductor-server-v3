@@ -750,7 +750,6 @@
     "expect": {
       "web_research_called": true,
       "walkthrough_destination": null,
-      "confidence_tier": "research",
       "sources_present": true
     },
     "turns": [
@@ -765,7 +764,6 @@
     "expect": {
       "web_research_called": true,
       "walkthrough_destination": null,
-      "confidence_tier": "research",
       "sources_present": true
     },
     "turns": [
@@ -807,7 +805,6 @@
     "expect": {
       "web_research_called": true,
       "walkthrough_destination": "freeze track",
-      "confidence_tier": "strong",
       "sources_present": true
     },
     "turns": [
@@ -903,10 +900,18 @@
   },
   {
     "name": "mode_pair_channel_eq_cmd",
-    "note": "2026-09-18 Track B mode-experiment addition -- command-phrasing half of a command-vs-question pair on the same target (channel eq). Baselines current behavior; today's prompt says phrasing shouldn't change the match/attach, only the mode-classification prose layered on top (see experiment_mode_classify.py) -- so both halves are graded on the same walkthrough_destination, no asserted difference.",
+    "note": "2026-09-18 Track B mode-experiment addition -- command-phrasing half of a command-vs-question pair on the same target (channel eq). Baselines current behavior; today's prompt says phrasing shouldn't change the match/attach, only the mode-classification prose layered on top (see experiment_mode_classify.py) -- so both halves are graded on the same walkthrough_destination, no asserted difference. 2026-09-21: a direct plugin command is an action (open_plugin), not the KB row -- typed action tools.",
     "expect": {
-      "match": "single",
-      "walkthrough_destination": "channel eq"
+      "action_calls": [
+        {
+          "tool": "open_plugin",
+          "args": {
+            "plugin": "channel eq"
+          }
+        }
+      ],
+      "no_refused_actions": true,
+      "no_completion_claims": true
     },
     "turns": [
       {
@@ -919,7 +924,8 @@
     "note": "2026-09-18 Track B mode-experiment addition -- question-phrasing half of the channel-eq pair, compare with mode_pair_channel_eq_cmd. Same expected walkthrough_destination -- baseline for whether phrasing alone changes what attaches.",
     "expect": {
       "match": "single",
-      "walkthrough_destination": "channel eq"
+      "walkthrough_destination": "channel eq",
+      "no_action_calls": true
     },
     "turns": [
       {
@@ -929,10 +935,18 @@
   },
   {
     "name": "mode_pair_compressor_cmd",
-    "note": "2026-09-18 Track B mode-experiment addition -- command-phrasing half of a command-vs-question pair on the same target (compressor).",
+    "note": "2026-09-18 Track B mode-experiment addition -- command-phrasing half of a command-vs-question pair on the same target (compressor). 2026-09-21: a direct plugin command is an action (open_plugin), not the KB row -- typed action tools.",
     "expect": {
-      "match": "single",
-      "walkthrough_destination": "compressor"
+      "action_calls": [
+        {
+          "tool": "open_plugin",
+          "args": {
+            "plugin": "compressor"
+          }
+        }
+      ],
+      "no_refused_actions": true,
+      "no_completion_claims": true
     },
     "turns": [
       {
@@ -945,7 +959,8 @@
     "note": "2026-09-18 Track B mode-experiment addition -- question-phrasing half of the compressor pair, compare with mode_pair_compressor_cmd.",
     "expect": {
       "match": "single",
-      "walkthrough_destination": "compressor"
+      "walkthrough_destination": "compressor",
+      "no_action_calls": true
     },
     "turns": [
       {
@@ -955,10 +970,10 @@
   },
   {
     "name": "mode_pair_buffer_size_cmd",
-    "note": "2026-09-18 Track B mode-experiment addition -- command-phrasing half of a command-vs-question pair on the same target (buffer size), a global/consequential setting rather than a per-track plugin.",
+    "note": "2026-09-18 Track B mode-experiment addition -- command-phrasing half of a command-vs-question pair on the same target (buffer size), a global/consequential setting rather than a per-track plugin. 2026-09-21: global settings are KB rows, not action tools; match assertion dropped (the model may reach the row without a first lookup).",
     "expect": {
-      "match": "single",
-      "walkthrough_destination": "buffer size"
+      "walkthrough_destination": "buffer size",
+      "no_action_calls": true
     },
     "turns": [
       {
@@ -971,7 +986,8 @@
     "note": "2026-09-18 Track B mode-experiment addition -- question-phrasing half of the buffer-size pair, compare with mode_pair_buffer_size_cmd.",
     "expect": {
       "match": "single",
-      "walkthrough_destination": "buffer size"
+      "walkthrough_destination": "buffer size",
+      "no_action_calls": true
     },
     "turns": [
       {
@@ -981,10 +997,10 @@
   },
   {
     "name": "mode_pair_sample_rate_cmd",
-    "note": "2026-09-18 Track B mode-experiment addition -- command-phrasing half of a command-vs-question pair on the same target (sample rate), another global/consequential setting.",
+    "note": "2026-09-18 Track B mode-experiment addition -- command-phrasing half of a command-vs-question pair on the same target (sample rate), another global/consequential setting. 2026-09-21: global settings are KB rows, not action tools; match assertion dropped (the model may reach the row without a first lookup).",
     "expect": {
-      "match": "single",
-      "walkthrough_destination": "sample rate"
+      "walkthrough_destination": "sample rate",
+      "no_action_calls": true
     },
     "turns": [
       {
@@ -997,7 +1013,8 @@
     "note": "2026-09-18 Track B mode-experiment addition -- question-phrasing half of the sample-rate pair, compare with mode_pair_sample_rate_cmd.",
     "expect": {
       "match": "single",
-      "walkthrough_destination": "sample rate"
+      "walkthrough_destination": "sample rate",
+      "no_action_calls": true
     },
     "turns": [
       {
@@ -1007,9 +1024,17 @@
   },
   {
     "name": "notinkb_vintage_eq",
-    "note": "2026-09-18 Track B mode-experiment addition -- this seed KB has no Vintage EQ entry at all (only 'channel eq', Logic's stock parametric EQ, whose own aliases include '8-band EQ' and 'parametric EQ plugin'). Nothing should confidently attach as if it were Vintage EQ's own path -- checks that a near-neighbour plugin (Channel EQ, or Compressor via its 'vintage compressor plugin' alias) doesn't get silently substituted in.",
+    "note": "2026-09-18 Track B mode-experiment addition -- this seed KB has no Vintage EQ entry at all (only 'channel eq', Logic's stock parametric EQ, whose own aliases include '8-band EQ' and 'parametric EQ plugin'). Nothing should confidently attach as if it were Vintage EQ's own path -- checks that a near-neighbour plugin (Channel EQ, or Compressor via its 'vintage compressor plugin' alias) doesn't get silently substituted in. 2026-09-21: open_plugin reaches any installed plugin by name, so the right outcome is now that action (still no substitute plugin named in prose).",
     "expect": {
-      "walkthrough_destination": null,
+      "action_calls": [
+        {
+          "tool": "open_plugin",
+          "args": {
+            "plugin": "vintage eq"
+          }
+        }
+      ],
+      "no_completion_claims": true,
       "response_not_contains": [
         "Channel EQ",
         "Compressor"
@@ -1023,9 +1048,17 @@
   },
   {
     "name": "notinkb_phat_fx",
-    "note": "2026-09-18 Track B mode-experiment addition -- Phat FX is not a KB destination; it only appears inside the 'saturation' solution's fix text (a suggestion for thin vocals, no path of its own). Nothing should confidently attach a path for it, and it shouldn't get swapped for a structurally similar plugin destination like Compressor or Multipressor just because the phrasing ('add X to this track') matches those scenarios' pattern.",
+    "note": "2026-09-18 Track B mode-experiment addition -- Phat FX is not a KB destination; it only appears inside the 'saturation' solution's fix text (a suggestion for thin vocals, no path of its own). Nothing should confidently attach a path for it, and it shouldn't get swapped for a structurally similar plugin destination like Compressor or Multipressor just because the phrasing ('add X to this track') matches those scenarios' pattern. 2026-09-21: open_plugin reaches any installed plugin by name, so the right outcome is now that action (still no substitute plugin named in prose).",
     "expect": {
-      "walkthrough_destination": null,
+      "action_calls": [
+        {
+          "tool": "open_plugin",
+          "args": {
+            "plugin": "phat fx"
+          }
+        }
+      ],
+      "no_completion_claims": true,
       "response_not_contains": [
         "Compressor",
         "Multipressor"
@@ -1039,9 +1072,17 @@
   },
   {
     "name": "notinkb_valhalla_vocal",
-    "note": "2026-09-18 Track B mode-experiment addition -- Valhalla is a third-party reverb plugin with no KB entry. Nothing should confidently attach a path for it, and it shouldn't get swapped for a semantically-nearby real KB reverb (Space Designer, ChromaVerb) just because both are reverbs.",
+    "note": "2026-09-18 Track B mode-experiment addition -- Valhalla is a third-party reverb plugin with no KB entry. Nothing should confidently attach a path for it, and it shouldn't get swapped for a semantically-nearby real KB reverb (Space Designer, ChromaVerb) just because both are reverbs. 2026-09-21: open_plugin reaches any installed plugin by name, so the right outcome is now that action (still no substitute plugin named in prose).",
     "expect": {
-      "walkthrough_destination": null,
+      "action_calls": [
+        {
+          "tool": "open_plugin",
+          "args": {
+            "plugin": "valhalla"
+          }
+        }
+      ],
+      "no_completion_claims": true,
       "response_not_contains": [
         "Space Designer",
         "ChromaVerb"
@@ -1052,5 +1093,253 @@
         "text": "put valhalla on the vocal"
       }
     ]
+  },
+  {
+    "name": "args_open_plugin_valhalla",
+    "note": "2026-09-18 template-args addition: not-in-KB plugin by direct command; must attach 'open plugin' with args.plugin extracted, not narrate. 2026-09-21: expects rewritten for typed action tools -- one open_plugin call.",
+    "turns": [
+      {
+        "text": "put valhalla supermassive on this track",
+        "ax_state": "### Untitled - Tracks\n- AXLayoutItem desc='Audio 1'\n  - AXTextField desc='name' value='Audio 1'\n  - AXButton desc='audio plug-in'\n  - AXButton desc='EQ' value='off'"
+      }
+    ],
+    "expect": {
+      "action_calls": [
+        {
+          "tool": "open_plugin",
+          "args": {
+            "plugin": "valhalla"
+          }
+        }
+      ],
+      "no_refused_actions": true,
+      "no_completion_claims": true
+    }
+  },
+  {
+    "name": "args_open_plugin_phat_fx",
+    "note": "2026-09-18 template-args addition: stock plugin with no KB row of its own. 2026-09-21: expects rewritten for typed action tools -- one open_plugin call, no new instance.",
+    "turns": [
+      {
+        "text": "add phat fx to the vocal",
+        "ax_state": "### Untitled - Tracks\n- AXLayoutItem desc='Audio 1'\n  - AXTextField desc='name' value='Audio 1'\n  - AXButton desc='audio plug-in'\n  - AXButton desc='EQ' value='off'"
+      }
+    ],
+    "expect": {
+      "action_calls": [
+        {
+          "tool": "open_plugin",
+          "args": {
+            "plugin": "phat fx"
+          },
+          "args_absent": [
+            "new_instance"
+          ]
+        }
+      ],
+      "no_completion_claims": true
+    }
+  },
+  {
+    "name": "args_open_plugin_channel_eq",
+    "note": "2026-09-18: 'channel eq' has its own KB row AND the template covers it -- either destination is acceptable, as long as something executable attaches. 2026-09-21: expects rewritten for typed action tools -- a direct 'open X' is an action even when X has a KB row; attaching the row instead is a FAIL.",
+    "turns": [
+      {
+        "text": "open channel eq",
+        "ax_state": "### Untitled - Tracks\n- AXLayoutItem desc='Audio 1'\n  - AXTextField desc='name' value='Audio 1'\n  - AXButton desc='audio plug-in'\n  - AXButton desc='EQ' value='off'"
+      }
+    ],
+    "expect": {
+      "action_calls": [
+        {
+          "tool": "open_plugin",
+          "args": {
+            "plugin": "channel eq"
+          }
+        }
+      ],
+      "no_completion_claims": true
+    }
+  },
+  {
+    "name": "args_set_param_low_cut",
+    "note": "2026-09-18 template-args addition: plugin already loaded (ax_state shows it) -> set plugin parameter with plugin/param/value extracted; value must be the plain number. 2026-09-21: expects rewritten for typed action tools -- one set_param call; plugin already loaded so no open_plugin needed.",
+    "turns": [
+      {
+        "text": "set the low cut on the eq to 80hz",
+        "ax_state": "### Audio 1\n- AXWindow title='Audio 1'\n  - AXStaticText value='Channel EQ'\n  - AXGroup desc='EQ'\n    - AXCheckBox desc='Low Cut' value=False\n    - AXSlider desc='Low Cut Frequency' value=0.0\n    - AXSlider desc='Peak 1 Gain' value=240.0\n### Untitled - Tracks\n- AXLayoutItem desc='Audio 1'\n  - AXGroup desc='Channel EQ'\n    - AXCheckBox desc='bypass' value=0\n    - AXButton desc='open'\n    - AXButton desc='list'\n  - AXButton desc='audio plug-in'"
+      }
+    ],
+    "expect": {
+      "action_calls": [
+        {
+          "tool": "set_param",
+          "args": {
+            "plugin": "channel eq",
+            "param": "low cut",
+            "value": "80"
+          }
+        }
+      ],
+      "no_refused_actions": true,
+      "no_completion_claims": true
+    }
+  },
+  {
+    "name": "args_set_param_threshold_not_loaded",
+    "note": "2026-09-18: compressor is NOT on the track; the correct first attach is 'open plugin' (compressor), with the threshold change in prose (one attach per turn). 2026-09-21: expects rewritten for typed action tools -- both actions, open before set, none refused, and no prose claiming either is done. This is the scenario that graded a false PASS on 09-18 ('The threshold is set to -18 dB' for a refused attach).",
+    "turns": [
+      {
+        "text": "put a compressor on this and set the threshold to -18",
+        "ax_state": "### Untitled - Tracks\n- AXLayoutItem desc='Audio 1'\n  - AXTextField desc='name' value='Audio 1'\n  - AXButton desc='audio plug-in'\n  - AXButton desc='EQ' value='off'"
+      }
+    ],
+    "expect": {
+      "action_calls": [
+        {
+          "tool": "open_plugin",
+          "args": {
+            "plugin": "compressor"
+          }
+        },
+        {
+          "tool": "set_param",
+          "args": {
+            "plugin": "compressor",
+            "param": "threshold",
+            "value": "-18"
+          }
+        }
+      ],
+      "no_refused_actions": true,
+      "no_completion_claims": true
+    }
+  },
+  {
+    "name": "args_open_plugin_already_loaded_no_new",
+    "note": "2026-09-18: Channel EQ already on the track per ax_state; 'open the eq' should attach 'open plugin' (opens existing) or the channel eq row -- and must NOT pass new=true. 2026-09-21: expects rewritten for typed action tools -- opens the loaded instance: open_plugin without new_instance.",
+    "turns": [
+      {
+        "text": "open the eq",
+        "ax_state": "### Audio 1\n- AXWindow title='Audio 1'\n  - AXStaticText value='Channel EQ'\n  - AXGroup desc='EQ'\n    - AXCheckBox desc='Low Cut' value=False\n    - AXSlider desc='Low Cut Frequency' value=0.0\n    - AXSlider desc='Peak 1 Gain' value=240.0\n### Untitled - Tracks\n- AXLayoutItem desc='Audio 1'\n  - AXGroup desc='Channel EQ'\n    - AXCheckBox desc='bypass' value=0\n    - AXButton desc='open'\n    - AXButton desc='list'\n  - AXButton desc='audio plug-in'"
+      }
+    ],
+    "expect": {
+      "action_calls": [
+        {
+          "tool": "open_plugin",
+          "args": {
+            "plugin": "channel eq"
+          },
+          "args_absent": [
+            "new_instance"
+          ]
+        }
+      ],
+      "no_completion_claims": true
+    }
+  },
+  {
+    "name": "tn_how_do_i_mute",
+    "note": "2026-09-21 true negative: asks how, not to do it.",
+    "turns": [
+      {
+        "text": "how do i mute a track",
+        "ax_state": "### Untitled - Tracks\n- AXLayoutItem desc='Audio 1'\n  - AXTextField desc='name' value='Audio 1'\n  - AXButton desc='audio plug-in'\n  - AXButton desc='EQ' value='off'"
+      }
+    ],
+    "expect": {
+      "no_action_calls": true
+    }
+  },
+  {
+    "name": "tn_what_does_ratio_do",
+    "note": "2026-09-21 true negative: concept question; nothing to attach or run.",
+    "turns": [
+      {
+        "text": "what does ratio do on a compressor"
+      }
+    ],
+    "expect": {
+      "no_action_calls": true,
+      "walkthrough_destination": null
+    }
+  },
+  {
+    "name": "tn_low_cut_purpose",
+    "note": "2026-09-21 true negative: concept question even with the plugin open.",
+    "turns": [
+      {
+        "text": "what does the low cut do on channel eq",
+        "ax_state": "### Audio 1\n- AXWindow title='Audio 1'\n  - AXStaticText value='Channel EQ'\n  - AXGroup desc='EQ'\n    - AXCheckBox desc='Low Cut' value=False\n    - AXSlider desc='Low Cut Frequency' value=0.0\n    - AXSlider desc='Peak 1 Gain' value=240.0\n### Untitled - Tracks\n- AXLayoutItem desc='Audio 1'\n  - AXGroup desc='Channel EQ'\n    - AXCheckBox desc='bypass' value=0\n    - AXButton desc='open'\n    - AXButton desc='list'\n  - AXButton desc='audio plug-in'"
+      }
+    ],
+    "expect": {
+      "no_action_calls": true
+    }
+  },
+  {
+    "name": "tn_channel_eq_bare",
+    "note": "2026-09-21 true negative: bare noun with a question mark -- a question, not a command.",
+    "turns": [
+      {
+        "text": "channel eq?"
+      }
+    ],
+    "expect": {
+      "no_action_calls": true
+    }
+  },
+  {
+    "name": "tn_show_me_how_open_eq",
+    "note": "2026-09-21 true negative: 'show me how' wants the hand walkthrough, not the action.",
+    "turns": [
+      {
+        "text": "can you show me how to open channel eq",
+        "ax_state": "### Untitled - Tracks\n- AXLayoutItem desc='Audio 1'\n  - AXTextField desc='name' value='Audio 1'\n  - AXButton desc='audio plug-in'\n  - AXButton desc='EQ' value='off'"
+      }
+    ],
+    "expect": {
+      "no_action_calls": true,
+      "walkthrough_destination": "channel eq"
+    }
+  },
+  {
+    "name": "tn_how_change_buffer_size",
+    "note": "2026-09-21 true negative: misread as a command 3/3 in the 09-18 mode experiment (indirect_buffer_size_how).",
+    "turns": [
+      {
+        "text": "how do i change the buffer size"
+      }
+    ],
+    "expect": {
+      "no_action_calls": true
+    }
+  },
+  {
+    "name": "tn_remove_all_plugins_every_track",
+    "note": "2026-09-21 true negative: bulk destructive; no first-set tool does this and nothing should be queued. Code-gated in a later phase; prompt-only until then, so a FAIL here is known.",
+    "turns": [
+      {
+        "text": "remove all plugins from every track in the session",
+        "ax_state": "### Untitled - Tracks\n- AXLayoutItem desc='Audio 1'\n  - AXTextField desc='name' value='Audio 1'\n  - AXButton desc='audio plug-in'\n  - AXButton desc='EQ' value='off'"
+      }
+    ],
+    "expect": {
+      "no_action_calls": true
+    }
+  },
+  {
+    "name": "tn_delete_track_2",
+    "note": "2026-09-21 true negative: not an action tool in the first set; must not be approximated with one.",
+    "turns": [
+      {
+        "text": "delete track 2",
+        "ax_state": "### Untitled - Tracks\n- AXLayoutItem desc='Audio 1'\n  - AXTextField desc='name' value='Audio 1'\n  - AXButton desc='audio plug-in'\n  - AXButton desc='EQ' value='off'"
+      }
+    ],
+    "expect": {
+      "no_action_calls": true
+    }
   }
 ]

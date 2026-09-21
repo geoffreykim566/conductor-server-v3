@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import sys
 import time
 from pathlib import Path
@@ -34,6 +35,74 @@ from app.pipeline import respond
 
 SCENARIOS_FILE = Path(__file__).parent.parent / "scenarios" / "battery.json"
 BETWEEN_SCENARIOS_DELAY_S = 8
+
+# Tools that queue an action the client runs (typed action tools, v041). Local
+# rather than imported from app.tools so the same grader runs against a build
+# that predates them.
+ACTION_TOOLS = {"open_plugin", "set_param", "set_track_toggle"}
+# v040 reached the same two actions as template KB rows through get_walkthrough
+# (archive/v040-2026-09-21). Mapped onto the typed-tool names so a v040
+# baseline and a v041 run grade identically.
+_LEGACY_ACTION_ROWS = {"open plugin": "open_plugin", "set plugin parameter": "set_param"}
+_LEGACY_ARG_NAMES = {"new": "new_instance"}
+
+# Prose that states an action as already done. Nothing a turn queues has run
+# when the reply is shown -- it runs when the user presses Run -- so any of
+# these on an action turn is false (09-18 args battery: "The threshold is set
+# to -18 dB" for an attach that had been refused outright, graded PASS).
+# Substring-style brittle like response_contains; a regression test, not a
+# semantic check.
+_COMPLETION_CLAIM = re.compile(
+    r"\b(?:is|are|was|were|has been|have been|now)\s+(?:now\s+)?"
+    r"(?:set|loaded|added|inserted|opened|muted|soloed|unmuted|unsoloed|renamed|removed|panned)\b"
+    r"|\bI(?:'ve| have)?\s+(?:set|loaded|added|inserted|opened|muted|soloed|renamed|removed)\b",
+    re.IGNORECASE,
+)
+
+
+def _action_calls(trace: list[dict]) -> list[dict]:
+    """Every action call in trace order, accepted or refused, as
+    {"tool", "args", "ok"}. A refused call is kept (ok=False) so a scenario
+    can require that nothing was refused and so the transcript shows it."""
+    calls = []
+    for c in trace:
+        tool, inp = c["tool"], c.get("input") or {}
+        if tool in ACTION_TOOLS:
+            args = dict(inp)
+        elif tool == "get_walkthrough" and inp.get("solution") in _LEGACY_ACTION_ROWS:
+            tool = _LEGACY_ACTION_ROWS[inp["solution"]]
+            args = {_LEGACY_ARG_NAMES.get(k, k): v for k, v in (inp.get("args") or {}).items()}
+        else:
+            continue
+        calls.append({"tool": tool, "args": args, "ok": bool((c.get("output") or {}).get("attached"))})
+    return calls
+
+
+def _norm_arg(v) -> str:
+    return str(v).lower().replace(" ", "")
+
+
+def _action_call_matches(exp: dict, got: dict) -> bool:
+    """exp: {"tool", "args": {k: substring}, "ok": bool=True, "args_absent": [k]}.
+    Args match case/space-insensitively by substring (the old walkthrough_args
+    rule), so "valhalla" matches "ValhallaSupermassive". A falsy value counts
+    as absent for args_absent (new_instance=false is the same as not passing it)."""
+    if exp["tool"] != got["tool"] or exp.get("ok", True) != got["ok"]:
+        return False
+    for k, v in (exp.get("args") or {}).items():
+        if k not in got["args"] or _norm_arg(v) not in _norm_arg(got["args"][k]):
+            return False
+    return not any(got["args"].get(k) for k in exp.get("args_absent", []))
+
+
+def _ordered_subsequence(expected: list[dict], got: list[dict]) -> bool:
+    """Each expected call matches a distinct actual call, in order. Extra actual
+    calls in between are allowed; use no_refused_actions to forbid refusals."""
+    i = 0
+    for g in got:
+        if i < len(expected) and _action_call_matches(expected[i], g):
+            i += 1
+    return i == len(expected)
 
 
 def _actual_outcome(trace: list[dict], response_text: str = "", confidence_tier: str = "", sources: list | None = None) -> dict:
@@ -75,6 +144,7 @@ def _actual_outcome(trace: list[dict], response_text: str = "", confidence_tier:
     attached_solutions = [
         c["input"]["solution"] for c in walkthrough_calls if c["output"].get("attached")
     ]
+    action_calls = _action_calls(trace)
 
     return {
         "match": match,
@@ -87,6 +157,9 @@ def _actual_outcome(trace: list[dict], response_text: str = "", confidence_tier:
         "web_research_queries": [c["input"].get("query") for c in research_calls],
         "confidence_tier": confidence_tier,
         "sources_present": bool(sources),
+        "action_calls": action_calls,
+        "first_tool": trace[0]["tool"] if trace else None,
+        "lookup_count": len(lookup_calls),
     }
 
 
@@ -118,6 +191,24 @@ def _grade(expect: dict, actual: dict) -> list[dict]:
         elif key == "walkthrough_solution":
             got = actual["attached_solutions"]
             ok = _membership_pass(expected, got)
+        elif key == "action_calls":
+            # null -> no action call at all (accepted or refused); a list ->
+            # those calls, in order, as a subsequence of what was called.
+            got = actual["action_calls"]
+            ok = got == [] if expected is None else _ordered_subsequence(expected, got)
+        elif key == "no_action_calls":
+            got = actual["action_calls"]
+            ok = (got == []) == bool(expected)
+        elif key == "no_refused_actions":
+            got = [c for c in actual["action_calls"] if not c["ok"]]
+            ok = (got == []) == bool(expected)
+        elif key == "no_completion_claims":
+            hits = [m.group(0) for m in _COMPLETION_CLAIM.finditer(actual.get("response_text") or "")]
+            got = f"found: {hits}" if hits else "none present"
+            ok = (not hits) == bool(expected)
+        elif key == "first_tool":
+            got = actual["first_tool"]
+            ok = got in expected if isinstance(expected, list) else got == expected
         elif key in ("response_contains", "response_not_contains", "response_contains_any"):
             text = (actual.get("response_text") or "").lower()
             hits = [term for term in expected if term.lower() in text]
@@ -186,6 +277,10 @@ async def run_scenario(scenario: dict) -> dict:
         print(f"  walkthrough attached: {result.walkthrough_steps is not None}"
               + (f" -> {result.walkthrough_steps}" if result.walkthrough_steps else ""))
         print(f"  confidence_tier: {result.confidence_tier!r}, sources: {len(result.sources)}")
+        acts = _action_calls(result.trace)
+        if acts:
+            print("  action calls: " + "; ".join(
+                f"{c['tool']}({c['args']}){'' if c['ok'] else ' REFUSED'}" for c in acts))
 
         if "expect" in turn:
             turn_verdicts = _grade(turn["expect"], _actual_outcome(result.trace, result.text, result.confidence_tier, result.sources))
