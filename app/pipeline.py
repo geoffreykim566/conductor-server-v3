@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from dataclasses import dataclass, field
 from types import SimpleNamespace
 from typing import Awaitable, Callable
@@ -755,12 +756,30 @@ async def _call_model(
         kwargs["tools"] = tools_param
     if tool_choice is not None:
         kwargs["tool_choice"] = tool_choice
+    t0 = time.monotonic()
     if on_chunk is None:
-        return await _client.messages.create(**kwargs)
-    async with _client.messages.stream(**kwargs) as stream:
-        async for text in stream.text_stream:
-            await on_chunk(text)
-        return await stream.get_final_message()
+        resp = await _client.messages.create(**kwargs)
+    else:
+        async with _client.messages.stream(**kwargs) as stream:
+            async for text in stream.text_stream:
+                await on_chunk(text)
+            resp = await stream.get_final_message()
+    # Per-call timing + cache accounting, so the within-turn cache breakpoints
+    # (see respond()'s _with_screenshots / live-state block) can be verified
+    # from prod logs rather than a one-off replay. WARNING level to match the
+    # other timing markers here (web_research_timing); same getattr guards as
+    # _usage_dict since the mocked unit tests return bare SimpleNamespace usage.
+    u = getattr(resp, "usage", None)
+    log.warning(
+        "[model_call] %s %.1fs in=%s cache_read=%s cache_write=%s out=%s forced=%s",
+        model, time.monotonic() - t0,
+        getattr(u, "input_tokens", "?"),
+        getattr(u, "cache_read_input_tokens", 0) or 0,
+        getattr(u, "cache_creation_input_tokens", 0) or 0,
+        getattr(u, "output_tokens", "?"),
+        tool_choice is not None,
+    )
+    return resp
 
 
 def _media_type_for_b64(b64: str) -> str:
@@ -913,11 +932,37 @@ async def respond(
             ] + [{"type": "text", "text": msgs[screenshot_idx]["content"]}],
         }
 
+    # Index of this turn's user message whether or not screenshots came with
+    # it -- the within-turn cache breakpoint below goes on it either way.
+    turn_idx: int | None = _last_user_text_index(msgs) if msgs else None
+
     def _with_screenshots(base: list[dict]) -> list[dict]:
-        if screenshot_idx is None:
+        """Per-call copy of `base` with (a) the screenshot version of this
+        turn's user message swapped in, and (b) a cache_control breakpoint on
+        that message's last block. Every decider iteration of a turn resends
+        the same prefix (system, tools, live state, prior history, this turn's
+        images + question), so marking the user message lets iterations two
+        onward read all of that from cache instead of re-processing it --
+        measured 2026-09-18: ~9k uncached input tokens per call dropped to
+        under 2.5k, roughly 1-1.5s per call, on a two-screenshot turn.
+        Breakpoint count is three (static prompt, live-state block, this
+        message), under the API's limit of four. Content is byte-identical
+        either way; caching changes what's re-computed and billed, never
+        what the model reads.
+
+        The marker lives ONLY on this per-call copy. `msgs` is what
+        Result.messages hands back to the client as next turn's history, and
+        api.py's _validate_history rejects any extra key on a text block, so
+        a cache_control that leaked into msgs would 422 the next request."""
+        if turn_idx is None:
             return base
         out = list(base)
-        out[screenshot_idx] = screenshot_msg
+        if screenshot_idx is not None:
+            content = list(screenshot_msg["content"])
+        else:
+            content = [{"type": "text", "text": base[turn_idx]["content"]}]
+        content[-1] = {**content[-1], "cache_control": {"type": "ephemeral"}}
+        out[turn_idx] = {"role": "user", "content": content}
         return out
 
 
@@ -998,6 +1043,12 @@ async def respond(
                 "Logic's internal accessibility names, not the on-screen ones.\n\n"
                 + live_state
             ),
+            # Its own breakpoint: constant across this turn's iterations (only
+            # changes between turns), so iterations two onward read the AX dump
+            # from cache rather than re-parsing up to ~3.5k tokens of it each
+            # call. Second of the three breakpoints per call (see
+            # _with_screenshots for the third and the measured effect).
+            "cache_control": {"type": "ephemeral"},
         })
 
     # Tool-skip gap fix: force lookup_concept on this turn's first iteration
