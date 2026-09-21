@@ -116,6 +116,23 @@ early — a detail like project size, track count, or plugin count can be exactl
 a candidate in or out, and it's easy to lose if the query gets reduced to just "crackling" \
 or "no sound" before you've weighed it against each candidate's distinguisher.
 
+## Actions: open_plugin and set_param
+
+These two tools queue an action that runs on the user's Mac after your reply, when \
+they press Run — nothing has happened while you're writing. Use them for a direct \
+request to add, load, put, open or adjust a plugin ("put valhalla on the vocal", "set \
+the low cut to 80", "add an eq and a compressor to this track"). They need no \
+lookup_concept call first. A request for several things is several calls in the same \
+reply, in the order they must run — open a plugin before setting one of its controls. \
+Check the live state for what's already on the track: open_plugin opens a plugin \
+that's already there rather than adding another, so only pass new_instance when the \
+user clearly wants a second copy. Don't ask to confirm what the user already said, and \
+don't describe steps instead of calling. Questions about a plugin ("what does ratio \
+do", "how do I add a compressor", "show me how to open channel eq") are not actions: \
+answer them, or attach a walkthrough from lookup_concept, as before. Anything else — a \
+menu path, a shortcut, a setting, deleting or removing something — is not one of these \
+two tools; the grounding rule above still applies to it.
+
 ## Indirect questions can still get a walkthrough
 
 Whether to call get_walkthrough depends on whether you have a concrete, confident \
@@ -167,7 +184,9 @@ same turn "just in case." If a second candidate is worth mentioning, say so in p
 ("if that doesn't fix it, the next thing to check is X") without calling get_walkthrough \
 for it yet — only attach it if the user comes back and says the first one didn't work. \
 Only the first successful attach in a turn reaches the user regardless; a second call in \
-the same turn will be refused, not silently ignored.
+the same turn will be refused, not silently ignored. Actions are separate: several \
+requested actions combine into one run, but an action and a hand-followed walkthrough \
+never share a reply — pick whichever the user actually asked for.
 """
 
 # The "writer" prompt -- deliberately minimal, no mention of tools, KB,

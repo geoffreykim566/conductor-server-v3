@@ -15,6 +15,7 @@ one join, not a re-search).
 """
 import asyncio
 import json
+import re
 
 from app import db
 from app.embed import embed
@@ -184,17 +185,95 @@ WEB_RESEARCH_SCHEMA = {
         "required": ["query"],
         "additionalProperties": False,
     },
-    # Cache breakpoint for the whole tools array -- all four schemas are
-    # static across every call in a run, but get resent unchanged on every
-    # loop iteration and every turn otherwise (measured 2026-08-05: 66 calls,
+}
+
+# Typed action tools (2026-09-21). An action the client runs on the user's Mac
+# when they press Run -- not a KB row reached by embedding distance. On v040
+# these were template rows ("open plugin" / "set plugin parameter") behind
+# lookup_concept + get_walkthrough(args): the model had to FIND them before it
+# could call them, their two-word names collided with plugin vocabulary
+# ("plugin manager", "multipressor"), and it reached them by name from the
+# prompt anyway (agentic-design-review-2026-09-20.md). As tools, the model
+# picks them directly, no lookup first; the wire step shapes are unchanged, so
+# the client executor is untouched.
+#
+# `value` is a string, parsed server-side (_parse_param_value): an anyOf
+# number-or-"on"/"off" union was probed under strict mode on 2026-09-21 and
+# the model still returned "-18" as a string, i.e. the union wasn't held.
+OPEN_PLUGIN_SCHEMA = {
+    "name": "open_plugin",
+    "description": (
+        "Queue an action that loads an audio-effect plugin onto a track by name, or opens its "
+        "window if that plugin is already on the track. It runs on the user's Mac after your "
+        "reply, when they press Run -- it has NOT happened when you write your reply. Works for "
+        "any installed plugin, Apple or third-party, whether or not the KB mentions it. Use it "
+        "for a direct request to add / put / load / open a plugin; no lookup_concept call is "
+        "needed first. Several action calls in one reply run in call order as one card."
+    ),
+    "strict": True,
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "plugin": {
+                "type": "string",
+                "description": "Plugin name as Logic lists it (Channel EQ, Compressor, Space Designer, Phat FX, ValhallaSupermassive).",
+            },
+            "track": {
+                "type": "string",
+                "description": "Track name from the live state, only when the user names or clearly means one; omit for the selected track.",
+            },
+            "new_instance": {
+                "type": "boolean",
+                "description": "true only when the user clearly wants a second copy of a plugin that's already on the track.",
+            },
+        },
+        "required": ["plugin"],
+        "additionalProperties": False,
+    },
+}
+
+SET_PARAM_SCHEMA = {
+    "name": "set_param",
+    "description": (
+        "Queue an action that sets one control of a plugin on a track to an exact value. It runs "
+        "on the user's Mac after your reply, when they press Run -- it has NOT happened when you "
+        "write your reply. The plugin must be on the track: if the live state doesn't show it, "
+        "call open_plugin for it first in the same reply."
+    ),
+    "strict": True,
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "plugin": {"type": "string", "description": "Plugin name, as for open_plugin."},
+            "param": {
+                "type": "string",
+                "description": "The control's label as the plugin shows it (Low Cut Frequency, Threshold, Ratio, Mix).",
+            },
+            "value": {
+                "type": "string",
+                "description": "A plain number in the control's displayed unit (\"80\", \"-18\", \"4\"), or \"on\" / \"off\" for a switch.",
+            },
+            "track": {
+                "type": "string",
+                "description": "Track name from the live state, only when the user names or clearly means one; omit for the selected track.",
+            },
+        },
+        "required": ["plugin", "param", "value"],
+        "additionalProperties": False,
+    },
+    # Cache breakpoint for the whole tools array -- every schema is static
+    # across every call in a run, but gets resent unchanged on every loop
+    # iteration and every turn otherwise (measured 2026-08-05: 66 calls,
     # 207,869 uncached input tokens across a 24-scenario battery). Must sit
     # on the LAST schema in the array for the cache breakpoint to cover all
-    # of them -- moved here from ask_clarifying_question when this schema was
+    # of them -- moved here from web_research when the action tools were
     # added after it.
     "cache_control": {"type": "ephemeral"},
 }
 
-TOOLS = [LOOKUP_CONCEPT_SCHEMA, GET_WALKTHROUGH_SCHEMA, ASK_CLARIFYING_QUESTION_SCHEMA, WEB_RESEARCH_SCHEMA]
+TOOLS = [LOOKUP_CONCEPT_SCHEMA, GET_WALKTHROUGH_SCHEMA, ASK_CLARIFYING_QUESTION_SCHEMA, WEB_RESEARCH_SCHEMA,
+         OPEN_PLUGIN_SCHEMA, SET_PARAM_SCHEMA]
+ACTION_TOOLS = {"open_plugin", "set_param"}
 
 
 def _content_summary(name: str, content: dict) -> str:
@@ -391,3 +470,76 @@ async def get_walkthrough(solution: str, ax_fixture: dict | None = None) -> dict
     if not steps:
         return {"attached": False, "reason": "path present but produced no executable steps"}
     return {"attached": True, "destination": resolved_name, "steps": steps}
+
+
+_MAX_NAME = 64
+_ON = ("on", "true", "enable", "enabled", "yes")
+_OFF = ("off", "false", "disable", "disabled", "no")
+_NUMBER = re.compile(r"^\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*(?:[a-z%]+)?\s*$", re.IGNORECASE)
+
+
+def _clean_name(value, what: str) -> tuple[str | None, str | None]:
+    name = str(value or "").strip()
+    if not name:
+        return None, f"{what} is empty"
+    if len(name) > _MAX_NAME:
+        return None, f"{what} is too long to be a {what} name"
+    return name, None
+
+
+def _parse_param_value(value) -> str | None:
+    """'on'/'off' for a switch, else the plain number as a string ("80hz" ->
+    "80", "-18 dB" -> "-18", "4:1" is not parsed). None if it's neither --
+    the client's writers take float(value) or an on/off word, nothing else."""
+    if isinstance(value, bool):
+        return "on" if value else "off"
+    if isinstance(value, (int, float)):
+        return f"{value:g}"
+    text = str(value or "").strip().lower()
+    if text in _ON:
+        return "on"
+    if text in _OFF:
+        return "off"
+    m = _NUMBER.match(text)
+    return m.group(1) if m else None
+
+
+def queue_open_plugin(inp: dict) -> dict:
+    """Executor for open_plugin: validate, then emit the client's wire step.
+    Pure -- the action runs client-side when the user presses Run."""
+    plugin, err = _clean_name(inp.get("plugin"), "plugin")
+    if err:
+        return {"attached": False, "reason": err}
+    step = {"ax_open_plugin": plugin}
+    if inp.get("new_instance") is True:
+        step["new"] = True
+    if inp.get("track"):
+        track, err = _clean_name(inp["track"], "track")
+        if err:
+            return {"attached": False, "reason": err}
+        step["track"] = track
+    return {"attached": True, "action": "open_plugin", "steps": [step]}
+
+
+def queue_set_param(inp: dict) -> dict:
+    """Executor for set_param: validate, then emit the client's wire step."""
+    plugin, err = _clean_name(inp.get("plugin"), "plugin")
+    if err:
+        return {"attached": False, "reason": err}
+    param, err = _clean_name(inp.get("param"), "param")
+    if err:
+        return {"attached": False, "reason": err}
+    value = _parse_param_value(inp.get("value"))
+    if value is None:
+        return {
+            "attached": False,
+            "reason": (f"value {inp.get('value')!r} isn't a plain number or on/off -- pass the "
+                       "number in the control's displayed unit (e.g. \"80\", \"-18\") or \"on\"/\"off\""),
+        }
+    spec = {"plugin": plugin, "param": param, "value": value}
+    if inp.get("track"):
+        track, err = _clean_name(inp["track"], "track")
+        if err:
+            return {"attached": False, "reason": err}
+        spec["track"] = track
+    return {"attached": True, "action": "set_param", "steps": [{"ax_set_param": spec}]}

@@ -55,6 +55,62 @@ _RESEARCH_DECLINED = {
 # This intervenes explicitly before that happens, distinct from the overall
 # MAX_ITERATIONS safety net below (which covers any tool, not just this one).
 LOOKUP_ATTEMPT_LIMIT = 4
+# What LOOKUP_ATTEMPT_LIMIT counts (2026-09-21): only UNPRODUCTIVE lookups --
+# no match, a weak match, or a bucket this turn already returned. The cap
+# exists for the retry loop above (a missing topic returning a different wrong
+# match on every rephrasing); a turn that looks up three different real
+# buckets is doing its job, not looping. True restores counting every lookup
+# (kept for the latency harness's before/after).
+COUNT_ALL_LOOKUPS = False
+
+# First decider call on a turn that needs grounding (_needs_first_lookup):
+# "any" = must call SOME tool, so a real question still can't be answered from
+# memory with zero tool calls (the 2026-08-09 tool-skip gap), but a direct
+# command can go straight to an action tool instead of paying a KB lookup for
+# something that isn't in the KB. True restores forcing lookup_concept itself
+# (the pre-2026-09-21 behaviour; kept for the harness's before/after).
+FORCE_FIRST_LOOKUP = False
+
+# Typed action tools (tools.ACTION_TOOLS): several in one turn combine into one
+# card and one run, in call order -- each was asked for, and each gets its own
+# revert-ledger entry. Commit-to-one still holds for get_walkthrough, whose
+# rule exists because two diagnostic candidates in one turn meant the last one
+# silently won (2026-08-05). The cap bounds a confused turn, not a real one:
+# "three new tracks + low cut on all three" is six.
+MAX_ACTIONS_PER_TURN = 6
+
+_ACTION_CAP_REFUSAL = (
+    f"this turn already has {MAX_ACTIONS_PER_TURN} actions queued, the limit for one "
+    "card. Tell the user what's queued and that you'll do the rest when they ask next."
+)
+_DUPLICATE_ACTION_REFUSAL = "this exact action is already queued this turn -- it runs once."
+_ACTION_VS_WALKTHROUGH_REFUSAL = (
+    "actions (open_plugin / set_param) and a hand-followed walkthrough don't share one "
+    "card, and the other kind is already attached this turn. Cover this one in prose, "
+    "or ask the user which they want first."
+)
+
+
+def _lookup_is_unproductive(output: dict, buckets_seen: set) -> bool:
+    """See COUNT_ALL_LOOKUPS. A capped/errored call isn't a lookup result at all."""
+    if "error" in output:
+        return False
+    if output.get("match") == "none":
+        return True
+    if str(output.get("match_confidence", "")).startswith("weak"):
+        return True
+    return output.get("problem") in buckets_seen
+
+
+def _action_key(name: str, inp: dict) -> str:
+    return json.dumps([name, inp], sort_keys=True, default=str)
+
+
+def _card_steps(walkthrough_steps: list | None, action_steps: list) -> list | None:
+    """What the client gets as walkthrough_steps: the one hand-followed
+    walkthrough, or the queued actions -- never both (see
+    _ACTION_VS_WALKTHROUGH_REFUSAL)."""
+    return walkthrough_steps if walkthrough_steps is not None else (list(action_steps) or None)
 
 _client = AsyncAnthropic(api_key=CENTRAL_ANTHROPIC_KEY)
 
@@ -102,7 +158,14 @@ async def _ack_clarifying_question() -> dict:
     return {"acknowledged": True}
 
 
+async def _now(result: dict) -> dict:
+    """Wraps a synchronous executor result for the awaited _EXECUTORS call."""
+    return result
+
+
 _EXECUTORS = {
+    "open_plugin": lambda inp, fixture: _now(tools.queue_open_plugin(inp)),
+    "set_param": lambda inp, fixture: _now(tools.queue_set_param(inp)),
     "lookup_concept": lambda inp, fixture: tools.lookup_concept(inp["problem"]),
     "get_walkthrough": lambda inp, fixture: tools.get_walkthrough(inp["solution"], ax_fixture=fixture),
     "ask_clarifying_question": lambda inp, fixture: _ack_clarifying_question(),
@@ -610,6 +673,7 @@ async def _finalize_answer(
     is_clarifying_question: bool = False,
     live_state: str | None = None,
     had_screenshots: bool = False,
+    has_actions: bool = False,
 ) -> tuple[str, str]:
     """Called once this turn's decider text is fully known (either the
     no-more-tool-calls return or the MAX_ITERATIONS safety net). Tier decision
@@ -629,6 +693,20 @@ async def _finalize_answer(
     Returns (response_text, confidence_tier)."""
     tier = _confidence_tier(trace, walkthrough_steps, attached_solution, is_clarifying_question)
     facts = text
+    # Queued actions run on the CLIENT, after this reply, when the user presses
+    # Run. Found live 2026-09-18: the writer said "Loaded ValhallaSupermassive
+    # onto Audio 2" before anything ran, and the next turn treated its own
+    # claim as fact. Code-guaranteed framing, not a prompt hope. (Phase 2 of
+    # the typed-tools plan replaces this with a sentence built in code.)
+    if has_actions:
+        facts = (
+            "Actions are attached to this reply as a card the user runs with one press; "
+            "NONE of them has happened yet. Describe each in one short sentence as about "
+            "to happen (\"This adds X to the selected track\" / \"This sets Y to Z\"), never "
+            "as done, and don't list manual steps for them -- the card does it. Only "
+            "describe actions actually queued; if one was refused, say it wasn't queued.\n\n"
+            + text
+        )
     # Only "moderate" gets the hedge facts injected below -- "research" is
     # trusted the same as "strong" (see _confidence_tier's 2026-09-04 note) and
     # deliberately falls straight through to facts = text, unhedged.
@@ -831,7 +909,10 @@ def _restore_turn_state(tail: list[dict]) -> dict:
     text_parts: list[str] = []
     walkthrough_steps = None
     attached_solution = None
-    lookup_attempts = 0
+    lookups_counted = 0
+    buckets_seen: set = set()
+    action_steps: list = []
+    action_keys: set = set()
     calls: dict[str, dict] = {}
     for m in tail:
         content = m.get("content")
@@ -856,13 +937,19 @@ def _restore_turn_state(tail: list[dict]) -> dict:
                 entry = {"tool": call["tool"], "input": call["input"], "output": output}
                 trace.append(entry)
                 if call["tool"] == "lookup_concept":
-                    lookup_attempts += 1
+                    if COUNT_ALL_LOOKUPS or _lookup_is_unproductive(output, buckets_seen):
+                        lookups_counted += 1
+                    buckets_seen.add(output.get("problem"))
+                if call["tool"] in tools.ACTION_TOOLS and output.get("attached"):
+                    action_steps.extend(output.get("steps") or [])
+                    action_keys.add(_action_key(call["tool"], call["input"]))
                 if call["tool"] == "get_walkthrough" and output.get("attached") and walkthrough_steps is None:
                     walkthrough_steps = output.get("steps")
                     attached_solution = call["input"].get("solution")
     return {
         "trace": trace, "text_parts": text_parts, "walkthrough_steps": walkthrough_steps,
-        "attached_solution": attached_solution, "lookup_attempts": lookup_attempts,
+        "attached_solution": attached_solution, "lookups_counted": lookups_counted,
+        "buckets_seen": buckets_seen, "action_steps": action_steps, "action_keys": action_keys,
     }
 
 
@@ -969,7 +1056,10 @@ async def respond(
     usage: list[dict] = []
     walkthrough_steps: list | None = None
     attached_solution: str | None = None
-    lookup_attempts = 0
+    lookups_counted = 0          # toward LOOKUP_ATTEMPT_LIMIT; see COUNT_ALL_LOOKUPS
+    buckets_seen: set = set()
+    action_steps: list = []      # queued actions, in call order (one card)
+    action_keys: set = set()
     # Text the model writes alongside a tool call (not just the final,
     # tool-free iteration) is a real part of the answer, not scratch
     # thinking -- found live 2026-08-20 (hedge_mixed_grounded_ungrounded):
@@ -987,7 +1077,10 @@ async def respond(
         text_parts.extend(restored["text_parts"])
         walkthrough_steps = restored["walkthrough_steps"]
         attached_solution = restored["attached_solution"]
-        lookup_attempts = restored["lookup_attempts"]
+        lookups_counted = restored["lookups_counted"]
+        buckets_seen = restored["buckets_seen"]
+        action_steps = restored["action_steps"]
+        action_keys = restored["action_keys"]
 
     # Pushed, not pulled: live state (when known for this turn) is handed to the
     # model automatically rather than waiting on it to decide to call a tool for
@@ -1078,7 +1171,10 @@ async def respond(
                 await on_status("Thinking…")
             tool_choice = None
             if i == 0 and force_first_lookup:
-                tool_choice = {"type": "tool", "name": "lookup_concept"}
+                tool_choice = (
+                    {"type": "tool", "name": "lookup_concept"} if FORCE_FIRST_LOOKUP
+                    else {"type": "any"}
+                )
             resp = await _call_model(system, tools.TOOLS, _with_screenshots(msgs), None, tool_choice)
             usage.append(_usage_dict(resp.usage))
             tool_uses = [b for b in resp.content if b.type == "tool_use"]
@@ -1104,11 +1200,13 @@ async def respond(
                         },
                     })
             text, tier = await _finalize_answer(
-                trace, walkthrough_steps, text, messages, on_chunk, usage, attached_solution,
-                live_state=live_state, had_screenshots=screenshot_idx is not None,
+                trace, _card_steps(walkthrough_steps, action_steps), text, messages, on_chunk, usage,
+                attached_solution, live_state=live_state, had_screenshots=screenshot_idx is not None,
+                has_actions=bool(action_steps),
             )
-            return Result(text=text, walkthrough_steps=walkthrough_steps, trace=trace, messages=msgs,
-                           usage=usage, confidence_tier=tier, sources=_collect_sources(trace))
+            return Result(text=text, walkthrough_steps=_card_steps(walkthrough_steps, action_steps),
+                          trace=trace, messages=msgs, usage=usage, confidence_tier=tier,
+                          sources=_collect_sources(trace))
 
         if resp is not None:
             msgs.append({"role": "assistant", "content": _serialize_content(resp.content)})
@@ -1131,17 +1229,23 @@ async def respond(
                 await on_status(status_text)
         tool_results = []
         for tu in tool_uses:
-            if tu.name == "lookup_concept":
-                lookup_attempts += 1
-            if tu.name == "lookup_concept" and lookup_attempts > LOOKUP_ATTEMPT_LIMIT:
+            if tu.name == "lookup_concept" and lookups_counted >= LOOKUP_ATTEMPT_LIMIT:
                 result = {
                     "error": (
-                        f"Too many lookup attempts ({lookup_attempts}) without a clear answer. "
+                        "Too many lookups without a clear answer. "
                         "Stop searching now — answer from general Logic Pro knowledge if you're "
                         "genuinely confident, or tell the user you don't have a verified answer "
                         "for this. Do not call lookup_concept again this turn."
                     )
                 }
+            elif tu.name in tools.ACTION_TOOLS and walkthrough_steps is not None:
+                result = {"attached": False, "reason": _ACTION_VS_WALKTHROUGH_REFUSAL}
+            elif tu.name in tools.ACTION_TOOLS and _action_key(tu.name, tu.input) in action_keys:
+                result = {"attached": False, "reason": _DUPLICATE_ACTION_REFUSAL}
+            elif tu.name in tools.ACTION_TOOLS and len(action_keys) >= MAX_ACTIONS_PER_TURN:
+                result = {"attached": False, "reason": _ACTION_CAP_REFUSAL}
+            elif tu.name == "get_walkthrough" and action_steps:
+                result = {"attached": False, "reason": _ACTION_VS_WALKTHROUGH_REFUSAL}
             elif tu.name == "get_walkthrough" and walkthrough_steps is not None:
                 # Commit-to-one: only the first successful attach in a turn
                 # reaches the user (found live 2026-08-05 -- multiple attaches
@@ -1176,6 +1280,13 @@ async def respond(
             if call_usage:
                 usage.append(call_usage)
             trace.append({"tool": tu.name, "input": tu.input, "output": result})
+            if tu.name == "lookup_concept" and "error" not in result:
+                if COUNT_ALL_LOOKUPS or _lookup_is_unproductive(result, buckets_seen):
+                    lookups_counted += 1
+                buckets_seen.add(result.get("problem"))
+            if tu.name in tools.ACTION_TOOLS and result.get("attached"):
+                action_steps.extend(result.get("steps") or [])
+                action_keys.add(_action_key(tu.name, tu.input))
             if tu.name == "get_walkthrough" and result.get("attached"):
                 walkthrough_steps = result.get("steps")
                 attached_solution = tu.input.get("solution")
@@ -1195,12 +1306,13 @@ async def respond(
         if any(tu.name == "ask_clarifying_question" for tu in tool_uses):
             text = "\n\n".join(text_parts)
             text, tier = await _finalize_answer(
-                trace, walkthrough_steps, text, messages, on_chunk, usage,
+                trace, _card_steps(walkthrough_steps, action_steps), text, messages, on_chunk, usage,
                 attached_solution, is_clarifying_question=True, live_state=live_state,
-                had_screenshots=screenshot_idx is not None,
+                had_screenshots=screenshot_idx is not None, has_actions=bool(action_steps),
             )
-            return Result(text=text, walkthrough_steps=walkthrough_steps, trace=trace, messages=msgs,
-                           usage=usage, confidence_tier=tier, sources=_collect_sources(trace))
+            return Result(text=text, walkthrough_steps=_card_steps(walkthrough_steps, action_steps),
+                          trace=trace, messages=msgs, usage=usage, confidence_tier=tier,
+                          sources=_collect_sources(trace))
 
     # Safety net: never return a truly empty response, regardless of why the
     # loop didn't converge on its own. Force one final tools-off call so the
@@ -1229,8 +1341,10 @@ async def respond(
     # turn with zero tool calls. A backfill check here was dead code (found via
     # Fable review, 2026-08-06) and has been removed rather than left in place.
     text, tier = await _finalize_answer(
-        trace, walkthrough_steps, text, messages, on_chunk, usage, attached_solution,
-        live_state=live_state, had_screenshots=screenshot_idx is not None,
+        trace, _card_steps(walkthrough_steps, action_steps), text, messages, on_chunk, usage,
+        attached_solution, live_state=live_state, had_screenshots=screenshot_idx is not None,
+        has_actions=bool(action_steps),
     )
-    return Result(text=text, walkthrough_steps=walkthrough_steps, trace=trace, messages=msgs,
-                   usage=usage, confidence_tier=tier, sources=_collect_sources(trace))
+    return Result(text=text, walkthrough_steps=_card_steps(walkthrough_steps, action_steps),
+                  trace=trace, messages=msgs, usage=usage, confidence_tier=tier,
+                  sources=_collect_sources(trace))
