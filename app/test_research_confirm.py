@@ -16,8 +16,9 @@ independently of whether the live model would call web_research at all.
   5. api.py: resume with no pending web_research in history -> None from
      _pending_research_query (the endpoint 422s on that).
 
-No DB needed: every model response is scripted, so lookup_concept never
-actually executes. Run inside the app container:
+No DB needed: every model response is scripted, and the server-side
+pre-lookup (pipeline.PRELOOKUP_FIRST_CALL, 2026-09-19) is stubbed so
+lookup_concept never actually executes. Run inside the app container:
     docker compose exec app python -m app.test_research_confirm
 """
 from __future__ import annotations
@@ -29,6 +30,11 @@ from unittest.mock import AsyncMock, patch
 
 from app import pipeline
 from app.api import _pending_research_query
+
+
+async def _fake_lookup(inp: dict, fixture) -> dict:
+    """Stands in for tools.lookup_concept so the pre-lookup needs no DB/Voyage."""
+    return {"match": "none", "match_confidence": "weak", "problem": None, "solutions": []}
 
 
 def _usage() -> SimpleNamespace:
@@ -57,7 +63,8 @@ async def _run(messages: list[dict], responses: list, **kwargs):
 
     research_mock = AsyncMock(return_value={"findings": "Found it.", "sources": [{"url": "https://x", "title": "x"}]})
     with patch.object(pipeline._client.messages, "create", new=AsyncMock(side_effect=fake_create)), \
-         patch.object(pipeline.research, "web_research", new=research_mock):
+         patch.object(pipeline.research, "web_research", new=research_mock), \
+         patch.dict(pipeline._EXECUTORS, {"lookup_concept": _fake_lookup}):
         result = await pipeline.respond(messages, **kwargs)
     return result, research_mock
 
@@ -79,8 +86,13 @@ async def test_parks_on_research_when_confirm_requested() -> None:
     assert last["role"] == "assistant" and any(
         b.get("type") == "tool_use" and b.get("name") == "web_research" for b in last["content"]
     ), f"parked transcript must end in the pending tool_use: {last}"
-    # Nothing has been answered, so no tool_result for it yet.
-    assert not any(m["role"] == "user" and isinstance(m["content"], list) for m in result.messages[1:])
+    # Nothing has been answered, so no tool_result for it yet. (The server-side
+    # pre-lookup's own tool_result legitimately precedes it -- check by id.)
+    pending_ids = {b["id"] for b in last["content"] if b.get("type") == "tool_use"}
+    assert not any(
+        b.get("type") == "tool_result" and b.get("tool_use_id") in pending_ids
+        for m in result.messages if isinstance(m.get("content"), list) for b in m["content"]
+    )
     print("PASS: research_confirm parks the turn at the web_research call, nothing executed.")
     return result.messages
 
