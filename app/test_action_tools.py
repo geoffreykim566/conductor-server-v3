@@ -375,31 +375,26 @@ def _lookup_outputs(result) -> list[dict]:
     return [c["output"] for c in result.trace if c["tool"] == "lookup_concept"]
 
 
-async def test_cap_counts_only_unproductive() -> None:
+async def test_lookup_cap() -> None:
     limit = pipeline.LOOKUP_ATTEMPT_LIMIT
-    # limit + 1 unproductive (no match) lookups -> the last one is capped
-    result, _ = await _run(_lookups(limit + 1) + [_resp(_text("done"))], lookups=[{"match": "none"}])
-    outs = _lookup_outputs(result)
-    assert "error" in outs[-1] and all("error" not in o for o in outs[:-1]), outs
-
-    # limit + 1 lookups each returning a DIFFERENT real bucket -> none capped
+    # Default (COUNT_ALL_LOOKUPS): every lookup counts, whatever it returned --
+    # restored 2026-09-22 after distinct moderate wrong buckets ("productive"
+    # under the other rule) let an off-KB turn run past the cap into research.
     distinct = [{"match": "problem", "problem": f"bucket {i}", "match_confidence": "strong"} for i in range(limit + 1)]
     with patch.object(pipeline, "MAX_ITERATIONS", limit + 3):
         result, _ = await _run(_lookups(limit + 1) + [_resp(_text("done"))], lookups=distinct)
-    assert all("error" not in o for o in _lookup_outputs(result)), _lookup_outputs(result)
-
-    # the same bucket over and over is unproductive after the first
-    same = [{"match": "problem", "problem": "bucket", "match_confidence": "strong"}]
-    with patch.object(pipeline, "MAX_ITERATIONS", limit + 3):
-        result, _ = await _run(_lookups(limit + 2) + [_resp(_text("done"))], lookups=same)
     outs = _lookup_outputs(result)
-    assert "error" in outs[-1] and all("error" not in o for o in outs[:limit + 1]), outs
+    assert "error" in outs[-1] and all("error" not in o for o in outs[:limit]), outs
 
-    # COUNT_ALL_LOOKUPS restores the old rule: distinct buckets still count
-    with patch.object(pipeline, "COUNT_ALL_LOOKUPS", True), patch.object(pipeline, "MAX_ITERATIONS", limit + 3):
+    # The unproductive-only variant (flag off): distinct real buckets don't count...
+    with patch.object(pipeline, "COUNT_ALL_LOOKUPS", False), patch.object(pipeline, "MAX_ITERATIONS", limit + 3):
         result, _ = await _run(_lookups(limit + 1) + [_resp(_text("done"))], lookups=distinct)
-    assert "error" in _lookup_outputs(result)[-1]
-    print("PASS: cap counts no-match / weak / repeated-bucket lookups only; COUNT_ALL_LOOKUPS restores the old rule.")
+        assert all("error" not in o for o in _lookup_outputs(result)), _lookup_outputs(result)
+        # ...but no-match ones do.
+        result, _ = await _run(_lookups(limit + 1) + [_resp(_text("done"))], lookups=[{"match": "none"}])
+        outs = _lookup_outputs(result)
+        assert "error" in outs[-1] and all("error" not in o for o in outs[:-1]), outs
+    print("PASS: the cap counts every lookup; COUNT_ALL_LOOKUPS=False counts only unproductive ones.")
 
 
 async def test_resume_restores_actions() -> None:
@@ -460,7 +455,7 @@ async def main() -> None:
     await test_auto_attach_respects_commit_to_one()
     await test_auto_run()
     await test_first_call_is_any()
-    await test_cap_counts_only_unproductive()
+    await test_lookup_cap()
     await test_resume_restores_actions()
 
 

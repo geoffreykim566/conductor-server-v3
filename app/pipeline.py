@@ -56,13 +56,14 @@ _RESEARCH_DECLINED = {
 # This intervenes explicitly before that happens, distinct from the overall
 # MAX_ITERATIONS safety net below (which covers any tool, not just this one).
 LOOKUP_ATTEMPT_LIMIT = 4
-# What LOOKUP_ATTEMPT_LIMIT counts (2026-09-21): only UNPRODUCTIVE lookups --
-# no match, a weak match, or a bucket this turn already returned. The cap
-# exists for the retry loop above (a missing topic returning a different wrong
-# match on every rephrasing); a turn that looks up three different real
-# buckets is doing its job, not looping. True restores counting every lookup
-# (kept for the latency harness's before/after).
-COUNT_ALL_LOOKUPS = False
+# What LOOKUP_ATTEMPT_LIMIT counts. Every lookup, as it always did: the
+# 2026-09-21 "only unproductive ones" variant was measured on 09-22 and
+# reverted -- an off-KB turn returned a DIFFERENT wrong bucket at moderate on
+# every rephrasing, each one "productive" by that rule, so the cap never bound
+# and the turn escalated to web_research (research_no_fire_* 3/3). The reason
+# for the change is gone anyway: compound commands call action tools now and
+# don't spend lookups. False counts only unproductive ones (kept for A/B).
+COUNT_ALL_LOOKUPS = True
 
 # First decider call on a turn that needs grounding (_needs_first_lookup):
 # "any" = must call SOME tool, so a real question still can't be answered from

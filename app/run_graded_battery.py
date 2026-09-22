@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import re
 import sys
 import time
@@ -34,7 +35,10 @@ from app import db
 from app.pipeline import respond
 
 SCENARIOS_FILE = Path(__file__).parent.parent / "scenarios" / "battery.json"
-BETWEEN_SCENARIOS_DELAY_S = 8
+# Was 8s, from when Voyage rate-limited every burst; the account's limits are
+# high now (2026-09-22) and runs go 429-free, so the default is short and
+# BATTERY_DELAY_S can override it per run.
+BETWEEN_SCENARIOS_DELAY_S = float(os.environ.get("BATTERY_DELAY_S", 2))
 
 # Tools that queue an action the client runs (typed action tools, v041). Local
 # rather than imported from app.tools so the same grader runs against a build

@@ -1,9 +1,8 @@
 [
   {
     "name": "slowed_direct",
-    "note": "direct destination ask on a solution whose destination-relevant text lives in 'cause', not a dedicated nav name — tests whether denormalizing path onto the diagnosis solution broke direct-destination matching",
+    "note": "direct destination ask on a solution whose destination-relevant text lives in 'cause', not a dedicated nav name — tests whether denormalizing path onto the diagnosis solution broke direct-destination matching 2026-09-22: 'match' dropped — the destination is an approved open_setting route, so the model reaches it directly with no lookup; the card is what's graded.",
     "expect": {
-      "match": "single",
       "walkthrough_destination": "sample rate"
     },
     "turns": [
@@ -14,9 +13,8 @@
   },
   {
     "name": "buffer_size_direct_risky",
-    "note": "same risk as above but harsher — 'buffer size' only appears in CPU overload's excluded 'fix' text, not in the embedded symptom/cause",
+    "note": "same risk as above but harsher — 'buffer size' only appears in CPU overload's excluded 'fix' text, not in the embedded symptom/cause 2026-09-22: 'match' dropped — the destination is an approved open_setting route, so the model reaches it directly with no lookup; the card is what's graded.",
     "expect": {
-      "match": "single",
       "walkthrough_destination": "buffer size"
     },
     "turns": [
@@ -579,9 +577,8 @@
   },
   {
     "name": "positive_direct_llm_alias",
-    "note": "2026-08-11 hedge-battery addition (Fable-designed) — alias-verbatim hit on a menu-toggle destination, never directly asked in any existing scenario (only ever reached via the latency problem bucket). Positive control: confirms normal grounded direct-destination behavior still works under whichever prompt is loaded.",
+    "note": "2026-08-11 hedge-battery addition (Fable-designed) — alias-verbatim hit on a menu-toggle destination, never directly asked in any existing scenario (only ever reached via the latency problem bucket). Positive control: confirms normal grounded direct-destination behavior still works under whichever prompt is loaded. 2026-09-22: 'match' dropped — the destination is an approved open_setting route, so the model reaches it directly with no lookup; the card is what's graded.",
     "expect": {
-      "match": "single",
       "walkthrough_destination": "low latency monitoring mode"
     },
     "turns": [
@@ -592,12 +589,13 @@
   },
   {
     "name": "positive_distinguisher_underdog_smart_tempo",
-    "note": "2026-08-11 hedge-battery addition — textual-distinguisher underdog pick: Smart Tempo (seed_weight 30) should beat sample rate mismatch (seed_weight 100) in the 'song sounds slowed' bucket via distinguisher text alone (affects one imported region, pitch stays correct), not AX evidence like ax_override_critical_test uses. Smart Tempo has no path, so a correct pick attaches nothing; a wrong pick attaches sample rate. Positive control for direct-evidence-over-seed_weight still working. 2026-09-21 (routes + auto-attach): Smart Tempo's settings are now approved routes, so acting on the right candidate can queue one; the thing that must not happen is the sample-rate card.",
+    "note": "2026-08-11 hedge-battery addition — textual-distinguisher underdog pick: Smart Tempo (seed_weight 30) should beat sample rate mismatch (seed_weight 100) in the 'song sounds slowed' bucket via distinguisher text alone (affects one imported region, pitch stays correct), not AX evidence like ax_override_critical_test uses. Smart Tempo has no path, so a correct pick attaches nothing; a wrong pick attaches sample rate. Positive control for direct-evidence-over-seed_weight still working. 2026-09-21 (routes + auto-attach): Smart Tempo's settings are now approved routes, so acting on the right candidate can queue one; the thing that must not happen is the sample-rate card. 2026-09-22: 'follow tempo' (Region Inspector) added — that is the per-region Smart Tempo fix this scenario describes, and the action its solution now maps to.",
     "expect": {
       "match": "problem",
       "resolved_problem": "song sounds slowed",
       "walkthrough_destination": [
         null,
+        "follow tempo",
         "smart tempo import default",
         "smart tempo settings"
       ],
@@ -638,9 +636,8 @@
   },
   {
     "name": "collision_bit_depth",
-    "note": "2026-08-11 hedge-battery addition — bit depth (24-bit recording) had zero KB coverage at the time, sitting in a tight embedding neighborhood with sample rate and buffer size. SUPERSEDED 2026-08-18: the Phase 1 port added a real 'recording settings' destination naming bit depth directly (alias 'recording bit depth setting', opens text names the 16/24-bit option) -- live-verified 2026-08-17 battery run resolves it correctly. Re-expressed as a positive control instead of a true negative.",
+    "note": "2026-08-11 hedge-battery addition — bit depth (24-bit recording) had zero KB coverage at the time, sitting in a tight embedding neighborhood with sample rate and buffer size. SUPERSEDED 2026-08-18: the Phase 1 port added a real 'recording settings' destination naming bit depth directly (alias 'recording bit depth setting', opens text names the 16/24-bit option) -- live-verified 2026-08-17 battery run resolves it correctly. Re-expressed as a positive control instead of a true negative. 2026-09-22: 'match' dropped — the destination is an approved open_setting route, so the model reaches it directly with no lookup; the card is what's graded.",
     "expect": {
-      "match": "single",
       "walkthrough_destination": "recording settings"
     },
     "turns": [
@@ -660,9 +657,8 @@
   },
   {
     "name": "true_negative_bounce_mp3",
-    "note": "2026-08-11 hedge-battery addition — at the time, zero export/bounce/share content existed anywhere in the KB. SUPERSEDED 2026-08-18: the Phase 1 port added a real 'bounce project' destination (Cmd+B, opens text names MP3 directly) -- live-verified 2026-08-17 battery run resolves it correctly. Re-expressed as a positive control instead of a true negative.",
+    "note": "2026-08-11 hedge-battery addition — at the time, zero export/bounce/share content existed anywhere in the KB. SUPERSEDED 2026-08-18: the Phase 1 port added a real 'bounce project' destination (Cmd+B, opens text names MP3 directly) -- live-verified 2026-08-17 battery run resolves it correctly. Re-expressed as a positive control instead of a true negative. 2026-09-22: 'match' dropped — the destination is an approved open_setting route, so the model reaches it directly with no lookup; the card is what's graded.",
     "expect": {
-      "match": "single",
       "walkthrough_destination": "bounce project"
     },
     "turns": [
@@ -686,9 +682,8 @@
   },
   {
     "name": "hedge_flex_time_prompt_example",
-    "note": "2026-08-11 hedge-battery addition — this exact phrase is the query-normalization worked example baked into both prompt versions ('i cant find how to change flex time'); at the time the KB had no flex destination. SUPERSEDED 2026-08-18: the Phase 1 port added a real 'flex time' destination (Cmd+F, algorithm dropdown) -- live-verified 2026-08-17 battery run resolves it correctly. Re-expressed as a positive control instead of a true negative.",
+    "note": "2026-08-11 hedge-battery addition — this exact phrase is the query-normalization worked example baked into both prompt versions ('i cant find how to change flex time'); at the time the KB had no flex destination. SUPERSEDED 2026-08-18: the Phase 1 port added a real 'flex time' destination (Cmd+F, algorithm dropdown) -- live-verified 2026-08-17 battery run resolves it correctly. Re-expressed as a positive control instead of a true negative. 2026-09-22: 'match' dropped — the destination is an approved open_setting route, so the model reaches it directly with no lookup; the card is what's graded.",
     "expect": {
-      "match": "single",
       "walkthrough_destination": "flex time"
     },
     "turns": [
@@ -887,9 +882,8 @@
   },
   {
     "name": "ax_state_irrelevant_context_no_distraction",
-    "note": "2026-09-04 ax_state-battery addition -- pushes a real, unrelated plugin/channel ax_state dump alongside an ordinary, already-covered KB navigation question (same query/expect as slowed_direct). Tests that a large irrelevant AX blob doesn't distract from or degrade normal destination routing.",
+    "note": "2026-09-04 ax_state-battery addition -- pushes a real, unrelated plugin/channel ax_state dump alongside an ordinary, already-covered KB navigation question (same query/expect as slowed_direct). Tests that a large irrelevant AX blob doesn't distract from or degrade normal destination routing. 2026-09-22: 'match' dropped — the destination is an approved open_setting route, so the model reaches it directly with no lookup; the card is what's graded.",
     "expect": {
-      "match": "single",
       "walkthrough_destination": "sample rate"
     },
     "turns": [
@@ -994,9 +988,8 @@
   },
   {
     "name": "mode_pair_buffer_size_q",
-    "note": "2026-09-18 Track B mode-experiment addition -- question-phrasing half of the buffer-size pair, compare with mode_pair_buffer_size_cmd.",
+    "note": "2026-09-18 Track B mode-experiment addition -- question-phrasing half of the buffer-size pair, compare with mode_pair_buffer_size_cmd. 2026-09-22: 'match' dropped — the route is in open_setting's own list, so the model reaches it directly with no lookup; the card and auto_run are what matter.",
     "expect": {
-      "match": "single",
       "walkthrough_destination": "buffer size",
       "no_action_calls": true,
       "auto_run": false
@@ -1023,9 +1016,8 @@
   },
   {
     "name": "mode_pair_sample_rate_q",
-    "note": "2026-09-18 Track B mode-experiment addition -- question-phrasing half of the sample-rate pair, compare with mode_pair_sample_rate_cmd.",
+    "note": "2026-09-18 Track B mode-experiment addition -- question-phrasing half of the sample-rate pair, compare with mode_pair_sample_rate_cmd. 2026-09-22: 'match' dropped — the route is in open_setting's own list, so the model reaches it directly with no lookup; the card and auto_run are what matter.",
     "expect": {
-      "match": "single",
       "walkthrough_destination": "sample rate",
       "no_action_calls": true,
       "auto_run": false
