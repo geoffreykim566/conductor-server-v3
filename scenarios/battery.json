@@ -779,10 +779,9 @@
   },
   {
     "name": "research_no_fire_generic_troubleshooting_miss",
-    "note": "2026-09-04 research-battery addition — clean-no-fire case: a genuinely uncovered but ordinary troubleshooting symptom, not an artist/gear/current-feature question. prompt.py explicitly steers this shape toward a plain hedge instead of web_research, even though a real fix might exist online somewhere -- a wrong web-sourced troubleshooting claim carries the same risk this project has always guarded lookup_concept-only claims against.",
+    "note": "2026-09-04 research-battery addition — clean-no-fire case: a genuinely uncovered but ordinary troubleshooting symptom, not an artist/gear/current-feature question. prompt.py explicitly steers this shape toward a plain hedge instead of web_research, even though a real fix might exist online somewhere -- a wrong web-sourced troubleshooting claim carries the same risk this project has always guarded lookup_concept-only claims against. 2026-09-22: research assertions dropped — a KB miss escalating to web_research is the intended fallback (user decision 09-19); the fix for researching too often is KB coverage. What still matters: nothing auto-runs off an unverified answer.",
     "expect": {
-      "web_research_called": false,
-      "sources_present": false
+      "auto_run": false
     },
     "turns": [
       {
@@ -792,11 +791,10 @@
   },
   {
     "name": "research_no_fire_navigation_gap",
-    "note": "2026-09-04 research-battery addition — reuses adversarial_gap_phantom_power's exact confirmed KB gap as a no-fire navigation case: web_research must not become a substitute source for a menu path/shortcut lookup_concept can't confirm -- prompt.py says a wrong web-sourced path is exactly as risky as an invented one.",
+    "note": "2026-09-04 research-battery addition — reuses adversarial_gap_phantom_power's exact confirmed KB gap as a no-fire navigation case: web_research must not become a substitute source for a menu path/shortcut lookup_concept can't confirm -- prompt.py says a wrong web-sourced path is exactly as risky as an invented one. 2026-09-22: research assertions dropped — a KB miss escalating to web_research is the intended fallback (user decision 09-19); the fix for researching too often is KB coverage. What still matters: nothing auto-runs off an unverified answer.",
     "expect": {
-      "web_research_called": false,
       "walkthrough_destination": null,
-      "sources_present": false
+      "auto_run": false
     },
     "turns": [
       {
@@ -1392,7 +1390,7 @@
   },
   {
     "name": "hybrid_muddy_vocal_fix_it",
-    "note": "2026-09-21 (one card + auto-run rule): a problem statement plus an instruction: whatever the card holds may auto-run (user decision). A clarifying question instead fails this -- read the transcript before treating that as wrong.",
+    "note": "2026-09-21 (one card + auto-run rule): a problem statement plus an instruction: whatever the card holds may auto-run (user decision). A clarifying question instead fails this -- read the transcript before treating that as wrong. 2026-09-22: auto_run flipped to false — the EQ move is inferred from a diagnosis lookup, not named by the user, and any turn that consulted the KB now waits for Run.",
     "turns": [
       {
         "text": "my vocal sounds muddy, fix it",
@@ -1400,7 +1398,7 @@
       }
     ],
     "expect": {
-      "auto_run": true,
+      "auto_run": false,
       "no_completion_claims": true
     }
   },

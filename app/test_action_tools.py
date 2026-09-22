@@ -272,8 +272,28 @@ async def test_endorsing_a_lookup_queued_action() -> None:
     opens = [c["output"] for c in result.trace if c["tool"] == "open_plugin"]
     assert opens[0].get("attached"), opens[0]                    # the lookup's own queue
     assert opens[-1].get("already_queued"), opens[-1]            # the model endorsing it
-    assert result.card_from_lookup is False and result.auto_run is True, (result.card_from_lookup, result.auto_run)
-    print("PASS: a direct call for an already-queued action replaces it, isn't refused, and lets the card auto-run.")
+    # The step is model-called now (card_from_lookup clears), but the turn still
+    # consulted the KB, so the card waits either way (see respond()).
+    assert result.card_from_lookup is False and result.auto_run is False, (result.card_from_lookup, result.auto_run)
+    print("PASS: a direct call for an already-queued action replaces it and isn't refused.")
+
+
+async def test_a_lookup_turn_never_auto_runs() -> None:
+    # 2026-09-22: on a turn whose own answer was "I don't have a verified fix",
+    # the model queued a global settings change off a moderate match and it was
+    # cleared to auto-run. Anything the KB led to waits, however it got queued.
+    lookups = [_bucket("track deselects", {"bypass control surfaces": {"open_setting": "bypass control surfaces"}})]
+    result, _ = await _run([
+        _resp(_tool_use("lookup_concept", {"problem": "track deselects on plugin click"}, "l1")),
+        _resp(_tool_use("open_setting", {"name": "bypass control surfaces"}, "w1")),
+        _resp(_text("try disabling control surfaces")),
+    ], lookups=lookups, messages=[{"role": "user", "content": "logic randomly deselects my track when i click a knob"}])
+    assert result.walkthrough_steps and result.auto_run is False, (result.walkthrough_steps, result.auto_run)
+    # The same action, asked for outright with no lookup, still auto-runs.
+    result, _ = await _run([_resp(_tool_use("open_setting", {"name": "bypass control surfaces"}, "w1")), _resp(_text("ok"))],
+                           messages=[{"role": "user", "content": "turn off control surfaces"}])
+    assert result.auto_run is True, result.auto_run
+    print("PASS: a card the KB led to waits for Run; the same action asked for directly auto-runs.")
 
 
 async def test_weak_bucket_does_not_force_a_pick() -> None:
@@ -451,6 +471,7 @@ async def main() -> None:
     await test_alternative_pick_refused_separate_request_joins()
     await test_resume_restores_lookup_queued_action()
     await test_endorsing_a_lookup_queued_action()
+    await test_a_lookup_turn_never_auto_runs()
     await test_weak_bucket_does_not_force_a_pick()
     await test_auto_attach_respects_commit_to_one()
     await test_auto_run()

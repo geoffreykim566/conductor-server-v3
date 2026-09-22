@@ -116,11 +116,12 @@ _ATTACH_CAP_REFUSAL = (
 _DUPLICATE_ATTACH_REFUSAL = "this exact step is already queued this turn -- it runs once."
 
 # Whether the card may run without the user pressing Run (client auto-run
-# setting permitting). Decided in code from the user's own message, not by
-# the model: an instruction ("my vocal sounds muddy, fix it", "put a
-# compressor on this", "can you add an eq") may auto-run; anything
-# question-shaped ("how do I…", "what does…", "channel eq?", "explain … and
-# add one") or broad in scope ("every track", "remove all") waits for Run.
+# setting permitting). Decided in code, never by the model: an instruction
+# naming what to do ("put a compressor on this", "can you add an eq") may
+# auto-run; anything question-shaped ("how do I…", "what does…", "channel
+# eq?", "explain … and add one"), broad in scope ("every track", "remove
+# all"), or inferred from a KB lookup rather than asked for (see respond())
+# waits for Run.
 _QUESTION_START = re.compile(
     r"^(?:how|what|whats|why|where|wheres|when|which|who|is|are|does|did|should|"
     r"do (?:i|you|we)|can (?:i|we)|could (?:i|we)|explain|show me how|tell me)\b"
@@ -243,7 +244,15 @@ async def respond(messages: list[dict], **kwargs) -> "Result":
     """The turn loop (_respond), plus whether its card may auto-run -- decided
     here, once, from the user's own message for every return path."""
     result = await _respond(messages, **kwargs)
-    result.auto_run = (not result.card_from_lookup) and _auto_run_ok(messages, result.walkthrough_steps)
+    # Any turn that consulted the KB waits for Run, whoever called the action:
+    # the fix was inferred from a diagnosis, not asked for. Found live
+    # 2026-09-22 (research_no_fire_generic_troubleshooting_miss): on a turn
+    # whose own answer was "I don't have a verified fix", the model queued
+    # "bypass control surfaces" off a moderate match and the card was cleared
+    # to run by itself. Only actions the user actually asked for -- a direct
+    # command with no lookup behind it -- may auto-run.
+    inferred = result.card_from_lookup or any(c["tool"] == "lookup_concept" for c in result.trace)
+    result.auto_run = (not inferred) and _auto_run_ok(messages, result.walkthrough_steps)
     return result
 
 
