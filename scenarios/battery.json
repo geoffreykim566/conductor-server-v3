@@ -309,10 +309,10 @@
   },
   {
     "name": "ax_override_critical_test",
-    "note": "the critical thesis test — stated+AX evidence should demote sample-rate-mismatch (seed_weight 100) and lead with Smart Tempo instead. Smart Tempo has no path, so a correct override means NO walkthrough attaches (attaching one would mean it recommended the ruled-out sample-rate-mismatch instead)",
+    "note": "the critical thesis test — stated+AX evidence should demote sample-rate-mismatch (seed_weight 100) and lead with Smart Tempo instead. Smart Tempo has no path, so a correct override means NO walkthrough attaches (attaching one would mean it recommended the ruled-out sample-rate-mismatch instead) 2026-09-21 (routes + auto-attach): the value_ax_key gate is gone (it also blocked the correct fix in ax_contradicts_user_claim), so the live 44.1 kHz ruling sample rate out is now the model's call: the assertion is that the sample-rate card is NOT queued; another candidate's card is fine.",
     "expect": {
       "match": "problem",
-      "walkthrough_destination": null
+      "walkthrough_destination_absent": "sample rate"
     },
     "turns": [
       {
@@ -445,9 +445,9 @@
   },
   {
     "name": "multiturn_evidence_arrives_later_turn",
-    "note": "the ax_override_critical_test thesis split across two turns instead of loaded into the opening message — turn 1 is ambiguous with no evidence (likely leads with the weight-100 default), turn 2 supplies the disambiguating stated+AX evidence. Tests whether the override still applies when it has to retract an earlier turn's leaning, not just avoid one from the start.",
+    "note": "the ax_override_critical_test thesis split across two turns instead of loaded into the opening message — turn 1 is ambiguous with no evidence (likely leads with the weight-100 default), turn 2 supplies the disambiguating stated+AX evidence. Tests whether the override still applies when it has to retract an earlier turn's leaning, not just avoid one from the start. 2026-09-21 (routes + auto-attach): same as ax_override_critical_test: live state rules sample rate out, so its card must not be queued.",
     "expect": {
-      "walkthrough_destination": null
+      "walkthrough_destination_absent": "sample rate"
     },
     "turns": [
       {
@@ -592,11 +592,16 @@
   },
   {
     "name": "positive_distinguisher_underdog_smart_tempo",
-    "note": "2026-08-11 hedge-battery addition — textual-distinguisher underdog pick: Smart Tempo (seed_weight 30) should beat sample rate mismatch (seed_weight 100) in the 'song sounds slowed' bucket via distinguisher text alone (affects one imported region, pitch stays correct), not AX evidence like ax_override_critical_test uses. Smart Tempo has no path, so a correct pick attaches nothing; a wrong pick attaches sample rate. Positive control for direct-evidence-over-seed_weight still working.",
+    "note": "2026-08-11 hedge-battery addition — textual-distinguisher underdog pick: Smart Tempo (seed_weight 30) should beat sample rate mismatch (seed_weight 100) in the 'song sounds slowed' bucket via distinguisher text alone (affects one imported region, pitch stays correct), not AX evidence like ax_override_critical_test uses. Smart Tempo has no path, so a correct pick attaches nothing; a wrong pick attaches sample rate. Positive control for direct-evidence-over-seed_weight still working. 2026-09-21 (routes + auto-attach): Smart Tempo's settings are now approved routes, so acting on the right candidate can queue one; the thing that must not happen is the sample-rate card.",
     "expect": {
       "match": "problem",
       "resolved_problem": "song sounds slowed",
-      "walkthrough_destination": null
+      "walkthrough_destination": [
+        null,
+        "smart tempo import default",
+        "smart tempo settings"
+      ],
+      "walkthrough_destination_absent": "sample rate"
     },
     "turns": [
       {
@@ -708,9 +713,14 @@
   },
   {
     "name": "hedge_indirect_beat_from_scratch",
-    "note": "2026-08-11 hedge-battery addition — the exact live repro case from tonight's investigation (0/18+ hedge rate observed across every prompt variant tested ad hoc before this scenario existed). Any real answer names Loop Browser, Drummer, Musical Typing, or the step sequencer -- none KB-covered. Path-stating happens incidentally inside tutorial prose, not as a direct focused ask -- the exact failure shape that started this whole investigation.",
+    "note": "2026-08-11 hedge-battery addition — the exact live repro case from tonight's investigation (0/18+ hedge rate observed across every prompt variant tested ad hoc before this scenario existed). Any real answer names Loop Browser, Drummer, Musical Typing, or the step sequencer -- none KB-covered. Path-stating happens incidentally inside tutorial prose, not as a direct focused ask -- the exact failure shape that started this whole investigation. 2026-09-21 (routes + auto-attach): an optional new-track card is acceptable (09-19 already judged it defensible); it waits since the message is a question.",
     "expect": {
-      "walkthrough_destination": null
+      "walkthrough_destination": [
+        null,
+        "new software instrument track",
+        "new track",
+        "new session player track"
+      ]
     },
     "turns": [
       {
@@ -1268,21 +1278,19 @@
   },
   {
     "name": "tn_what_does_ratio_do",
-    "note": "2026-09-21 true negative: concept question; nothing to attach or run.",
+    "note": "2026-09-21 true negative: concept question; nothing to attach or run. 2026-09-21 (routes + auto-attach): a lookup landing on the compressor row now queues its open_plugin as an optional card; allowed, as long as it waits.",
     "turns": [
       {
         "text": "what does ratio do on a compressor"
       }
     ],
     "expect": {
-      "no_action_calls": true,
-      "walkthrough_destination": null,
       "auto_run": false
     }
   },
   {
     "name": "tn_low_cut_purpose",
-    "note": "2026-09-21 true negative: concept question even with the plugin open.",
+    "note": "2026-09-21 true negative: concept question even with the plugin open. 2026-09-21 (routes + auto-attach): same as tn_what_does_ratio_do.",
     "turns": [
       {
         "text": "what does the low cut do on channel eq",
@@ -1290,7 +1298,6 @@
       }
     ],
     "expect": {
-      "no_action_calls": true,
       "auto_run": false
     }
   },
@@ -1323,14 +1330,14 @@
   },
   {
     "name": "tn_how_change_buffer_size",
-    "note": "2026-09-21 true negative: misread as a command 3/3 in the 09-18 mode experiment (indirect_buffer_size_how).",
+    "note": "2026-09-21 true negative: misread as a command 3/3 in the 09-18 mode experiment (indirect_buffer_size_how). 2026-09-21 (routes + auto-attach): the buffer-size route is queued (from the lookup or directly) and waits.",
     "turns": [
       {
         "text": "how do i change the buffer size"
       }
     ],
     "expect": {
-      "no_action_calls": true,
+      "walkthrough_destination": "buffer size",
       "auto_run": false
     }
   },

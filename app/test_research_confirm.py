@@ -87,7 +87,7 @@ async def test_parks_on_research_when_confirm_requested() -> None:
 
 def _parked_history_with_prior_attach() -> list[dict]:
     """A parked transcript where the decider attached a walkthrough (via a
-    successful get_walkthrough) BEFORE deciding to research something else."""
+    successful open_setting) BEFORE deciding to research something else."""
     return _USER + [
         {"role": "assistant", "content": [
             {"type": "tool_use", "id": "call_l", "name": "lookup_concept", "input": {"problem": "sample rate"}},
@@ -97,7 +97,7 @@ def _parked_history_with_prior_attach() -> list[dict]:
         ]},
         {"role": "assistant", "content": [
             {"type": "text", "text": "Sample rate is under Project Settings."},
-            {"type": "tool_use", "id": "call_w", "name": "get_walkthrough", "input": {"solution": "sample rate"}},
+            {"type": "tool_use", "id": "call_w", "name": "open_setting", "input": {"name": "sample rate"}},
         ]},
         {"role": "user", "content": [
             {"type": "tool_result", "tool_use_id": "call_w",
@@ -114,7 +114,7 @@ async def test_resume_deny_skips_research_and_restores_state() -> None:
     result, research = await _run(parked, [_FINAL], resume="deny_research", research_confirm=True)
     assert research.await_count == 0, "deny must never run the research executor"
     tools_called = [c["tool"] for c in result.trace]
-    assert tools_called == ["lookup_concept", "get_walkthrough", "web_research"], tools_called
+    assert tools_called == ["lookup_concept", "open_setting", "web_research"], tools_called
     assert result.trace[-1]["output"] == pipeline._RESEARCH_DECLINED, result.trace[-1]["output"]
     assert result.walkthrough_steps == [["menu", "File"]], "attach made before the prompt must survive the resume"
     # The model sees the decline as a normal tool_result, so the transcript is API-valid.

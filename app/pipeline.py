@@ -72,16 +72,39 @@ COUNT_ALL_LOOKUPS = False
 # (the pre-2026-09-21 behaviour; kept for the harness's before/after).
 FORCE_FIRST_LOOKUP = False
 
-# One card per turn (2026-09-21). Every attach -- a KB route from
-# get_walkthrough or a typed action -- is a step on the same card, in call
-# order: on the client they were already the same thing (a Run card whose
-# steps Conductor performs), so "three new tracks + low cut on all three"
-# is a menu route and actions on one card. What commit-to-one was for stays:
-# a second get_walkthrough for the SAME problem is an alternative fix, not a
-# second request (2026-08-05: the last candidate silently won), and is
+# One card per turn (2026-09-21). Every action -- called directly by the model
+# or queued because a lookup landed on a solution that maps to it -- is a step
+# on the same card, in call order. What commit-to-one was for stays: acting
+# on a second candidate from the SAME problem bucket is an alternative fix,
+# not a second request (2026-08-05: the last candidate silently won), and is
 # refused. The cap bounds a confused turn, not a real one.
 MAX_ATTACHES_PER_TURN = 6
-_ATTACH_TOOLS = tools.ACTION_TOOLS | {"get_walkthrough"}
+_ATTACH_TOOLS = tools.ACTION_TOOLS
+
+# A lookup that lands on ONE solution with a strong match queues that
+# solution's action itself (2026-09-21): deciding whether to also attach was
+# the single biggest failure point -- the model looked the answer up, said it,
+# and never made the second call (09-21 baseline: most walkthrough misses).
+# Weaker or multi-candidate results leave the choice to the model, which then
+# has to act on one or ask (see _needs_pick).
+# Moderate single matches get pick-or-ask too (not auto-attach): e.g. "how do
+# i change the recording bit depth" lands on 'recording settings' at moderate,
+# and was a 09-21 walkthrough miss. The confidence bands (0.40/0.60) were
+# tuned at 8 problems / 21 solutions and never recalibrated, so a correct hit
+# often reads moderate; a moderate COLLISION ("frame rate" -> sample rate) is
+# why this asks the model to act, ask or look again rather than attaching.
+PICK_ON_MODERATE_SINGLE = True
+
+_ON_CARD_NOTE = (
+    "This solution's action is already on the reply's card -- it waits for the user "
+    "to press Run. Don't call it again, and don't describe it as done."
+)
+_PICK_NUDGE = (
+    "A lookup this turn returned solutions that map to an action. If your answer "
+    "recommends one, call its action so the user gets it on the card; if you can't tell "
+    "which applies, ask the one question that would decide it (ask_clarifying_question); "
+    "if the match isn't actually what they asked about, look up something more specific."
+)
 
 _ATTACH_CAP_REFUSAL = (
     f"this turn already has {MAX_ATTACHES_PER_TURN} steps queued, the limit for one "
@@ -144,6 +167,51 @@ def _lookup_is_unproductive(output: dict, buckets_seen: set) -> bool:
 def _attach_key(name: str, inp: dict) -> str:
     return json.dumps([name, inp], sort_keys=True, default=str)
 
+
+def _bucket_candidates(trace: list[dict]) -> dict[str, str]:
+    """attach key of each candidate's action -> its problem bucket, for every
+    multi-candidate ('problem') lookup this turn, plus moderate single matches
+    (PICK_ON_MODERATE_SINGLE). What tells a second pick from the same bucket
+    (an alternative, refused) apart from a separate request, and what
+    _needs_pick checks."""
+    out: dict[str, str] = {}
+    for c in trace:
+        o = c["output"] if c["tool"] == "lookup_concept" else {}
+        moderate_single = (
+            PICK_ON_MODERATE_SINGLE and o.get("match") == "single"
+            and str(o.get("match_confidence", "")).startswith("moderate")
+        )
+        if o.get("match") != "problem" and not moderate_single:
+            continue
+        for sol in o.get("solutions") or []:
+            for tool, inp in tools.action_calls(sol.get("action")):
+                out.setdefault(_attach_key(tool, inp), o.get("problem"))
+    return out
+
+
+def _is_alternative_pick(name: str, inp: dict, trace: list[dict]) -> bool:
+    """True if this action is a candidate from a bucket another of whose
+    candidates is already on the card -- a fallback, not a second request."""
+    cands = _bucket_candidates(trace)
+    key = _attach_key(name, inp)
+    problem = cands.get(key)
+    if problem is None:
+        return False
+    return any(
+        c["tool"] in _ATTACH_TOOLS and c["output"].get("attached")
+        and cands.get(_attach_key(c["tool"], c["input"])) == problem
+        and _attach_key(c["tool"], c["input"]) != key
+        for c in trace
+    )
+
+
+def _needs_pick(trace: list[dict], card: list) -> bool:
+    """A bucket lookup returned actionable candidates and the turn is about to
+    end with nothing on the card and no clarifying question."""
+    if card or any(c["tool"] == "ask_clarifying_question" for c in trace):
+        return False
+    return bool(_bucket_candidates(trace))
+
 _client = AsyncAnthropic(api_key=CENTRAL_ANTHROPIC_KEY)
 
 
@@ -151,7 +219,7 @@ async def respond(messages: list[dict], **kwargs) -> "Result":
     """The turn loop (_respond), plus whether its card may auto-run -- decided
     here, once, from the user's own message for every return path."""
     result = await _respond(messages, **kwargs)
-    result.auto_run = _auto_run_ok(messages, result.walkthrough_steps)
+    result.auto_run = (not result.card_from_lookup) and _auto_run_ok(messages, result.walkthrough_steps)
     return result
 
 
@@ -207,7 +275,7 @@ _EXECUTORS = {
     "open_plugin": lambda inp, fixture: _now(tools.queue_open_plugin(inp)),
     "set_param": lambda inp, fixture: _now(tools.queue_set_param(inp)),
     "lookup_concept": lambda inp, fixture: tools.lookup_concept(inp["problem"]),
-    "get_walkthrough": lambda inp, fixture: tools.get_walkthrough(inp["solution"], ax_fixture=fixture),
+    "open_setting": lambda inp, fixture: _now(tools.queue_open_setting(inp, fixture)),
     "ask_clarifying_question": lambda inp, fixture: _ack_clarifying_question(),
     "web_research": lambda inp, fixture: research.web_research(inp["query"]),
 }
@@ -237,6 +305,9 @@ class Result:
     # True if this turn's card may run without the user pressing Run (the
     # client's own auto-run setting still has to be on). See _auto_run_ok.
     auto_run: bool = False
+    # Some card step was queued by a lookup rather than called directly by the
+    # model; such a card never auto-runs (see respond()).
+    card_from_lookup: bool = False
 
 
 # Bare "again" and "forgot" deliberately excluded, and "cant find it" removed
@@ -382,7 +453,7 @@ def _backfill_walkthrough(messages: list[dict], text: str) -> dict | None:
     """Commit-to-one is scoped per turn, so a turn that attaches nothing normally
     leaves the user with prose only -- correct when the model is just answering a
     new question, but wrong when the user asked to *see* a destination again and
-    the model answered from memory instead of re-calling get_walkthrough (found
+    the model answered from memory instead of re-queuing the route (found
     live 2026-08-05, multiturn_same_destination_revisited_new_turn: inconsistent,
     sometimes recalls the tool, sometimes doesn't). Deterministic backfill instead
     of another prompt instruction -- prompt-only attempts at behaviors like this
@@ -411,7 +482,7 @@ def _backfill_walkthrough(messages: list[dict], text: str) -> dict | None:
     guessing what a live model happens to say.
 
     Scans prior turns' message history (not this turn's own -- there's nothing to
-    find there if this turn made no tool calls) for successful get_walkthrough
+    find there if this turn made no tool calls) for successful route
     attaches, identified by result shape (attached+destination+steps together, not
     by tool name -- avoids needing to correlate tool_use_id across blocks). If the
     re-ask check passes, reattaches the one destination whose name appears in this
@@ -509,7 +580,7 @@ def _strong_grounded_lookup_exists(trace: list[dict]) -> bool:
     return any(
         c["tool"] == "lookup_concept"
         and c["output"].get("match_confidence") == "strong"
-        and any(s.get("has_path") for s in c["output"].get("solutions") or [])
+        and any(s.get("action") for s in c["output"].get("solutions") or [])
         for c in trace
     )
 
@@ -619,26 +690,10 @@ def _collect_sources(trace: list[dict]) -> list[dict]:
     return sources
 
 
-def _solution_to_problem(trace: list[dict]) -> dict[str, str | None]:
-    """Maps each solution name surfaced by this turn's lookup_concept calls to
-    the problem bucket it was returned under, so a refused second get_walkthrough
-    can tell whether it's an alternative candidate for the SAME problem (a
-    fallback) or a solution from a DIFFERENT problem entirely (a separate,
-    unrelated request) -- see hedge_mixed_grounded_ungrounded below."""
-    mapping: dict[str, str | None] = {}
-    for c in trace:
-        if c["tool"] != "lookup_concept":
-            continue
-        problem = c["output"].get("problem")
-        for sol in c["output"].get("solutions") or []:
-            mapping.setdefault(sol["name"], problem)
-    return mapping
-
-
 _FALLBACK_REFUSAL = (
-    "a walkthrough for this same problem is already attached this turn -- this "
-    "is an alternative fix, not a second request. Mention it in prose as the "
-    "next thing to try, and only attach it if the user comes back and says the "
+    "another candidate for this same problem is already on the card this turn -- "
+    "this is an alternative fix, not a second request. Mention it in prose as the "
+    "next thing to try, and only queue it if the user comes back and says the "
     "first one didn't work."
 )
 
@@ -936,13 +991,11 @@ def _restore_turn_state(tail: list[dict]) -> dict:
     (research_mixed_kb_and_research is a real scenario shape)."""
     trace: list[dict] = []
     text_parts: list[str] = []
-    walkthrough_steps = None
-    attached_solution = None
     lookups_counted = 0
     buckets_seen: set = set()
     card_steps: list = []
     attach_keys: set = set()
-    actions_queued = False
+    card_from_lookup = False
     calls: dict[str, dict] = {}
     for m in tail:
         content = m.get("content")
@@ -970,18 +1023,21 @@ def _restore_turn_state(tail: list[dict]) -> dict:
                     if COUNT_ALL_LOOKUPS or _lookup_is_unproductive(output, buckets_seen):
                         lookups_counted += 1
                     buckets_seen.add(output.get("problem"))
+                    # Actions this lookup queued itself (see _auto_attach) ride
+                    # in its own result, the only place they're recorded.
+                    for auto in output.get("on_card") or []:
+                        trace.append({"tool": auto["tool"], "input": auto["input"],
+                                      "output": auto["output"], "auto_from": output.get("problem")})
+                        card_steps.extend(auto["output"].get("steps") or [])
+                        attach_keys.add(_attach_key(auto["tool"], auto["input"]))
+                        card_from_lookup = True
                 if call["tool"] in _ATTACH_TOOLS and output.get("attached"):
                     card_steps.extend(output.get("steps") or [])
                     attach_keys.add(_attach_key(call["tool"], call["input"]))
-                    actions_queued = actions_queued or call["tool"] in tools.ACTION_TOOLS
-                if call["tool"] == "get_walkthrough" and output.get("attached") and walkthrough_steps is None:
-                    walkthrough_steps = output.get("steps")
-                    attached_solution = call["input"].get("solution")
     return {
-        "trace": trace, "text_parts": text_parts, "walkthrough_steps": walkthrough_steps,
-        "attached_solution": attached_solution, "lookups_counted": lookups_counted,
+        "trace": trace, "text_parts": text_parts, "lookups_counted": lookups_counted,
         "buckets_seen": buckets_seen, "card_steps": card_steps, "attach_keys": attach_keys,
-        "actions_queued": actions_queued,
+        "card_from_lookup": card_from_lookup,
     }
 
 
@@ -1086,13 +1142,13 @@ async def _respond(
 
 
     usage: list[dict] = []
-    walkthrough_steps: list | None = None
-    attached_solution: str | None = None
+    attached_solution: str | None = None   # no longer set; kept for _confidence_tier until tiers go
     lookups_counted = 0          # toward LOOKUP_ATTEMPT_LIMIT; see COUNT_ALL_LOOKUPS
     buckets_seen: set = set()
     card_steps: list = []        # every attach this turn, in call order (one card)
     attach_keys: set = set()
-    actions_queued = False       # any typed action on the card (writer framing)
+    card_from_lookup = False     # a step was queued by a lookup, not called directly
+    pick_forced = False          # the one pick-or-ask re-call per turn (see _needs_pick)
     # Text the model writes alongside a tool call (not just the final,
     # tool-free iteration) is a real part of the answer, not scratch
     # thinking -- found live 2026-08-20 (hedge_mixed_grounded_ungrounded):
@@ -1108,13 +1164,11 @@ async def _respond(
         restored = _restore_turn_state(msgs[len(messages):-1])
         trace.extend(restored["trace"])
         text_parts.extend(restored["text_parts"])
-        walkthrough_steps = restored["walkthrough_steps"]
-        attached_solution = restored["attached_solution"]
         lookups_counted = restored["lookups_counted"]
         buckets_seen = restored["buckets_seen"]
         card_steps = restored["card_steps"]
         attach_keys = restored["attach_keys"]
-        actions_queued = restored["actions_queued"]
+        card_from_lookup = restored["card_from_lookup"]
 
     # Pushed, not pulled: live state (when known for this turn) is handed to the
     # model automatically rather than waiting on it to decide to call a tool for
@@ -1213,6 +1267,20 @@ async def _respond(
             usage.append(_usage_dict(resp.usage))
             tool_uses = [b for b in resp.content if b.type == "tool_use"]
             iter_text = "".join(b.text for b in resp.content if b.type == "text")
+            if not tool_uses and not pick_forced and _needs_pick(trace, card_steps):
+                # About to end on prose after a bucket lookup whose candidates
+                # all map to actions: once per turn, re-ask with a tool call
+                # required, so the pick the answer makes reaches the card (or
+                # becomes a clarifying question). The prose-only reply is
+                # discarded -- its replacement is made with the same context.
+                pick_forced = True
+                resp = await _call_model(
+                    system + [{"type": "text", "text": "\n\n" + _PICK_NUDGE}],
+                    tools.TOOLS, _with_screenshots(msgs), None, {"type": "any"},
+                )
+                usage.append(_usage_dict(resp.usage))
+                tool_uses = [b for b in resp.content if b.type == "tool_use"]
+                iter_text = "".join(b.text for b in resp.content if b.type == "text")
             if iter_text:
                 text_parts.append(iter_text)
 
@@ -1222,11 +1290,10 @@ async def _respond(
             if not trace:
                 backfilled = _backfill_walkthrough(messages, text)
                 if backfilled:
-                    walkthrough_steps = backfilled["steps"]
                     card_steps = list(backfilled["steps"])
                     trace.append({
-                        "tool": "get_walkthrough",
-                        "input": {"solution": None},
+                        "tool": "open_setting",
+                        "input": {"name": backfilled["destination"]},
                         "output": {
                             "attached": True,
                             "destination": backfilled["destination"],
@@ -1237,11 +1304,11 @@ async def _respond(
             text, tier = await _finalize_answer(
                 trace, (list(card_steps) or None), text, messages, on_chunk, usage,
                 attached_solution, live_state=live_state, had_screenshots=screenshot_idx is not None,
-                has_actions=actions_queued,
+                has_actions=bool(card_steps),
             )
             return Result(text=text, walkthrough_steps=(list(card_steps) or None),
                           trace=trace, messages=msgs, usage=usage, confidence_tier=tier,
-                          sources=_collect_sources(trace))
+                          sources=_collect_sources(trace), card_from_lookup=card_from_lookup)
 
         if resp is not None:
             msgs.append({"role": "assistant", "content": _serialize_content(resp.content)})
@@ -1277,11 +1344,7 @@ async def _respond(
                 result = {"attached": False, "reason": _DUPLICATE_ATTACH_REFUSAL}
             elif tu.name in _ATTACH_TOOLS and len(attach_keys) >= MAX_ATTACHES_PER_TURN:
                 result = {"attached": False, "reason": _ATTACH_CAP_REFUSAL}
-            elif (
-                tu.name == "get_walkthrough" and walkthrough_steps is not None
-                and _solution_to_problem(trace).get(tu.input.get("solution"))
-                == _solution_to_problem(trace).get(attached_solution)
-            ):
+            elif tu.name in _ATTACH_TOOLS and _is_alternative_pick(tu.name, tu.input, trace):
                 # Commit-to-one for alternatives: a second candidate for the
                 # SAME problem is a fallback, not a second request (found live
                 # 2026-08-05 -- the last candidate silently won, contradicting
@@ -1304,7 +1367,29 @@ async def _respond(
             call_usage = result.pop("_usage", None) if isinstance(result, dict) else None
             if call_usage:
                 usage.append(call_usage)
+            on_card: list[dict] = []
+            if (
+                tu.name == "lookup_concept" and result.get("match") == "single"
+                and str(result.get("match_confidence", "")).startswith("strong")
+            ):
+                sol = (result.get("solutions") or [{}])[0]
+                for tool, inp in tools.action_calls(sol.get("action")):
+                    key = _attach_key(tool, inp)
+                    if key in attach_keys or len(attach_keys) >= MAX_ATTACHES_PER_TURN:
+                        continue
+                    out = await _EXECUTORS[tool](inp, ax_fixture)
+                    on_card.append({"tool": tool, "input": inp, "output": out})
+                    if out.get("attached"):
+                        card_steps.extend(out.get("steps") or [])
+                        attach_keys.add(key)
+                        card_from_lookup = True
+                if on_card:
+                    refused = [o["output"].get("reason") for o in on_card if not o["output"].get("attached")]
+                    result = {**result, "on_card": on_card,
+                              "on_card_note": _ON_CARD_NOTE if not refused else
+                              "This solution's action was NOT queued: " + "; ".join(r for r in refused if r)}
             trace.append({"tool": tu.name, "input": tu.input, "output": result})
+            trace.extend({**o, "auto_from": result.get("problem")} for o in on_card)
             if tu.name == "lookup_concept" and "error" not in result:
                 if COUNT_ALL_LOOKUPS or _lookup_is_unproductive(result, buckets_seen):
                     lookups_counted += 1
@@ -1312,10 +1397,6 @@ async def _respond(
             if tu.name in _ATTACH_TOOLS and result.get("attached"):
                 card_steps.extend(result.get("steps") or [])
                 attach_keys.add(_attach_key(tu.name, tu.input))
-                actions_queued = actions_queued or tu.name in tools.ACTION_TOOLS
-            if tu.name == "get_walkthrough" and result.get("attached"):
-                walkthrough_steps = result.get("steps")
-                attached_solution = tu.input.get("solution")
             tool_results.append({
                 "type": "tool_result",
                 "tool_use_id": tu.id,
@@ -1334,11 +1415,11 @@ async def _respond(
             text, tier = await _finalize_answer(
                 trace, (list(card_steps) or None), text, messages, on_chunk, usage,
                 attached_solution, is_clarifying_question=True, live_state=live_state,
-                had_screenshots=screenshot_idx is not None, has_actions=actions_queued,
+                had_screenshots=screenshot_idx is not None, has_actions=bool(card_steps),
             )
             return Result(text=text, walkthrough_steps=(list(card_steps) or None),
                           trace=trace, messages=msgs, usage=usage, confidence_tier=tier,
-                          sources=_collect_sources(trace))
+                          sources=_collect_sources(trace), card_from_lookup=card_from_lookup)
 
     # Safety net: never return a truly empty response, regardless of why the
     # loop didn't converge on its own. Force one final tools-off call so the
@@ -1369,8 +1450,8 @@ async def _respond(
     text, tier = await _finalize_answer(
         trace, (list(card_steps) or None), text, messages, on_chunk, usage,
         attached_solution, live_state=live_state, had_screenshots=screenshot_idx is not None,
-        has_actions=actions_queued,
+        has_actions=bool(card_steps),
     )
     return Result(text=text, walkthrough_steps=(list(card_steps) or None),
                   trace=trace, messages=msgs, usage=usage, confidence_tier=tier,
-                  sources=_collect_sources(trace))
+                  sources=_collect_sources(trace), card_from_lookup=card_from_lookup)

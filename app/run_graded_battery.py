@@ -134,17 +134,35 @@ def _actual_outcome(trace: list[dict], response_text: str = "", confidence_tier:
     # diagnosis name, once by the resolved destination's own name) and land on
     # the same correct destination both times; grading only the last call
     # treated that redundancy as a wrong answer (found live 2026-08-05).
+    # Since 2026-09-21 a route reaches the card through open_setting -- called
+    # directly, queued by a lookup (auto_from), or backfilled. Legacy
+    # get_walkthrough attaches (a v040/v041-pre-routes build) still count.
+    route_calls = [c for c in trace if c["tool"] in ("open_setting", "get_walkthrough")]
     attached_destinations = [
-        c["output"]["destination"] for c in walkthrough_calls if c["output"].get("attached")
+        c["output"]["destination"] for c in route_calls
+        if c["output"].get("attached") and c["output"].get("destination")
     ]
     # The solution actually requested, not its resolved destination -- distinct fields
     # because extends_to lets multiple solutions share one destination (e.g. "no sound
     # output" and "Core Audio goes silent mid-session" both resolve to "audio settings"),
     # so attached_destinations alone can't tell a correct pick from a wrong one that
     # happens to land on the same screen.
+    # Which KB solution each attached action came from: the lookup results
+    # list every candidate's action, so an attached call maps back to the
+    # candidate(s) it belongs to.
+    by_action: dict[str, list[str]] = {}
+    for c in lookup_calls:
+        for sol in c["output"].get("solutions") or []:
+            for call in (sol.get("action") if isinstance(sol.get("action"), list) else [sol.get("action")] if sol.get("action") else []):
+                for tool, arg in call.items():
+                    key = json.dumps([tool, {"name": arg} if tool == "open_setting" else arg], sort_keys=True)
+                    by_action.setdefault(key, []).append(sol["name"])
     attached_solutions = [
         c["input"]["solution"] for c in walkthrough_calls if c["output"].get("attached")
     ]
+    for c in trace:
+        if c["tool"] in ("open_setting", "open_plugin", "set_param") and c["output"].get("attached"):
+            attached_solutions.extend(by_action.get(json.dumps([c["tool"], c["input"]], sort_keys=True), []))
     action_calls = _action_calls(trace)
 
     return {
@@ -192,6 +210,11 @@ def _grade(expect: dict, actual: dict) -> list[dict]:
         if key == "walkthrough_destination":
             got = actual["attached_destinations"]
             ok = _membership_pass(expected, got)
+        elif key == "walkthrough_destination_absent":
+            # This route must NOT be on the card -- e.g. live state rules the
+            # candidate out (ax_override_critical_test).
+            got = actual["attached_destinations"]
+            ok = expected not in got
         elif key == "walkthrough_solution":
             got = actual["attached_solutions"]
             ok = _membership_pass(expected, got)
@@ -276,7 +299,7 @@ async def run_scenario(scenario: dict) -> dict:
                 print(f"      -> match={out.get('match')!r} problem={out.get('problem')!r} confidence={out.get('match_confidence')!r}")
                 for sol in out.get("solutions", []):
                     print(f"         solution: {sol['name']!r} weight={sol.get('seed_weight')} "
-                          f"has_path={sol.get('has_path')} distinguisher={sol.get('distinguisher')!r}")
+                          f"action={sol.get('action')} distinguisher={sol.get('distinguisher')!r}")
             else:
                 print(f"      -> {out}")
         print(f"  response: {result.text}")

@@ -1,4 +1,5 @@
-"""v3 tools: lookup_concept, get_walkthrough, read_ax_state.
+"""v3 tools: lookup_concept (knowledge) and the action tools (open_plugin,
+set_param, open_setting) that queue steps onto the reply's card.
 
 lookup_concept queries problems and solutions TOGETHER, in one ranked pass, and
 lets whichever is actually closest by distance win — same fix as the v2 pilot's
@@ -8,14 +9,17 @@ problem bucket, it always resolves as that bucket, never in isolation —
 otherwise raw embedding-distance noise can let a bucket member win the top-1
 slot and hide its siblings entirely (found live 2026-07-31,
 ax_override_critical_test resolving three different ways across three runs).
-get_walkthrough reads a solution's own path if it has one, otherwise follows
-its extends_to link to fetch the real path from the solution it points at
-(never a second embedding call — extends_to is a fixed reference, resolved by
-one join, not a re-search).
+
+Since 2026-09-21 the KB holds knowledge only. A solution with a fix carries
+the action call it maps to (solutions.action); navigation paths live once, in
+seed/routes.json, reached only through open_setting -- never embedded, never
+matched against. get_walkthrough is gone: picking a solution is what queues
+its action (see pipeline.py's auto-attach).
 """
 import asyncio
 import json
 import re
+from pathlib import Path
 
 from app import db
 from app.embed import embed
@@ -98,30 +102,6 @@ LOOKUP_CONCEPT_SCHEMA = {
     },
 }
 
-GET_WALKTHROUGH_SCHEMA = {
-    "name": "get_walkthrough",
-    "description": (
-        "Attach an executable, step-by-step walkthrough for a solution returned by "
-        "lookup_concept. Call this once you're confident this destination matches what "
-        "you're recommending — most navigation is low-stakes (opening a panel to look at "
-        "or change), so don't withhold this out of over-caution. For anything more "
-        "consequential (global settings, converting/resampling audio, changes harder to "
-        "undo), still call it, just say plainly what to expect in your response. No call "
-        "means no walkthrough is shown; do not describe steps in prose as a substitute "
-        "for calling this."
-    ),
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "solution": {
-                "type": "string",
-                "description": "The exact solution name from a lookup_concept result.",
-            }
-        },
-        "required": ["solution"],
-        "additionalProperties": False,
-    },
-}
 
 # Pure structural signal, no side effect -- exists so "this turn makes no
 # claim" is a hard fact in trace, not something inferred from response text.
@@ -147,7 +127,7 @@ ASK_CLARIFYING_QUESTION_SCHEMA = {
         "with no distinguishing evidence yet). Never call this if you're also offering "
         "any guidance, even tentative guidance, in the same response -- that response "
         "should stand as a real (possibly hedged) answer, not a claim-free question. "
-        "Never call this alongside get_walkthrough."
+        "Never call this alongside an action tool."
     ),
     "input_schema": {
         "type": "object",
@@ -263,19 +243,48 @@ SET_PARAM_SCHEMA = {
         "required": ["plugin", "param", "value"],
         "additionalProperties": False,
     },
+}
+
+# Approved navigation routes (2026-09-21): name -> verified path, loaded once.
+# The model only ever names a route; the path it runs is always this file's.
+# Model-written menu paths are the failure this codebase has hit most
+# (confidently wrong, and wrong in ways the user can't catch).
+ROUTES: dict[str, dict] = json.loads(
+    (Path(__file__).parent.parent / "seed" / "routes.json").read_text()
+)
+
+OPEN_SETTING_SCHEMA = {
+    "name": "open_setting",
+    "description": (
+        "Queue an action that takes the user to a Logic Pro setting, window or feature by one of "
+        "the approved routes below -- the route's verified steps run on the user's Mac after your "
+        "reply, when they press Run (it has NOT happened when you write your reply). Use it for a "
+        "direct request to open or go to one of these; name must be one of the routes listed. If "
+        "what the user wants isn't listed, don't pick the nearest one -- say you don't have a "
+        "verified route for it.\n\nRoutes:\n"
+        + "\n".join(f"- {name}: {route['desc']}" for name, route in sorted(ROUTES.items()))
+    ),
+    "strict": True,
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string", "enum": sorted(ROUTES), "description": "One of the approved routes."},
+        },
+        "required": ["name"],
+        "additionalProperties": False,
+    },
     # Cache breakpoint for the whole tools array -- every schema is static
     # across every call in a run, but gets resent unchanged on every loop
     # iteration and every turn otherwise (measured 2026-08-05: 66 calls,
     # 207,869 uncached input tokens across a 24-scenario battery). Must sit
     # on the LAST schema in the array for the cache breakpoint to cover all
-    # of them -- moved here from web_research when the action tools were
-    # added after it.
+    # of them.
     "cache_control": {"type": "ephemeral"},
 }
 
-TOOLS = [LOOKUP_CONCEPT_SCHEMA, GET_WALKTHROUGH_SCHEMA, ASK_CLARIFYING_QUESTION_SCHEMA, WEB_RESEARCH_SCHEMA,
-         OPEN_PLUGIN_SCHEMA, SET_PARAM_SCHEMA]
-ACTION_TOOLS = {"open_plugin", "set_param"}
+TOOLS = [LOOKUP_CONCEPT_SCHEMA, ASK_CLARIFYING_QUESTION_SCHEMA, WEB_RESEARCH_SCHEMA,
+         OPEN_PLUGIN_SCHEMA, SET_PARAM_SCHEMA, OPEN_SETTING_SCHEMA]
+ACTION_TOOLS = {"open_plugin", "set_param", "open_setting"}
 
 
 def _content_summary(name: str, content: dict) -> str:
@@ -302,12 +311,12 @@ async def lookup_concept(problem: str, _vec: list[float] | None = None) -> dict:
         """
         select * from (
             select 'problem'::text as kind, id, name, null::jsonb as content,
-                   null::jsonb as path, null::uuid as extends_to, note,
+                   null::jsonb as action, note,
                    (embedding <=> $1) as distance
             from problems
             union all
             select 'solution'::text as kind, id, name, content,
-                   path, extends_to, null::text as note,
+                   action, null::text as note,
                    (embedding <=> $1) as distance
             from solutions
         ) combined
@@ -356,7 +365,7 @@ async def lookup_concept(problem: str, _vec: list[float] | None = None) -> dict:
     if problem_id is not None:
         links = await db.pool().fetch(
             """
-            select s.name, s.content, s.path, s.extends_to, ps.seed_weight, ps.distinguisher
+            select s.name, s.content, s.action, ps.seed_weight, ps.distinguisher
             from problem_solutions ps
             join solutions s on s.id = ps.solution_id
             where ps.problem_id = $1
@@ -370,7 +379,7 @@ async def lookup_concept(problem: str, _vec: list[float] | None = None) -> dict:
                 "seed_weight": r["seed_weight"],
                 "distinguisher": r["distinguisher"],
                 "summary": _content_summary(r["name"], r["content"] or {}),
-                "has_path": bool(r["path"] or r["extends_to"]),
+                "action": r["action"],
             }
             for r in links
         ]
@@ -391,7 +400,7 @@ async def lookup_concept(problem: str, _vec: list[float] | None = None) -> dict:
             "seed_weight": None,
             "distinguisher": None,
             "summary": _content_summary(top["name"], top["content"] or {}),
-            "has_path": bool(top["path"] or top["extends_to"]),
+            "action": top["action"],
         }],
         "note": None,
     }
@@ -409,69 +418,6 @@ def _is_truthy(value) -> bool:
     if isinstance(value, int):
         return value == 1
     return False
-
-
-async def get_walkthrough(solution: str, ax_fixture: dict | None = None) -> dict:
-    row = await db.pool().fetchrow(
-        "select path, extends_to, toggle_ax_key, value_ax_key from solutions where name = $1",
-        solution,
-    )
-    if not row:
-        return {"attached": False, "reason": "solution not found"}
-
-    # Refuses on the assumption the target is always "make it visible/on"
-    # (true of every toggle-type destination in the KB today). A force=true
-    # escape hatch for the opposite intent (turning something OFF) was tried
-    # and reverted 2026-08-05: in 3 of 4 reruns the model set force=true on
-    # the exact "I can't find it, where is it" query this guard exists to
-    # protect -- the same soft-instruction-doesn't-reliably-constrain-
-    # behavior failure this project keeps finding elsewhere. Left as a known,
-    # undocumented-fix limitation rather than a fix that made things worse.
-    if row["toggle_ax_key"] and ax_fixture and _is_truthy(ax_fixture.get(row["toggle_ax_key"])):
-        return {
-            "attached": False,
-            "reason": (
-                f"already in the target state ({row['toggle_ax_key']} is already true this "
-                "turn) -- attaching would toggle it away, not reveal it; tell the user it's "
-                "already there instead of walking through how to enable it"
-            ),
-        }
-
-    # value_ax_key: unlike a toggle, there's no fixed target value -- the key's
-    # mere presence in ax_fixture means this turn already has ground truth for
-    # it, so a walkthrough whose job is "go look this value up" is redundant
-    # regardless of what the value actually is. Found live 2026-08-18
-    # (multiturn_evidence_arrives_later_turn): the model correctly used the
-    # solution's own later fix steps in prose but still attached a walkthrough
-    # for the exact value the turn already had confirmed.
-    if row["value_ax_key"] and ax_fixture and row["value_ax_key"] in ax_fixture:
-        return {
-            "attached": False,
-            "reason": (
-                f"the current value is already known this turn ({row['value_ax_key']} = "
-                f"{ax_fixture[row['value_ax_key']]}) -- don't attach a walkthrough for "
-                "checking/changing it. Tell the user directly that this value is already "
-                "confirmed, and if the solution's own content describes a further step "
-                "beyond this value, cover that step in prose instead."
-            ),
-        }
-
-    path = row["path"]
-    resolved_name = solution
-    if not path and row["extends_to"]:
-        target = await db.pool().fetchrow(
-            "select name, path from solutions where id = $1", row["extends_to"]
-        )
-        if target:
-            path = target["path"]
-            resolved_name = target["name"]
-
-    if not path:
-        return {"attached": False, "reason": "no executable path for this solution"}
-    steps = path_to_walkthrough_steps(path)
-    if not steps:
-        return {"attached": False, "reason": "path present but produced no executable steps"}
-    return {"attached": True, "destination": resolved_name, "steps": steps}
 
 
 _MAX_NAME = 64
@@ -545,3 +491,42 @@ def queue_set_param(inp: dict) -> dict:
             return {"attached": False, "reason": err}
         spec["track"] = track
     return {"attached": True, "action": "set_param", "steps": [{"ax_set_param": spec}]}
+
+
+def queue_open_setting(inp: dict, ax_fixture: dict | None = None) -> dict:
+    """Executor for open_setting: an approved route's verified steps."""
+    name = str(inp.get("name") or "").strip()
+    route = ROUTES.get(name)
+    if route is None:
+        return {"attached": False, "reason": f"{name!r} isn't an approved route -- say you don't have a verified route for it"}
+    # Toggle gate (moved here from the solution row, 2026-08-05): the route
+    # flips something the live state says is already in its target state, so
+    # running it would switch it AWAY. Refused rather than attached.
+    key = route.get("toggle_ax_key")
+    if key and ax_fixture and _is_truthy(ax_fixture.get(key)):
+        return {
+            "attached": False,
+            "reason": (f"already in the target state ({key} is already true this turn) -- running this "
+                       "would switch it away; tell the user it's already there instead"),
+        }
+    steps = path_to_walkthrough_steps(route["path"])
+    if not steps:
+        return {"attached": False, "reason": "route has no executable steps"}
+    # `destination` keeps the result shape pipeline._backfill_walkthrough
+    # recognises (attached + destination + steps).
+    return {"attached": True, "action": "open_setting", "destination": name, "steps": steps}
+
+
+def action_calls(action) -> list[tuple[str, dict]]:
+    """A solution's stored action ({"open_setting": "x"} / {"open_plugin": {...}}
+    / a list of those) as (tool name, tool input) pairs -- the same shape a
+    model's own call would have, so an auto-attached action and a direct call
+    are indistinguishable downstream."""
+    out = []
+    for call in (action if isinstance(action, list) else [action] if action else []):
+        for tool, arg in call.items():
+            if tool == "open_setting":
+                out.append((tool, {"name": arg}))
+            elif tool in ACTION_TOOLS and isinstance(arg, dict):
+                out.append((tool, dict(arg)))
+    return out

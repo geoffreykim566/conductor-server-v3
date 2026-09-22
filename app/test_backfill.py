@@ -50,13 +50,13 @@ async def _run_turn(messages: list, responses: list) -> object:
 
 
 async def test_genuine_reask_backfills() -> None:
-    """Turn 1 attaches for real (a real get_walkthrough call against the live
-    DB, exactly like test_multiattach_guard.py); turn 2 has zero tool calls and
+    """Turn 1 attaches for real (a real open_setting call against the approved
+    routes); turn 2 has zero tool calls and
     explicit re-ask language -- backfill should fire and reattach turn 1's
     exact steps."""
     turn1 = await _run_turn([{"role": "user", "content": "wheres sample rate"}], [
         SimpleNamespace(
-            content=[_tool_use("get_walkthrough", {"solution": "sample rate"}, "call_1")],
+            content=[_tool_use("open_setting", {"name": "sample rate"}, "call_1")],
             usage=_usage(),
         ),
         SimpleNamespace(content=[_text("File > Project Settings > Audio, click Sample Rate.")], usage=_usage()),
@@ -81,7 +81,7 @@ async def test_thanks_again_does_not_backfill() -> None:
     response that happens to name the destination -- must NOT backfill."""
     turn1 = await _run_turn([{"role": "user", "content": "wheres sample rate"}], [
         SimpleNamespace(
-            content=[_tool_use("get_walkthrough", {"solution": "sample rate"}, "call_1")],
+            content=[_tool_use("open_setting", {"name": "sample rate"}, "call_1")],
             usage=_usage(),
         ),
         SimpleNamespace(content=[_text("File > Project Settings > Audio, click Sample Rate.")], usage=_usage()),
@@ -105,7 +105,7 @@ async def test_ambiguous_multiple_destinations_does_not_backfill() -> None:
     user means."""
     turn1 = await _run_turn([{"role": "user", "content": "wheres sample rate"}], [
         SimpleNamespace(
-            content=[_tool_use("get_walkthrough", {"solution": "sample rate"}, "call_1")],
+            content=[_tool_use("open_setting", {"name": "sample rate"}, "call_1")],
             usage=_usage(),
         ),
         SimpleNamespace(content=[_text("File > Project Settings > Audio, click Sample Rate.")], usage=_usage()),
@@ -113,7 +113,7 @@ async def test_ambiguous_multiple_destinations_does_not_backfill() -> None:
     messages = turn1.messages + [{"role": "user", "content": "wheres buffer size"}]
     turn2 = await _run_turn(messages, [
         SimpleNamespace(
-            content=[_tool_use("get_walkthrough", {"solution": "buffer size"}, "call_2")],
+            content=[_tool_use("open_setting", {"name": "buffer size"}, "call_2")],
             usage=_usage(),
         ),
         SimpleNamespace(content=[_text("Logic Pro > Settings > Audio, I/O Buffer Size.")], usage=_usage()),
@@ -145,7 +145,7 @@ async def test_tool_call_this_turn_does_not_backfill() -> None:
     """
     turn1 = await _run_turn([{"role": "user", "content": "wheres sample rate"}], [
         SimpleNamespace(
-            content=[_tool_use("get_walkthrough", {"solution": "sample rate"}, "call_1")],
+            content=[_tool_use("open_setting", {"name": "sample rate"}, "call_1")],
             usage=_usage(),
         ),
         SimpleNamespace(content=[_text("File > Project Settings > Audio, click Sample Rate.")], usage=_usage()),
@@ -154,7 +154,7 @@ async def test_tool_call_this_turn_does_not_backfill() -> None:
     messages = turn1.messages + [{"role": "user", "content": "remind me, does this also apply to buffer size?"}]
     turn2 = await _run_turn(messages, [
         SimpleNamespace(
-            content=[_tool_use("get_walkthrough", {"solution": "buffer size"}, "call_2")],
+            content=[_tool_use("open_setting", {"name": "buffer size"}, "call_2")],
             usage=_usage(),
         ),
         SimpleNamespace(

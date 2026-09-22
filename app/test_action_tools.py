@@ -5,11 +5,13 @@ Covers: action calls concatenating into one card in call order (same response
 and across iterations), the per-turn cap, duplicate refusal, the first call being
 tool_choice "any" rather than a forced lookup_concept, the cap counting only
 unproductive lookups, the resume path restoring queued actions, the
-executors' own argument validation, and (2026-09-21) one card per turn for
-walkthroughs and actions alike plus the auto-run rule.
+executors' own argument validation, one card per turn, the auto-run rule, and
+(routes, 2026-09-21) open_setting, a strong single lookup queuing its
+solution's action, pick-or-ask after a bucket lookup, and refusing a second
+candidate from the same bucket.
 
-No DB, no Voyage: model responses are scripted, and lookup_concept /
-get_walkthrough are stubbed in pipeline._EXECUTORS. Run inside the app container:
+No DB, no Voyage: model responses are scripted and lookup_concept is stubbed
+in pipeline._EXECUTORS (open_setting reads seed/routes.json). Run inside the app container:
     docker compose exec app python -m app.test_action_tools
 """
 from __future__ import annotations
@@ -39,8 +41,18 @@ def _resp(*blocks) -> SimpleNamespace:
     return SimpleNamespace(content=list(blocks), usage=_usage())
 
 
-async def _fake_walkthrough(inp: dict, fixture) -> dict:
-    return {"attached": True, "destination": inp["solution"], "steps": [{"menu_path": ["File", inp["solution"]]}]}
+def _route(name: str) -> list:
+    return tools.queue_open_setting({"name": name})["steps"]
+
+
+def _single(solution: str, action: dict, conf: str = "strong") -> dict:
+    return {"match": "single", "problem": solution, "match_confidence": conf,
+            "solutions": [{"name": solution, "action": action}]}
+
+
+def _bucket(problem: str, cands: dict[str, dict]) -> dict:
+    return {"match": "problem", "problem": problem, "match_confidence": "strong",
+            "solutions": [{"name": n, "action": a} for n, a in cands.items()]}
 
 
 def _fake_lookup(outputs: list[dict]):
@@ -56,7 +68,7 @@ def _fake_lookup(outputs: list[dict]):
 
 
 async def _run(responses: list, lookups: list[dict] | None = None, messages: list[dict] | None = None,
-               **kwargs):
+               **kwargs):  # noqa: D401
     """Drive respond() through scripted decider responses. Decider calls pass
     tools=; the writer call doesn't, so it gets a plain text reply and the
     decider script isn't consumed by it. Returns (result, decider_kwargs)."""
@@ -68,8 +80,7 @@ async def _run(responses: list, lookups: list[dict] | None = None, messages: lis
         decider_calls.append(kw)
         return responses[min(len(decider_calls) - 1, len(responses) - 1)]
 
-    stubs = {"get_walkthrough": _fake_walkthrough,
-             "lookup_concept": _fake_lookup(lookups or [{"match": "none"}])}
+    stubs = {"lookup_concept": _fake_lookup(lookups or [{"match": "none"}])}
     with patch.object(pipeline._client.messages, "create", new=AsyncMock(side_effect=fake_create)), \
          patch.dict(pipeline._EXECUTORS, stubs):
         result = await pipeline.respond(messages or [{"role": "user", "content": "test"}], **kwargs)
@@ -127,41 +138,124 @@ async def test_duplicate_action_refused() -> None:
     print("PASS: an exact duplicate action is refused; it runs once.")
 
 
-async def test_action_and_walkthrough_share_the_card() -> None:
-    # One card per turn: a KB route and an action are both steps, call order.
+async def test_route_and_action_share_the_card() -> None:
     result, _ = await _run([
-        _resp(_tool_use("get_walkthrough", {"solution": "buffer size"}, "w1"), _open("Compressor", "a1")),
+        _resp(_tool_use("open_setting", {"name": "buffer size"}, "w1"), _open("Compressor", "a1")),
         _resp(_text("done")),
     ])
-    assert result.walkthrough_steps == [{"menu_path": ["File", "buffer size"]}, {"ax_open_plugin": "Compressor"}], \
-        result.walkthrough_steps
-    print("PASS: a walkthrough and an action share one card, in call order.")
+    assert result.walkthrough_steps == _route("buffer size") + [{"ax_open_plugin": "Compressor"}], result.walkthrough_steps
+    assert result.card_from_lookup is False
+    print("PASS: a route and a plugin action share one card, in call order.")
 
 
-async def test_fallback_refused_separate_request_joins() -> None:
-    # Two solutions from the SAME problem -> the second is an alternative, refused.
-    same = [{"match": "problem", "problem": "crackling", "match_confidence": "strong",
-             "solutions": [{"name": "buffer size"}, {"name": "sample rate"}]}]
+async def test_unknown_route_refused() -> None:
+    result, _ = await _run([_resp(_tool_use("open_setting", {"name": "frame rate"}, "w1")), _resp(_text("done"))])
+    out = next(c["output"] for c in result.trace if c["tool"] == "open_setting")
+    assert out["attached"] is False and "approved route" in out["reason"], out
+    assert result.walkthrough_steps is None
+    print("PASS: open_setting refuses a name that isn't an approved route.")
+
+
+async def test_auto_attach_strong_single() -> None:
+    lookups = [_single("buffer size", {"open_setting": "buffer size"})]
+    result, calls = await _run([
+        _resp(_tool_use("lookup_concept", {"problem": "buffer size"}, "l1")),
+        _resp(_text("It's the I/O buffer size.")),
+    ], lookups=lookups, messages=[{"role": "user", "content": "raise my buffer size"}])
+    assert result.walkthrough_steps == _route("buffer size"), result.walkthrough_steps
+    assert result.card_from_lookup is True and result.auto_run is False, (result.card_from_lookup, result.auto_run)
+    look = next(c["output"] for c in result.trace if c["tool"] == "lookup_concept")
+    assert look["on_card_note"] == pipeline._ON_CARD_NOTE, look
+    assert len(calls) == 2, "no extra decider call on an auto-attached turn"
+    print("PASS: a strong single lookup queues its solution's action; a lookup-queued card never auto-runs.")
+
+
+async def test_moderate_single_is_pick_or_ask() -> None:
+    lookups = [_single("recording settings", {"open_setting": "recording settings"}, conf="moderate — treat with skepticism")]
+    result, calls = await _run([_resp(_tool_use("lookup_concept", {"problem": "x"}, "l1")), _resp(_text("hm")),
+                                _resp(_tool_use("open_setting", {"name": "recording settings"}, "w1")), _resp(_text("ok"))],
+                               lookups=lookups)
+    assert calls[2]["tool_choice"] == {"type": "any"}, calls[2].get("tool_choice")
+    assert result.walkthrough_steps == _route("recording settings") and result.card_from_lookup is False
+    with patch.object(pipeline, "PICK_ON_MODERATE_SINGLE", False):
+        result, calls = await _run([_resp(_tool_use("lookup_concept", {"problem": "x"}, "l1")), _resp(_text("hm"))],
+                                   lookups=lookups)
+    assert result.walkthrough_steps is None and len(calls) == 2
+    print("PASS: a moderate single isn't auto-attached but gets pick-or-ask (flag restores prose-only).")
+
+
+async def test_route_toggle_gate() -> None:
+    lookups = [_single("input monitoring toggle", {"open_setting": "input monitoring toggle"})]
+    result, _ = await _run([_resp(_tool_use("lookup_concept", {"problem": "monitor button"}, "l1")), _resp(_text("ok"))],
+                           lookups=lookups, ax_fixture={"input_monitoring_button_visible": True})
+    look = next(c["output"] for c in result.trace if c["tool"] == "lookup_concept")
+    assert result.walkthrough_steps is None and look["on_card_note"].startswith("This solution's action was NOT queued"), look
+    print("PASS: the toggle gate on a route refuses an auto-attach that would switch it away.")
+
+
+async def test_pick_or_ask() -> None:
+    crackling = [_bucket("crackling", {"CPU overload": {"open_setting": "buffer size"},
+                                       "sample rate mismatch": {"open_setting": "sample rate"}})]
+    # Prose-only answer after the bucket -> one forced re-ask, which picks.
+    result, calls = await _run([
+        _resp(_tool_use("lookup_concept", {"problem": "crackling"}, "l1")),
+        _resp(_text("It's CPU overload -- raise the buffer.")),
+        _resp(_tool_use("open_setting", {"name": "buffer size"}, "w1")),
+        _resp(_text("Raise the buffer size.")),
+    ], lookups=crackling)
+    assert calls[2]["tool_choice"] == {"type": "any"} and pipeline._PICK_NUDGE in calls[2]["system"][-1]["text"], calls[2]
+    assert result.walkthrough_steps == _route("buffer size"), result.walkthrough_steps
+    # Asked once only: a second prose-only answer ends the turn with no card.
+    result, calls = await _run([
+        _resp(_tool_use("lookup_concept", {"problem": "crackling"}, "l1")),
+        _resp(_text("prose")), _resp(_text("still prose")),
+    ], lookups=crackling)
+    assert result.walkthrough_steps is None and len(calls) == 3, (result.walkthrough_steps, len(calls))
+    # A clarifying question satisfies it.
+    result, calls = await _run([
+        _resp(_tool_use("lookup_concept", {"problem": "crackling"}, "l1")),
+        _resp(_tool_use("ask_clarifying_question", {}, "q1")),
+    ], lookups=crackling)
+    assert len(calls) == 2, len(calls)
+    print("PASS: after a bucket lookup the turn can't end on prose alone -- one forced re-ask; a question counts.")
+
+
+async def test_alternative_pick_refused_separate_request_joins() -> None:
+    crackling = [_bucket("crackling", {"CPU overload": {"open_setting": "buffer size"},
+                                       "sample rate mismatch": {"open_setting": "sample rate"}})]
     result, _ = await _run([
         _resp(_tool_use("lookup_concept", {"problem": "crackling"}, "l1")),
-        _resp(_tool_use("get_walkthrough", {"solution": "buffer size"}, "w1"),
-              _tool_use("get_walkthrough", {"solution": "sample rate"}, "w2")),
+        _resp(_tool_use("open_setting", {"name": "buffer size"}, "w1"), _tool_use("open_setting", {"name": "sample rate"}, "w2")),
         _resp(_text("done")),
-    ], lookups=same)
-    outs = [c["output"] for c in result.trace if c["tool"] == "get_walkthrough"]
+    ], lookups=crackling)
+    outs = [c["output"] for c in result.trace if c["tool"] == "open_setting"]
     assert outs[0]["attached"] and outs[1] == {"attached": False, "reason": pipeline._FALLBACK_REFUSAL}, outs
-    # Solutions from DIFFERENT problems -> two requests, both on the card.
-    two = [{"match": "problem", "problem": "crackling", "match_confidence": "strong", "solutions": [{"name": "buffer size"}]},
-           {"match": "problem", "problem": "freezing", "match_confidence": "strong", "solutions": [{"name": "freeze track"}]}]
+    two = [_bucket("crackling", {"CPU overload": {"open_setting": "buffer size"}}),
+           _bucket("freezing", {"track freeze (technique)": {"open_setting": "freeze track"}})]
     result, _ = await _run([
         _resp(_tool_use("lookup_concept", {"problem": "crackling"}, "l1"), _tool_use("lookup_concept", {"problem": "freeze"}, "l2")),
-        _resp(_tool_use("get_walkthrough", {"solution": "buffer size"}, "w1"),
-              _tool_use("get_walkthrough", {"solution": "freeze track"}, "w2")),
+        _resp(_tool_use("open_setting", {"name": "buffer size"}, "w1"), _tool_use("open_setting", {"name": "freeze track"}, "w2")),
         _resp(_text("done")),
     ], lookups=two)
-    assert result.walkthrough_steps == [{"menu_path": ["File", "buffer size"]}, {"menu_path": ["File", "freeze track"]}], \
-        result.walkthrough_steps
-    print("PASS: an alternative for the same problem is refused; a separate request joins the card.")
+    assert result.walkthrough_steps == _route("buffer size") + _route("freeze track"), result.walkthrough_steps
+    print("PASS: a second candidate from the same bucket is refused; a separate request joins the card.")
+
+
+async def test_resume_restores_lookup_queued_action() -> None:
+    steps = _route("buffer size")
+    look = {**_single("buffer size", {"open_setting": "buffer size"}),
+            "on_card": [{"tool": "open_setting", "input": {"name": "buffer size"},
+                         "output": {"attached": True, "destination": "buffer size", "steps": steps}}]}
+    parked = [
+        {"role": "user", "content": "raise my buffer and tell me about 1176s"},
+        {"role": "assistant", "content": [{"type": "tool_use", "id": "l1", "name": "lookup_concept", "input": {"problem": "buffer size"}}]},
+        {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "l1", "content": json.dumps(look)}]},
+        {"role": "assistant", "content": [{"type": "tool_use", "id": "r1", "name": "web_research", "input": {"query": "1176"}}]},
+    ]
+    with patch.object(pipeline.research, "web_research", new=AsyncMock(return_value={"findings": "x", "sources": []})):
+        result, _ = await _run([_resp(_text("done"))], messages=parked, resume="allow_research")
+    assert result.walkthrough_steps == steps and result.card_from_lookup is True, (result.walkthrough_steps, result.card_from_lookup)
+    print("PASS: a resumed turn keeps the action its lookup queued, and still doesn't auto-run it.")
 
 
 async def test_auto_run() -> None:
@@ -287,8 +381,14 @@ async def main() -> None:
     await test_actions_combine_across_iterations()
     await test_action_cap()
     await test_duplicate_action_refused()
-    await test_action_and_walkthrough_share_the_card()
-    await test_fallback_refused_separate_request_joins()
+    await test_route_and_action_share_the_card()
+    await test_unknown_route_refused()
+    await test_auto_attach_strong_single()
+    await test_moderate_single_is_pick_or_ask()
+    await test_route_toggle_gate()
+    await test_pick_or_ask()
+    await test_alternative_pick_refused_separate_request_joins()
+    await test_resume_restores_lookup_queued_action()
     await test_auto_run()
     await test_first_call_is_any()
     await test_cap_counts_only_unproductive()

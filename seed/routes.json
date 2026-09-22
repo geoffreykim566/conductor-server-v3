@@ -1,0 +1,518 @@
+{
+  "audio settings": {
+    "desc": "Settings window, Audio tab",
+    "path": [
+      {
+        "type": "menu",
+        "value": "Logic Pro"
+      },
+      {
+        "type": "menu",
+        "value": "Settings"
+      },
+      {
+        "type": "menu",
+        "value": "Audio"
+      }
+    ]
+  },
+  "bounce in place": {
+    "desc": "Bounce in Place",
+    "path": [
+      {
+        "type": "shortcut",
+        "value": "Ctrl+B"
+      }
+    ]
+  },
+  "bounce project": {
+    "desc": "Bounce dialog",
+    "path": [
+      {
+        "type": "shortcut",
+        "value": "Cmd+B"
+      }
+    ]
+  },
+  "buffer size": {
+    "desc": "Audio settings pane, Devices tab",
+    "path": [
+      {
+        "type": "menu",
+        "value": "Logic Pro"
+      },
+      {
+        "type": "menu",
+        "value": "Settings"
+      },
+      {
+        "type": "menu",
+        "value": "Audio"
+      },
+      {
+        "type": "click_value_of",
+        "value": "I/O Buffer Size"
+      }
+    ]
+  },
+  "bypass control surfaces": {
+    "desc": "Disables all control surface communication, including MIDI controllers Logic has detected as control surfaces",
+    "path": [
+      {
+        "type": "menu",
+        "value": "Logic Pro"
+      },
+      {
+        "type": "menu",
+        "value": "Control Surfaces"
+      },
+      {
+        "type": "menu",
+        "value": "Bypass All Control Surfaces"
+      }
+    ]
+  },
+  "cycle mode": {
+    "desc": "Cycle mode",
+    "path": [
+      {
+        "type": "shortcut",
+        "value": "C"
+      }
+    ]
+  },
+  "event list": {
+    "desc": "Event List editor",
+    "path": [
+      {
+        "type": "shortcut",
+        "value": "Cmd+7"
+      }
+    ]
+  },
+  "export all tracks": {
+    "desc": "Export dialog",
+    "path": [
+      {
+        "type": "shortcut",
+        "value": "Shift+Cmd+E"
+      }
+    ]
+  },
+  "flashback capture": {
+    "desc": "Retroactively captures MIDI played during the last playback pass",
+    "path": [
+      {
+        "type": "shortcut",
+        "value": "Shift+R"
+      }
+    ]
+  },
+  "flex pitch": {
+    "desc": "Flex Pitch enabled on the selected track",
+    "path": [
+      {
+        "type": "shortcut",
+        "value": "Cmd+F"
+      },
+      {
+        "type": "click_text",
+        "value": [
+          "Automatic (Polyphonic)",
+          "Monophonic",
+          "Slicing",
+          "Rhythmic",
+          "Polyphonic",
+          "Speed (FX)",
+          "Tempophone (FX)"
+        ]
+      },
+      {
+        "type": "click_text",
+        "value": "Flex Pitch"
+      }
+    ]
+  },
+  "flex time": {
+    "desc": "Click the Flex button on the track header (or press Cmd+F) to open the Flex dropdown",
+    "path": [
+      {
+        "type": "shortcut",
+        "value": "Cmd+F"
+      },
+      {
+        "type": "click_text",
+        "value": [
+          "Automatic (Polyphonic)",
+          "Monophonic",
+          "Slicing",
+          "Rhythmic",
+          "Polyphonic",
+          "Speed (FX)",
+          "Tempophone (FX)"
+        ]
+      }
+    ]
+  },
+  "follow tempo": {
+    "desc": "Region Inspector (select an audio region, press I)",
+    "path": [
+      {
+        "type": "shortcut",
+        "value": "I"
+      },
+      {
+        "type": "click_text",
+        "value": "Region"
+      },
+      {
+        "type": "click_value_of",
+        "value": "Smart Tempo"
+      }
+    ]
+  },
+  "freeze track": {
+    "desc": "Freeze renders the track's plugins to a temporary audio file and disables them, freeing CPU",
+    "path": [
+      {
+        "type": "shortcut",
+        "value": "Option+T"
+      },
+      {
+        "type": "click_text",
+        "value": "Freeze"
+      }
+    ]
+  },
+  "global tracks": {
+    "desc": "Global Tracks area above the Tracks Area",
+    "path": [
+      {
+        "type": "shortcut",
+        "value": "G"
+      }
+    ]
+  },
+  "input monitoring toggle": {
+    "desc": "Opens the Configure Track Header panel, where Input Monitoring (the \"I\" button on audio tracks) can be checked",
+    "path": [
+      {
+        "type": "shortcut",
+        "value": "Option+T"
+      },
+      {
+        "type": "click_text",
+        "value": "Input Monitoring"
+      }
+    ],
+    "toggle_ax_key": "input_monitoring_button_visible"
+  },
+  "key commands": {
+    "desc": "Key Commands window",
+    "path": [
+      {
+        "type": "shortcut",
+        "value": "Option+K"
+      }
+    ]
+  },
+  "loop browser": {
+    "desc": "Loop Browser panel",
+    "path": [
+      {
+        "type": "shortcut",
+        "value": "O"
+      }
+    ]
+  },
+  "low latency monitoring mode": {
+    "desc": "Toggles Low Latency Monitoring Mode",
+    "path": [
+      {
+        "type": "menu",
+        "value": "Record"
+      },
+      {
+        "type": "menu",
+        "value": "Low Latency Monitoring Mode"
+      }
+    ]
+  },
+  "metronome settings": {
+    "desc": "Project Settings window, Metronome tab",
+    "path": [
+      {
+        "type": "menu",
+        "value": "File"
+      },
+      {
+        "type": "menu",
+        "value": "Project Settings"
+      },
+      {
+        "type": "menu",
+        "value": "Metronome"
+      }
+    ]
+  },
+  "midi project settings": {
+    "desc": "Project Settings window, MIDI tab",
+    "path": [
+      {
+        "type": "menu",
+        "value": "File"
+      },
+      {
+        "type": "menu",
+        "value": "Project Settings"
+      },
+      {
+        "type": "menu",
+        "value": "MIDI"
+      }
+    ]
+  },
+  "mixer": {
+    "desc": "The Mixer",
+    "path": [
+      {
+        "type": "shortcut",
+        "value": "X"
+      }
+    ]
+  },
+  "new audio track": {
+    "desc": "Creates a new Audio track directly, with a channel strip ready for recording or importing audio",
+    "path": [
+      {
+        "type": "shortcut",
+        "value": "Option+Cmd+A"
+      }
+    ]
+  },
+  "new external midi track": {
+    "desc": "Creates a new External MIDI track",
+    "path": [
+      {
+        "type": "shortcut",
+        "value": "Option+Cmd+X"
+      }
+    ]
+  },
+  "new session player track": {
+    "desc": "Opens the New Session Player Track dialog",
+    "path": [
+      {
+        "type": "shortcut",
+        "value": "Option+Cmd+U"
+      }
+    ]
+  },
+  "new software instrument track": {
+    "desc": "Creates a new Software Instrument track directly, ready to load an instrument plugin",
+    "path": [
+      {
+        "type": "shortcut",
+        "value": "Option+Cmd+S"
+      }
+    ]
+  },
+  "new track": {
+    "desc": "New Tracks dialog",
+    "path": [
+      {
+        "type": "menu",
+        "value": "Track"
+      },
+      {
+        "type": "menu",
+        "value": "New Tracks\u2026"
+      }
+    ]
+  },
+  "new track with duplicate settings": {
+    "desc": "Creates a new track with the same channel strip settings (inserts, sends, routing) as the currently selected t",
+    "path": [
+      {
+        "type": "shortcut",
+        "value": "Cmd+D"
+      }
+    ]
+  },
+  "piano roll": {
+    "desc": "Piano Roll editor",
+    "path": [
+      {
+        "type": "shortcut",
+        "value": "Cmd+4"
+      }
+    ]
+  },
+  "plugin manager": {
+    "desc": "Plug-in Manager",
+    "path": [
+      {
+        "type": "menu",
+        "value": "Logic Pro"
+      },
+      {
+        "type": "menu",
+        "value": "Settings"
+      },
+      {
+        "type": "menu",
+        "value": "Plug-in Manager..."
+      }
+    ]
+  },
+  "processing threads": {
+    "desc": "Audio settings pane, Devices tab",
+    "path": [
+      {
+        "type": "menu",
+        "value": "Logic Pro"
+      },
+      {
+        "type": "menu",
+        "value": "Settings"
+      },
+      {
+        "type": "menu",
+        "value": "Audio"
+      },
+      {
+        "type": "click_value_of",
+        "value": "Processing Threads"
+      }
+    ]
+  },
+  "project recording settings": {
+    "desc": "Turn on or enable count-in / pre-roll before recording starts, or change where recorded audio files are saved",
+    "path": [
+      {
+        "type": "menu",
+        "value": "File"
+      },
+      {
+        "type": "menu",
+        "value": "Project Settings"
+      },
+      {
+        "type": "menu",
+        "value": "Recording"
+      }
+    ]
+  },
+  "quantize": {
+    "desc": "Quantize pop-up in the Region Inspector",
+    "path": [
+      {
+        "type": "shortcut",
+        "value": "Q"
+      }
+    ]
+  },
+  "recording settings": {
+    "desc": "File Type and Bit Depth for recorded audio, and Overlapping Track Recordings behavior",
+    "path": [
+      {
+        "type": "menu",
+        "value": "Logic Pro"
+      },
+      {
+        "type": "menu",
+        "value": "Settings"
+      },
+      {
+        "type": "menu",
+        "value": "Recording"
+      }
+    ]
+  },
+  "sample rate": {
+    "desc": "Project Settings window, Audio tab",
+    "path": [
+      {
+        "type": "menu",
+        "value": "File"
+      },
+      {
+        "type": "menu",
+        "value": "Project Settings"
+      },
+      {
+        "type": "menu",
+        "value": "Audio"
+      },
+      {
+        "type": "click_value_of",
+        "value": "Sample Rate"
+      }
+    ]
+  },
+  "show automation": {
+    "desc": "Automation lanes revealed on all tracks",
+    "path": [
+      {
+        "type": "shortcut",
+        "value": "A"
+      }
+    ]
+  },
+  "smart controls": {
+    "desc": "Smart Controls panel at the bottom of the main window",
+    "path": [
+      {
+        "type": "shortcut",
+        "value": "B"
+      }
+    ]
+  },
+  "smart tempo import default": {
+    "desc": "Project Settings window, Smart Tempo tab, 'Defaults for Flex and Smart Tempo Region Setting' section",
+    "path": [
+      {
+        "type": "menu",
+        "value": "File"
+      },
+      {
+        "type": "menu",
+        "value": "Project Settings"
+      },
+      {
+        "type": "menu",
+        "value": "Smart Tempo"
+      },
+      {
+        "type": "click_value_of",
+        "value": "Set Imported Files To"
+      }
+    ]
+  },
+  "smart tempo settings": {
+    "desc": "Project Settings window, Smart Tempo tab",
+    "path": [
+      {
+        "type": "menu",
+        "value": "File"
+      },
+      {
+        "type": "menu",
+        "value": "Project Settings"
+      },
+      {
+        "type": "menu",
+        "value": "Smart Tempo"
+      }
+    ]
+  },
+  "strip silence": {
+    "desc": "Remove Silence dialog",
+    "path": [
+      {
+        "type": "shortcut",
+        "value": "Ctrl+X"
+      }
+    ]
+  }
+}

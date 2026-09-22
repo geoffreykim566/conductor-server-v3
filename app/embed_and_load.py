@@ -13,6 +13,7 @@ from app import db
 from app.embed import embed
 
 SEED_FILE = Path(__file__).parent.parent / "seed" / "problems.json"
+ROUTES_FILE = Path(__file__).parent.parent / "seed" / "routes.json"
 
 
 def _solution_embed_text(sol: dict) -> str:
@@ -58,24 +59,15 @@ async def main() -> None:
 
     print(f"Loaded {len(solutions)} solutions, {len(problems)} problems from {SEED_FILE}")
 
-    # extends_to must be a single hop -- a path is a concrete, terminal thing,
-    # so a solution's extends_to target must not itself declare extends_to.
-    by_name = {s["name"]: s for s in solutions}
+    # Every open_setting a solution maps to must name a real route -- a typo
+    # here would only surface as a refused action at run time.
+    routes = json.loads(ROUTES_FILE.read_text())
     for sol in solutions:
-        target_name = sol.get("extends_to")
-        if not target_name:
-            continue
-        target = by_name.get(target_name)
-        if target is None:
-            raise ValueError(f"{sol['name']!r} extends_to unknown solution {target_name!r}")
-        if target.get("extends_to"):
-            raise ValueError(
-                f"{sol['name']!r} extends_to {target_name!r}, which itself extends_to "
-                f"{target['extends_to']!r} -- chaining is not allowed, point directly "
-                f"at the solution that actually holds the path"
-            )
-        if target.get("path") is None:
-            raise ValueError(f"{sol['name']!r} extends_to {target_name!r}, which has no path")
+        calls = sol.get("action") or []
+        for call in (calls if isinstance(calls, list) else [calls]):
+            name = call.get("open_setting")
+            if name is not None and name not in routes:
+                raise ValueError(f"{sol['name']!r} maps to open_setting {name!r}, which isn't in routes.json")
 
     sol_texts = [_solution_embed_text(s) for s in solutions]
     prob_texts = [_problem_embed_text(p) for p in problems]
@@ -94,33 +86,23 @@ async def main() -> None:
                 for sol, emb in zip(solutions, sol_embeddings):
                     row = await conn.fetchrow(
                         """
-                        insert into solutions (name, embedding, content, path, tier, extends_to, toggle_ax_key, value_ax_key)
-                        values ($1, $2, $3, $4, $5, null, $6, $7)
+                        insert into solutions (name, embedding, content, path, tier, extends_to,
+                                               toggle_ax_key, value_ax_key, action)
+                        values ($1, $2, $3, null, $4, null, null, null, $5)
                         on conflict (name) do update set
                             embedding      = excluded.embedding,
                             content        = excluded.content,
-                            path           = excluded.path,
+                            path           = null,
                             tier           = excluded.tier,
                             extends_to     = null,
-                            toggle_ax_key  = excluded.toggle_ax_key,
-                            value_ax_key   = excluded.value_ax_key
+                            toggle_ax_key  = null,
+                            value_ax_key   = null,
+                            action         = excluded.action
                         returning id
                         """,
-                        sol["name"], emb, sol["content"], sol.get("path"), sol.get("tier", "established"),
-                        sol.get("toggle_ax_key"), sol.get("value_ax_key"),
+                        sol["name"], emb, sol["content"], sol.get("tier", "established"), sol.get("action"),
                     )
                     sol_ids[sol["name"]] = row["id"]
-
-                # Second pass: extends_to references another solution's id, so it
-                # can only be wired up once every solution above has one.
-                for sol in solutions:
-                    target_name = sol.get("extends_to")
-                    if not target_name:
-                        continue
-                    await conn.execute(
-                        "update solutions set extends_to = $1 where id = $2",
-                        sol_ids[target_name], sol_ids[sol["name"]],
-                    )
 
                 prob_ids: dict[str, str] = {}
                 for prob, emb in zip(problems, prob_embeddings):
