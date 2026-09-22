@@ -25,7 +25,10 @@
         "do_not": "do not change the project tempo to try to match the audio \u2014 this affects the whole project"
       },
       "kind": "diagnosis",
-      "aliases": []
+      "aliases": [],
+      "action": {
+        "open_setting": "follow tempo"
+      }
     },
     {
       "name": "muddy bass",

@@ -258,6 +258,71 @@ async def test_resume_restores_lookup_queued_action() -> None:
     print("PASS: a resumed turn keeps the action its lookup queued, and still doesn't auto-run it.")
 
 
+async def test_endorsing_a_lookup_queued_action() -> None:
+    # The model calls the action the lookup already queued: agreement, not a
+    # second request -- its version (with the track) replaces the queued step,
+    # nothing is refused, and the card is model-called so it may auto-run.
+    lookups = [_single("channel eq", {"open_plugin": {"plugin": "Channel EQ"}})]
+    result, _ = await _run([
+        _resp(_tool_use("lookup_concept", {"problem": "channel eq"}, "l1")),
+        _resp(_open("Channel EQ", "a1", track="Audio 1")),
+        _resp(_text("done")),
+    ], lookups=lookups, messages=[{"role": "user", "content": "open channel eq"}])
+    assert result.walkthrough_steps == [{"ax_open_plugin": "Channel EQ", "track": "Audio 1"}], result.walkthrough_steps
+    opens = [c["output"] for c in result.trace if c["tool"] == "open_plugin"]
+    assert opens[0].get("attached"), opens[0]                    # the lookup's own queue
+    assert opens[-1].get("already_queued"), opens[-1]            # the model endorsing it
+    assert result.card_from_lookup is False and result.auto_run is True, (result.card_from_lookup, result.auto_run)
+    print("PASS: a direct call for an already-queued action replaces it, isn't refused, and lets the card auto-run.")
+
+
+async def test_weak_bucket_does_not_force_a_pick() -> None:
+    weak = [{"match": "problem", "problem": "something else", "match_confidence": "weak — likely not relevant",
+             "solutions": [{"name": "buffer size", "action": {"open_setting": "buffer size"}}]}]
+    result, calls = await _run([
+        _resp(_tool_use("lookup_concept", {"problem": "phantom power"}, "l1")),
+        _resp(_text("I don't have a verified answer for that.")),
+    ], lookups=weak)
+    assert result.walkthrough_steps is None and len(calls) == 2, (result.walkthrough_steps, len(calls))
+    print("PASS: a weak match never forces a pick -- an honest 'no verified answer' stands.")
+
+
+async def test_auto_attach_respects_commit_to_one() -> None:
+    # Bucket pick first, then the model looks the sibling candidate up by name
+    # (a strong single): its action must NOT slip onto the card.
+    lookups = [
+        _bucket("crackling", {"CPU overload": {"open_setting": "buffer size"},
+                              "sample rate mismatch": {"open_setting": "sample rate"}}),
+        _single("sample rate mismatch", {"open_setting": "sample rate"}),
+    ]
+    result, _ = await _run([
+        _resp(_tool_use("lookup_concept", {"problem": "crackling"}, "l1")),
+        _resp(_tool_use("open_setting", {"name": "buffer size"}, "w1")),
+        _resp(_tool_use("lookup_concept", {"problem": "sample rate mismatch"}, "l2")),
+        _resp(_text("done")),
+    ], lookups=lookups)
+    assert result.walkthrough_steps == _route("buffer size"), result.walkthrough_steps
+    second = [c for c in result.trace if c["tool"] == "lookup_concept"][1]["output"]
+    assert second["on_card"][0]["output"] == {"attached": False, "reason": pipeline._FALLBACK_REFUSAL}, second
+    print("PASS: a lookup can't auto-queue a second candidate for a problem already on the card.")
+
+
+def test_card_descriptions() -> None:
+    trace = [
+        {"tool": "open_plugin", "input": {"plugin": "Channel EQ", "track": "Audio 1"}, "output": {"attached": True}},
+        {"tool": "set_param", "input": {"plugin": "Channel EQ", "param": "Low Cut Frequency", "value": "80"},
+         "output": {"attached": True}},
+        {"tool": "open_setting", "input": {"name": "buffer size"}, "output": {"attached": True}},
+        {"tool": "open_plugin", "input": {"plugin": "Compressor"}, "output": {"attached": False, "reason": "x"}},
+    ]
+    lines = pipeline.card_descriptions(trace)
+    assert lines[0] == "opens Channel EQ on Audio 1", lines
+    assert lines[1] == "sets Channel EQ Low Cut Frequency to 80", lines
+    assert lines[2].startswith("opens buffer size -- Audio settings pane"), lines
+    assert len(lines) == 3, "a refused call is not on the card"
+    print("PASS: the writer's card description covers every queued step and nothing else.")
+
+
 async def test_auto_run() -> None:
     card = [_resp(_open("Compressor", "a1")), _resp(_text("done"))]
     cases = {
@@ -377,6 +442,7 @@ def test_executor_validation() -> None:
 async def main() -> None:
     test_executor_validation()
     test_is_question()
+    test_card_descriptions()
     await test_actions_combine_same_response()
     await test_actions_combine_across_iterations()
     await test_action_cap()
@@ -389,6 +455,9 @@ async def main() -> None:
     await test_pick_or_ask()
     await test_alternative_pick_refused_separate_request_joins()
     await test_resume_restores_lookup_queued_action()
+    await test_endorsing_a_lookup_queued_action()
+    await test_weak_bucket_does_not_force_a_pick()
+    await test_auto_attach_respects_commit_to_one()
     await test_auto_run()
     await test_first_call_is_any()
     await test_cap_counts_only_unproductive()
