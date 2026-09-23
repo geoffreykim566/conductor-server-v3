@@ -1,7 +1,7 @@
 [
   {
     "name": "slowed_direct",
-    "note": "direct destination ask on a solution whose destination-relevant text lives in 'cause', not a dedicated nav name — tests whether denormalizing path onto the diagnosis solution broke direct-destination matching 2026-09-22: 'match' dropped — the destination is an approved open_setting route, so the model reaches it directly with no lookup; the card is what's graded.",
+    "note": "direct destination ask on a solution whose destination-relevant text lives in 'cause', not a dedicated nav name \u2014 tests whether denormalizing path onto the diagnosis solution broke direct-destination matching 2026-09-22: 'match' dropped \u2014 the destination is an approved open_setting route, so the model reaches it directly with no lookup; the card is what's graded.",
     "expect": {
       "walkthrough_destination": "sample rate"
     },
@@ -13,7 +13,7 @@
   },
   {
     "name": "buffer_size_direct_risky",
-    "note": "same risk as above but harsher — 'buffer size' only appears in CPU overload's excluded 'fix' text, not in the embedded symptom/cause 2026-09-22: 'match' dropped — the destination is an approved open_setting route, so the model reaches it directly with no lookup; the card is what's graded.",
+    "note": "same risk as above but harsher \u2014 'buffer size' only appears in CPU overload's excluded 'fix' text, not in the embedded symptom/cause 2026-09-22: 'match' dropped \u2014 the destination is an approved open_setting route, so the model reaches it directly with no lookup; the card is what's graded.",
     "expect": {
       "walkthrough_destination": "buffer size"
     },
@@ -38,7 +38,7 @@
   },
   {
     "name": "slowed_context_pitch",
-    "note": "distinguisher present (pitch AND speed off) — should tip firmly toward sample rate mismatch",
+    "note": "distinguisher present (pitch AND speed off) \u2014 should tip firmly toward sample rate mismatch",
     "expect": {
       "match": "problem",
       "walkthrough_destination": "sample rate"
@@ -51,7 +51,7 @@
   },
   {
     "name": "muddy_direct_bass",
-    "note": "element explicitly named — but muddy bass/vocals/kick-clash are all path-less technique content, so no walkthrough is ever possible here regardless of which one it picks",
+    "note": "element explicitly named \u2014 but muddy bass/vocals/kick-clash are all path-less technique content, so no walkthrough is ever possible here regardless of which one it picks",
     "expect": {
       "walkthrough_destination": null
     },
@@ -63,7 +63,7 @@
   },
   {
     "name": "muddy_ambiguous",
-    "note": "no element named, 3 real candidates — expect a clarifying question",
+    "note": "no element named, 3 real candidates \u2014 expect a clarifying question",
     "expect": {
       "match": "problem",
       "walkthrough_destination": null
@@ -76,7 +76,7 @@
   },
   {
     "name": "thin_hollow_boundary",
-    "note": "verbatim plan.md #85 case — genuinely 3-way ambiguous",
+    "note": "verbatim plan.md #85 case \u2014 genuinely 3-way ambiguous",
     "expect": {
       "match": "problem",
       "walkthrough_destination": null
@@ -89,7 +89,7 @@
   },
   {
     "name": "thin_hollow_context",
-    "note": "real distinguisher present — should narrow to mix collapses in mono without asking",
+    "note": "real distinguisher present \u2014 should narrow to mix collapses in mono without asking",
     "expect": {
       "match": "problem"
     },
@@ -101,7 +101,7 @@
   },
   {
     "name": "no_sound_direct",
-    "note": "3-way ambiguous new bucket, no evidence given — committing to the weight-60 default or asking are both acceptable; leading with the weight-25 candidate with zero evidence (found live 2026-08-04) is not, and isn't in the accepted set below",
+    "note": "3-way ambiguous new bucket, no evidence given \u2014 committing to the weight-60 default or asking are both acceptable; leading with the weight-25 candidate with zero evidence (found live 2026-08-04) is not, and isn't in the accepted set below",
     "expect": {
       "match": "problem",
       "walkthrough_destination": [
@@ -160,7 +160,7 @@
   },
   {
     "name": "crackling_context_consistent_small_project",
-    "note": "distinguisher pointing the OTHER way, to sample rate mismatch, not CPU overload — prior Fable review flagged this scenario as less decisive/hedging more than it used to",
+    "note": "distinguisher pointing the OTHER way, to sample rate mismatch, not CPU overload \u2014 prior Fable review flagged this scenario as less decisive/hedging more than it used to",
     "expect": {
       "match": "problem",
       "walkthrough_destination": "sample rate"
@@ -198,7 +198,7 @@
   },
   {
     "name": "latency_single_solution",
-    "note": "deliberately single-candidate bucket — should NOT hedge or ask, just answer",
+    "note": "deliberately single-candidate bucket \u2014 should NOT hedge or ask, just answer",
     "expect": {
       "match": "problem",
       "walkthrough_destination": "low latency monitoring mode"
@@ -231,13 +231,13 @@
     },
     "turns": [
       {
-        "text": "system overload message, and im on an M3 MacBook — Processing Threads shows only 3 in use even though I have way more cores"
+        "text": "system overload message, and im on an M3 MacBook \u2014 Processing Threads shows only 3 in use even though I have way more cores"
       }
     ]
   },
   {
     "name": "adversarial_gap_phantom_power",
-    "note": "genuine KB gap (confirmed, not fabricated) — tests match:none handling and the confident-negative-claim guard",
+    "note": "genuine KB gap (confirmed, not fabricated) \u2014 tests match:none handling and the confident-negative-claim guard",
     "expect": {
       "walkthrough_destination": null
     },
@@ -249,7 +249,7 @@
   },
   {
     "name": "adversarial_gap_monitor_button",
-    "note": "was a genuine gap (2026-08-04), now has real content — should resolve for real, not decline or hallucinate",
+    "note": "was a genuine gap (2026-08-04), now has real content \u2014 should resolve for real, not decline or hallucinate",
     "expect": {
       "match": "single",
       "walkthrough_destination": "input monitoring toggle"
@@ -262,7 +262,7 @@
   },
   {
     "name": "monitor_button_already_on",
-    "note": "pushed AX state says Input Monitoring is already visible — should say so and point at the track header, not walk through toggling it (which would turn it OFF). Was a known gap (2026-08-05, see v3-log.md) until the toggle_ax_key guard was built; now passes. CODE-GUARANTEED (flagged via Fable review, 2026-08-06): the toggle_ax_key gate in tools.py deterministically refuses the attach whenever the fixture key is truthy, so walkthrough_destination:null passes regardless of what the model does -- this is a regression test for that code path, not a test of model judgment. The 'should say so' prose behavior is real but ungraded.",
+    "note": "pushed AX state says Input Monitoring is already visible \u2014 should say so and point at the track header, not walk through toggling it (which would turn it OFF). Was a known gap (2026-08-05, see v3-log.md) until the toggle_ax_key guard was built; now passes. CODE-GUARANTEED (flagged via Fable review, 2026-08-06): the toggle_ax_key gate in tools.py deterministically refuses the attach whenever the fixture key is truthy, so walkthrough_destination:null passes regardless of what the model does -- this is a regression test for that code path, not a test of model judgment. The 'should say so' prose behavior is real but ungraded.",
     "expect": {
       "match": "single",
       "walkthrough_destination": null
@@ -278,7 +278,7 @@
   },
   {
     "name": "monitor_button_already_off",
-    "note": "pushed AX state says Input Monitoring is off — should walk through enabling it via Option+T",
+    "note": "pushed AX state says Input Monitoring is off \u2014 should walk through enabling it via Option+T",
     "expect": {
       "match": "single",
       "walkthrough_destination": "input monitoring toggle"
@@ -307,7 +307,7 @@
   },
   {
     "name": "ax_override_critical_test",
-    "note": "the critical thesis test — stated+AX evidence should demote sample-rate-mismatch (seed_weight 100) and lead with Smart Tempo instead. Smart Tempo has no path, so a correct override means NO walkthrough attaches (attaching one would mean it recommended the ruled-out sample-rate-mismatch instead) 2026-09-21 (routes + auto-attach): the value_ax_key gate is gone (it also blocked the correct fix in ax_contradicts_user_claim), so the live 44.1 kHz ruling sample rate out is now the model's call: the assertion is that the sample-rate card is NOT queued; another candidate's card is fine.",
+    "note": "the critical thesis test \u2014 stated+AX evidence should demote sample-rate-mismatch (seed_weight 100) and lead with Smart Tempo instead. Smart Tempo has no path, so a correct override means NO walkthrough attaches (attaching one would mean it recommended the ruled-out sample-rate-mismatch instead) 2026-09-21 (routes + auto-attach): the value_ax_key gate is gone (it also blocked the correct fix in ax_contradicts_user_claim), so the live 44.1 kHz ruling sample rate out is now the model's call: the assertion is that the sample-rate card is NOT queued; another candidate's card is fine.",
     "expect": {
       "match": "problem",
       "walkthrough_destination_absent": "sample rate"
@@ -323,7 +323,7 @@
   },
   {
     "name": "ax_contradicts_user_claim",
-    "note": "mirror image of ax_override_critical_test — every existing AX-fixture scenario pushes state that AGREES with what the user says (found via Fable review, 2026-08-06: never actually tested a real disagreement). Here the user is WRONG: they claim the project and file both read 44.1kHz, but the pushed AX data shows the project is actually at 48kHz -- a real mismatch the user hasn't noticed. Correct behavior: trust the real data over the user's mistaken claim and attach sample rate mismatch, not defer to Smart Tempo the way the agreeing-evidence version correctly does. This is the actual test of whether AX 'outranks stated claims... when they conflict' (prompt.py's own words) rather than just a case where trusting either one gives the same answer.",
+    "note": "mirror image of ax_override_critical_test \u2014 every existing AX-fixture scenario pushes state that AGREES with what the user says (found via Fable review, 2026-08-06: never actually tested a real disagreement). Here the user is WRONG: they claim the project and file both read 44.1kHz, but the pushed AX data shows the project is actually at 48kHz -- a real mismatch the user hasn't noticed. Correct behavior: trust the real data over the user's mistaken claim and attach sample rate mismatch, not defer to Smart Tempo the way the agreeing-evidence version correctly does. This is the actual test of whether AX 'outranks stated claims... when they conflict' (prompt.py's own words) rather than just a case where trusting either one gives the same answer.",
     "expect": {
       "match": "problem",
       "walkthrough_destination": "sample rate"
@@ -339,7 +339,7 @@
   },
   {
     "name": "multiturn_fallback_system_overload_confirmed",
-    "note": "commit-to-one continuity, live-verified 2026-08-05 before being codified here — turn 1 attaches CPU overload and mentions the Apple Silicon path only in prose (per the commit-to-one prompt rule); turn 2 reports that fix failed and reveals the M3 distinguisher, and should attach the fallback by name without re-calling lookup_concept. Turn-1 attach is now actually asserted, not just narrated -- an adversarial review (2026-08-05) found a real battery run where turn 1 attached nothing yet the scenario still passed, since only the final turn was graded at the time. Turn 1's text is identical to system_overload_generic's own opening line, which is already documented as flaky (3/7 recent runs); left strict on purpose (matching that sibling scenario's strictness) rather than loosened -- a turn-1 failure here is expected to be the same known instability, not a new one, and loosening it would grade the identical input two different ways across scenarios.",
+    "note": "commit-to-one continuity, live-verified 2026-08-05 before being codified here \u2014 turn 1 attaches CPU overload and mentions the Apple Silicon path only in prose (per the commit-to-one prompt rule); turn 2 reports that fix failed and reveals the M3 distinguisher, and should attach the fallback by name without re-calling lookup_concept. Turn-1 attach is now actually asserted, not just narrated -- an adversarial review (2026-08-05) found a real battery run where turn 1 attached nothing yet the scenario still passed, since only the final turn was graded at the time. Turn 1's text is identical to system_overload_generic's own opening line, which is already documented as flaky (3/7 recent runs); left strict on purpose (matching that sibling scenario's strictness) rather than loosened -- a turn-1 failure here is expected to be the same known instability, not a new one, and loosening it would grade the identical input two different ways across scenarios.",
     "expect": {
       "walkthrough_destination": "processing threads"
     },
@@ -357,7 +357,7 @@
   },
   {
     "name": "multiturn_fallback_crackling_new_evidence_turn2",
-    "note": "distinguishing evidence arrives a turn late instead of in the opening message — turn 1 is genuinely ambiguous crackling, turn 2 reveals the consistent-even-on-a-tiny-project distinguisher that points toward sample rate mismatch. Corrected 2026-08-05: an initial run showed the model asking for pitch/speed confirmation instead of attaching directly, which is legitimate, not a bug — sample rate mismatch's own distinguisher requires a pitch+speed shift, not just glitches, and this scenario's turn 2 text never states one. Committing straight to sample rate is also legitimate (the small-project distinguisher does tip that way); either is acceptable, leading with CPU overload again or attaching nothing at all is not.",
+    "note": "distinguishing evidence arrives a turn late instead of in the opening message \u2014 turn 1 is genuinely ambiguous crackling, turn 2 reveals the consistent-even-on-a-tiny-project distinguisher that points toward sample rate mismatch. Corrected 2026-08-05: an initial run showed the model asking for pitch/speed confirmation instead of attaching directly, which is legitimate, not a bug \u2014 sample rate mismatch's own distinguisher requires a pitch+speed shift, not just glitches, and this scenario's turn 2 text never states one. Committing straight to sample rate is also legitimate (the small-project distinguisher does tip that way); either is acceptable, leading with CPU overload again or attaching nothing at all is not.",
     "expect": {
       "walkthrough_destination": [
         "sample rate",
@@ -375,7 +375,7 @@
   },
   {
     "name": "multiturn_fix_worked_no_reattach",
-    "note": "turn 2 is a plain acknowledgment with nothing left to diagnose — should not call any tool or attach a walkthrough again just because the conversation continues.",
+    "note": "turn 2 is a plain acknowledgment with nothing left to diagnose \u2014 should not call any tool or attach a walkthrough again just because the conversation continues.",
     "expect": {
       "no_tool_calls": true,
       "walkthrough_destination": null
@@ -391,7 +391,7 @@
   },
   {
     "name": "multiturn_topic_pivot",
-    "note": "turn 2 explicitly abandons the turn-1 topic for an unrelated one — tests that history doesn't anchor the model to the old diagnosis once the user has moved on. match alone can't catch anchoring (a drifted-back lookup also returns match=problem) -- resolved_problem checks it actually landed on the mic-not-picking-up bucket, not a stale slowed-down one (found via Fable review, 2026-08-06).",
+    "note": "turn 2 explicitly abandons the turn-1 topic for an unrelated one \u2014 tests that history doesn't anchor the model to the old diagnosis once the user has moved on. match alone can't catch anchoring (a drifted-back lookup also returns match=problem) -- resolved_problem checks it actually landed on the mic-not-picking-up bucket, not a stale slowed-down one (found via Fable review, 2026-08-06).",
     "expect": {
       "match": "problem",
       "resolved_problem": "recording is silent / mic not picking up"
@@ -401,13 +401,13 @@
         "text": "why does my song sound slowed down"
       },
       {
-        "text": "actually never mind that, different issue — my mic isnt picking up any sound when i try to record"
+        "text": "actually never mind that, different issue \u2014 my mic isnt picking up any sound when i try to record"
       }
     ]
   },
   {
     "name": "multiturn_prose_correction_already_visible",
-    "note": "exploratory, not code-guaranteed like the AX-fixture version — turn 2 states in prose (no ax_fixture) that the button was already there. toggle_ax_key gating only fires off pushed ax_fixture data, so this tests whether a prose-only self-correction is respected the same way; may fail, consistent with this project's repeated finding that soft/prose-only signals aren't reliably honored where code doesn't enforce them.",
+    "note": "exploratory, not code-guaranteed like the AX-fixture version \u2014 turn 2 states in prose (no ax_fixture) that the button was already there. toggle_ax_key gating only fires off pushed ax_fixture data, so this tests whether a prose-only self-correction is respected the same way; may fail, consistent with this project's repeated finding that soft/prose-only signals aren't reliably honored where code doesn't enforce them.",
     "expect": {
       "walkthrough_destination": null
     },
@@ -422,7 +422,7 @@
   },
   {
     "name": "multiturn_ax_state_updates_reflect_completion",
-    "note": "ax_fixture changes between turns rather than being pushed once — turn 1 (off) gets the walkthrough, turn 2 (now on, simulating the user having just completed it) should recognize the state changed and not walk through it again. CODE-GUARANTEED on turn 2 (flagged via Fable review, 2026-08-06): the toggle_ax_key gate deterministically refuses once the fixture key is truthy, so turn 2's null-destination outcome doesn't depend on model judgment. Turn 1's walkthrough-attach is a genuine model-behavior check.",
+    "note": "ax_fixture changes between turns rather than being pushed once \u2014 turn 1 (off) gets the walkthrough, turn 2 (now on, simulating the user having just completed it) should recognize the state changed and not walk through it again. CODE-GUARANTEED on turn 2 (flagged via Fable review, 2026-08-06): the toggle_ax_key gate deterministically refuses once the fixture key is truthy, so turn 2's null-destination outcome doesn't depend on model judgment. Turn 1's walkthrough-attach is a genuine model-behavior check.",
     "expect": {
       "walkthrough_destination": null
     },
@@ -443,7 +443,7 @@
   },
   {
     "name": "multiturn_evidence_arrives_later_turn",
-    "note": "the ax_override_critical_test thesis split across two turns instead of loaded into the opening message — turn 1 is ambiguous with no evidence (likely leads with the weight-100 default), turn 2 supplies the disambiguating stated+AX evidence. Tests whether the override still applies when it has to retract an earlier turn's leaning, not just avoid one from the start. 2026-09-21 (routes + auto-attach): same as ax_override_critical_test: live state rules sample rate out, so its card must not be queued.",
+    "note": "the ax_override_critical_test thesis split across two turns instead of loaded into the opening message \u2014 turn 1 is ambiguous with no evidence (likely leads with the weight-100 default), turn 2 supplies the disambiguating stated+AX evidence. Tests whether the override still applies when it has to retract an earlier turn's leaning, not just avoid one from the start. 2026-09-21 (routes + auto-attach): same as ax_override_critical_test: live state rules sample rate out, so its card must not be queued.",
     "expect": {
       "walkthrough_destination_absent": "sample rate"
     },
@@ -461,7 +461,7 @@
   },
   {
     "name": "multiturn_distinct_second_topic_no_bleed",
-    "note": "turn 2 raises a completely unrelated problem in the same conversation — tests that the turn-1 buffer-size context doesn't bleed into or bias the turn-2 diagnosis.",
+    "note": "turn 2 raises a completely unrelated problem in the same conversation \u2014 tests that the turn-1 buffer-size context doesn't bleed into or bias the turn-2 diagnosis.",
     "expect": {
       "walkthrough_destination": null
     },
@@ -476,7 +476,7 @@
   },
   {
     "name": "multiturn_pushback_with_new_evidence",
-    "note": "user explicitly disagrees with the turn-1 diagnosis and supplies the Apple-Silicon distinguisher on the pushback — tests re-diagnosis under disagreement, not just under a neutral follow-up.",
+    "note": "user explicitly disagrees with the turn-1 diagnosis and supplies the Apple-Silicon distinguisher on the pushback \u2014 tests re-diagnosis under disagreement, not just under a neutral follow-up.",
     "expect": {
       "walkthrough_destination": "processing threads"
     },
@@ -491,7 +491,7 @@
   },
   {
     "name": "multiturn_clarify_then_resolve_thin_hollow",
-    "note": "same distinguisher as thin_hollow_context but delivered a turn late, after the genuinely 3-way-ambiguous opener — tests resolution once clarifying information actually arrives instead of being present from the first message.",
+    "note": "same distinguisher as thin_hollow_context but delivered a turn late, after the genuinely 3-way-ambiguous opener \u2014 tests resolution once clarifying information actually arrives instead of being present from the first message.",
     "expect": {
       "match": "problem"
     },
@@ -506,7 +506,7 @@
   },
   {
     "name": "multiturn_decline_then_legit_followup",
-    "note": "turn 1 should decline outright with no tool call; turn 2 is a real, unrelated, legitimate question — tests that declining a destructive request doesn't leave the model stuck or overly cautious about a genuine follow-up. Turn-1 decline is now actually asserted, not just narrated (2026-08-05, same adversarial-review fix as multiturn_fallback_system_overload_confirmed).",
+    "note": "turn 1 should decline outright with no tool call; turn 2 is a real, unrelated, legitimate question \u2014 tests that declining a destructive request doesn't leave the model stuck or overly cautious about a genuine follow-up. Turn-1 decline is now actually asserted, not just narrated (2026-08-05, same adversarial-review fix as multiturn_fallback_system_overload_confirmed).",
     "expect": {
       "walkthrough_destination": "buffer size"
     },
@@ -525,7 +525,7 @@
   },
   {
     "name": "multiturn_same_destination_revisited_new_turn",
-    "note": "commit-to-one is scoped per turn, not per conversation — turn 1 attaches sample rate, turn 2 has a new, independent reason to ask for the same destination again and should be able to attach it a second time, not be silently blocked by turn 1's already-attached state. FIXED 2026-08-06 (see v3-log.md): pipeline.py's _backfill_walkthrough reattaches from message history when a turn makes zero tool calls AND the user's own message contains explicit re-ask language (e.g. 'remind me', 'closed the window') -- the response-text-only version of this gate false-positived live and was replaced (commit 47b0861) before this note was updated the first time.",
+    "note": "commit-to-one is scoped per turn, not per conversation \u2014 turn 1 attaches sample rate, turn 2 has a new, independent reason to ask for the same destination again and should be able to attach it a second time, not be silently blocked by turn 1's already-attached state. FIXED 2026-08-06 (see v3-log.md): pipeline.py's _backfill_walkthrough reattaches from message history when a turn makes zero tool calls AND the user's own message contains explicit re-ask language (e.g. 'remind me', 'closed the window') -- the response-text-only version of this gate false-positived live and was replaced (commit 47b0861) before this note was updated the first time.",
     "expect": {
       "walkthrough_destination": "sample rate"
     },
@@ -540,7 +540,7 @@
   },
   {
     "name": "multiturn_ax_push_scoped_correctly",
-    "note": "turn 1 is an unrelated topic with its own tool call already in history; turn 2 pushes AX state for a completely different destination — tests that the toggle_ax_key gate still fires correctly on turn 2 regardless of unrelated prior turns, not just in a fresh single-turn conversation. CODE-GUARANTEED on turn 2 (flagged via Fable review, 2026-08-06): same deterministic gate as multiturn_ax_state_updates_reflect_completion -- real value here is confirming the gate isn't accidentally scoped wrong by prior-turn history, not testing model judgment.",
+    "note": "turn 1 is an unrelated topic with its own tool call already in history; turn 2 pushes AX state for a completely different destination \u2014 tests that the toggle_ax_key gate still fires correctly on turn 2 regardless of unrelated prior turns, not just in a fresh single-turn conversation. CODE-GUARANTEED on turn 2 (flagged via Fable review, 2026-08-06): same deterministic gate as multiturn_ax_state_updates_reflect_completion -- real value here is confirming the gate isn't accidentally scoped wrong by prior-turn history, not testing model judgment.",
     "expect": {
       "walkthrough_destination": null
     },
@@ -558,7 +558,7 @@
   },
   {
     "name": "multiturn_three_turn_resolution_then_close",
-    "note": "three turns instead of two — turn 2 supplies the disambiguating evidence and gets a walkthrough, turn 3 closes out the conversation by reporting it turned out to be something else entirely and is already fixed. Tests sustained correct behavior over more history than the rest of this batch, and that closing out doesn't trigger a spurious reattach.",
+    "note": "three turns instead of two \u2014 turn 2 supplies the disambiguating evidence and gets a walkthrough, turn 3 closes out the conversation by reporting it turned out to be something else entirely and is already fixed. Tests sustained correct behavior over more history than the rest of this batch, and that closing out doesn't trigger a spurious reattach.",
     "expect": {
       "no_tool_calls": true,
       "walkthrough_destination": null
@@ -577,7 +577,7 @@
   },
   {
     "name": "positive_direct_llm_alias",
-    "note": "2026-08-11 hedge-battery addition (Fable-designed) — alias-verbatim hit on a menu-toggle destination, never directly asked in any existing scenario (only ever reached via the latency problem bucket). Positive control: confirms normal grounded direct-destination behavior still works under whichever prompt is loaded. 2026-09-22: 'match' dropped — the destination is an approved open_setting route, so the model reaches it directly with no lookup; the card is what's graded.",
+    "note": "2026-08-11 hedge-battery addition (Fable-designed) \u2014 alias-verbatim hit on a menu-toggle destination, never directly asked in any existing scenario (only ever reached via the latency problem bucket). Positive control: confirms normal grounded direct-destination behavior still works under whichever prompt is loaded. 2026-09-22: 'match' dropped \u2014 the destination is an approved open_setting route, so the model reaches it directly with no lookup; the card is what's graded.",
     "expect": {
       "walkthrough_destination": "low latency monitoring mode"
     },
@@ -589,7 +589,7 @@
   },
   {
     "name": "positive_distinguisher_underdog_smart_tempo",
-    "note": "2026-08-11 hedge-battery addition — textual-distinguisher underdog pick: Smart Tempo (seed_weight 30) should beat sample rate mismatch (seed_weight 100) in the 'song sounds slowed' bucket via distinguisher text alone (affects one imported region, pitch stays correct), not AX evidence like ax_override_critical_test uses. Smart Tempo has no path, so a correct pick attaches nothing; a wrong pick attaches sample rate. Positive control for direct-evidence-over-seed_weight still working. 2026-09-21 (routes + auto-attach): Smart Tempo's settings are now approved routes, so acting on the right candidate can queue one; the thing that must not happen is the sample-rate card. 2026-09-22: 'follow tempo' (Region Inspector) added — that is the per-region Smart Tempo fix this scenario describes, and the action its solution now maps to.",
+    "note": "2026-08-11 hedge-battery addition \u2014 textual-distinguisher underdog pick: Smart Tempo (seed_weight 30) should beat sample rate mismatch (seed_weight 100) in the 'song sounds slowed' bucket via distinguisher text alone (affects one imported region, pitch stays correct), not AX evidence like ax_override_critical_test uses. Smart Tempo has no path, so a correct pick attaches nothing; a wrong pick attaches sample rate. Positive control for direct-evidence-over-seed_weight still working. 2026-09-21 (routes + auto-attach): Smart Tempo's settings are now approved routes, so acting on the right candidate can queue one; the thing that must not happen is the sample-rate card. 2026-09-22: 'follow tempo' (Region Inspector) added \u2014 that is the per-region Smart Tempo fix this scenario describes, and the action its solution now maps to.",
     "expect": {
       "match": "problem",
       "resolved_problem": "song sounds slowed",
@@ -609,7 +609,7 @@
   },
   {
     "name": "collision_frame_rate_vs_sample_rate",
-    "note": "2026-08-11 hedge-battery addition — live-verified 2026-08-10/11 outside the battery: Logic has a real frame-rate setting (Project Settings > General, video sync) with zero KB coverage here; nearest neighbor is 'sample rate', a genuine embedding collision. Tests whether the sample-rate walkthrough gets wrongly attached. Hedge-language quality on this one is being graded by hand, not by keyword match.",
+    "note": "2026-08-11 hedge-battery addition \u2014 live-verified 2026-08-10/11 outside the battery: Logic has a real frame-rate setting (Project Settings > General, video sync) with zero KB coverage here; nearest neighbor is 'sample rate', a genuine embedding collision. Tests whether the sample-rate walkthrough gets wrongly attached. Hedge-language quality on this one is being graded by hand, not by keyword match.",
     "expect": {
       "walkthrough_destination": null
     },
@@ -621,7 +621,7 @@
   },
   {
     "name": "collision_pan_law",
-    "note": "2026-08-11 hedge-battery addition — 'Pan Law' appears verbatim in the sample-rate destination's own opens text (Sample Rate, Spatial Audio, Surround Format, Pan Law...), a genuine textual collision. The pane itself (File > Project Settings > Audio) is actually correct, but a walkthrough click targeting the Sample Rate control specifically would be wrong. Fable flagged as unconfirmed whether opens text is embedded at all -- this run's match_confidence (visible in the transcript) also answers that question.",
+    "note": "2026-08-11 hedge-battery addition \u2014 'Pan Law' appears verbatim in the sample-rate destination's own opens text (Sample Rate, Spatial Audio, Surround Format, Pan Law...), a genuine textual collision. The pane itself (File > Project Settings > Audio) is actually correct, but a walkthrough click targeting the Sample Rate control specifically would be wrong. Fable flagged as unconfirmed whether opens text is embedded at all -- this run's match_confidence (visible in the transcript) also answers that question.",
     "expect": {
       "walkthrough_destination": [
         "sample rate",
@@ -636,7 +636,7 @@
   },
   {
     "name": "collision_bit_depth",
-    "note": "2026-08-11 hedge-battery addition — bit depth (24-bit recording) had zero KB coverage at the time, sitting in a tight embedding neighborhood with sample rate and buffer size. SUPERSEDED 2026-08-18: the Phase 1 port added a real 'recording settings' destination naming bit depth directly (alias 'recording bit depth setting', opens text names the 16/24-bit option) -- live-verified 2026-08-17 battery run resolves it correctly. Re-expressed as a positive control instead of a true negative. 2026-09-22: 'match' dropped — the destination is an approved open_setting route, so the model reaches it directly with no lookup; the card is what's graded.",
+    "note": "2026-08-11 hedge-battery addition \u2014 bit depth (24-bit recording) had zero KB coverage at the time, sitting in a tight embedding neighborhood with sample rate and buffer size. SUPERSEDED 2026-08-18: the Phase 1 port added a real 'recording settings' destination naming bit depth directly (alias 'recording bit depth setting', opens text names the 16/24-bit option) -- live-verified 2026-08-17 battery run resolves it correctly. Re-expressed as a positive control instead of a true negative. 2026-09-22: 'match' dropped \u2014 the destination is an approved open_setting route, so the model reaches it directly with no lookup; the card is what's graded.",
     "expect": {
       "walkthrough_destination": "recording settings"
     },
@@ -648,7 +648,7 @@
   },
   {
     "name": "collision_software_monitoring",
-    "note": "2026-08-11 hedge-battery addition, exploratory only, no hard expect block on purpose — 'software monitoring' sits semantically between input_monitoring_toggle and low_latency_monitoring_mode, a three-way internal near-miss. Ground truth is genuinely murky (input monitoring is arguably a legitimate answer to intent) -- for transcript review, not structural grading. ADDENDUM 2026-08-18: the 2026-08-17 run resolved this to 'audio settings' (moderate confidence) and then stated 'click the General tab' -- a detail present in NEITHER the destination's aliases nor its opens text, stated with zero hedge. Root cause traced to pipeline.py::_needs_hedge, which suppresses the hedge on ANY successful walkthrough attach regardless of the underlying match confidence, so a moderate-confidence attach carries the same unhedged confidence as a strong one. Deliberately left unasserted here rather than keyword-matching on 'General tab' specifically -- that detail might genuinely be correct in the shipping app, and a substring check can't tell a true incidental detail from a fabricated one, only whether this exact phrase recurs. The real fix (if any) belongs in the hedge gate or a groundedness check on free-text UI-element claims, not this scenario's grading -- logged as a known gap, not chased yet.",
+    "note": "2026-08-11 hedge-battery addition, exploratory only, no hard expect block on purpose \u2014 'software monitoring' sits semantically between input_monitoring_toggle and low_latency_monitoring_mode, a three-way internal near-miss. Ground truth is genuinely murky (input monitoring is arguably a legitimate answer to intent) -- for transcript review, not structural grading. ADDENDUM 2026-08-18: the 2026-08-17 run resolved this to 'audio settings' (moderate confidence) and then stated 'click the General tab' -- a detail present in NEITHER the destination's aliases nor its opens text, stated with zero hedge. Root cause traced to pipeline.py::_needs_hedge, which suppresses the hedge on ANY successful walkthrough attach regardless of the underlying match confidence, so a moderate-confidence attach carries the same unhedged confidence as a strong one. Deliberately left unasserted here rather than keyword-matching on 'General tab' specifically -- that detail might genuinely be correct in the shipping app, and a substring check can't tell a true incidental detail from a fabricated one, only whether this exact phrase recurs. The real fix (if any) belongs in the hedge gate or a groundedness check on free-text UI-element claims, not this scenario's grading -- logged as a known gap, not chased yet.",
     "turns": [
       {
         "text": "wheres the software monitoring checkbox"
@@ -657,7 +657,7 @@
   },
   {
     "name": "true_negative_bounce_mp3",
-    "note": "2026-08-11 hedge-battery addition — at the time, zero export/bounce/share content existed anywhere in the KB. SUPERSEDED 2026-08-18: the Phase 1 port added a real 'bounce project' destination (Cmd+B, opens text names MP3 directly) -- live-verified 2026-08-17 battery run resolves it correctly. Re-expressed as a positive control instead of a true negative. 2026-09-22: 'match' dropped — the destination is an approved open_setting route, so the model reaches it directly with no lookup; the card is what's graded.",
+    "note": "2026-08-11 hedge-battery addition \u2014 at the time, zero export/bounce/share content existed anywhere in the KB. SUPERSEDED 2026-08-18: the Phase 1 port added a real 'bounce project' destination (Cmd+B, opens text names MP3 directly) -- live-verified 2026-08-17 battery run resolves it correctly. Re-expressed as a positive control instead of a true negative. 2026-09-22: 'match' dropped \u2014 the destination is an approved open_setting route, so the model reaches it directly with no lookup; the card is what's graded.",
     "expect": {
       "walkthrough_destination": "bounce project"
     },
@@ -669,7 +669,7 @@
   },
   {
     "name": "hedge_freeze_shortcut_negative_claim",
-    "note": "2026-08-11 hedge-battery addition — at the time, 'freeze' appeared only in CPU overload's excluded fix text, no destination entry, no shortcut anywhere in the KB. SUPERSEDED 2026-08-18: the Phase 1 port added a real 'freeze track' destination (Option+T, click Freeze) -- live-verified 2026-08-17 battery run resolves it correctly. Re-expressed as a positive control instead of a true negative.",
+    "note": "2026-08-11 hedge-battery addition \u2014 at the time, 'freeze' appeared only in CPU overload's excluded fix text, no destination entry, no shortcut anywhere in the KB. SUPERSEDED 2026-08-18: the Phase 1 port added a real 'freeze track' destination (Option+T, click Freeze) -- live-verified 2026-08-17 battery run resolves it correctly. Re-expressed as a positive control instead of a true negative.",
     "expect": {
       "match": "single",
       "walkthrough_destination": "freeze track"
@@ -682,7 +682,7 @@
   },
   {
     "name": "hedge_flex_time_prompt_example",
-    "note": "2026-08-11 hedge-battery addition — this exact phrase is the query-normalization worked example baked into both prompt versions ('i cant find how to change flex time'); at the time the KB had no flex destination. SUPERSEDED 2026-08-18: the Phase 1 port added a real 'flex time' destination (Cmd+F, algorithm dropdown) -- live-verified 2026-08-17 battery run resolves it correctly. Re-expressed as a positive control instead of a true negative. 2026-09-22: 'match' dropped — the destination is an approved open_setting route, so the model reaches it directly with no lookup; the card is what's graded.",
+    "note": "2026-08-11 hedge-battery addition \u2014 this exact phrase is the query-normalization worked example baked into both prompt versions ('i cant find how to change flex time'); at the time the KB had no flex destination. SUPERSEDED 2026-08-18: the Phase 1 port added a real 'flex time' destination (Cmd+F, algorithm dropdown) -- live-verified 2026-08-17 battery run resolves it correctly. Re-expressed as a positive control instead of a true negative. 2026-09-22: 'match' dropped \u2014 the destination is an approved open_setting route, so the model reaches it directly with no lookup; the card is what's graded.",
     "expect": {
       "walkthrough_destination": "flex time"
     },
@@ -694,7 +694,7 @@
   },
   {
     "name": "hedge_autotune_rewrite_example",
-    "note": "2026-08-11 hedge-battery addition — the on-disk prompt rewrite's own get_walkthrough example claims an autotune ask should get 'that window open', but at the time no pitch-correction destination existed anywhere in the KB. SUPERSEDED 2026-08-18: the Phase 1 port added 'vocals are out of tune' (problem) / 'flex pitch vocal tuning' (solution, resolves to the 'flex pitch' destination) -- live-verified 2026-08-17 battery run resolves it correctly. Re-expressed as a positive control instead of a true negative.",
+    "note": "2026-08-11 hedge-battery addition \u2014 the on-disk prompt rewrite's own get_walkthrough example claims an autotune ask should get 'that window open', but at the time no pitch-correction destination existed anywhere in the KB. SUPERSEDED 2026-08-18: the Phase 1 port added 'vocals are out of tune' (problem) / 'flex pitch vocal tuning' (solution, resolves to the 'flex pitch' destination) -- live-verified 2026-08-17 battery run resolves it correctly. Re-expressed as a positive control instead of a true negative.",
     "expect": {
       "match": "problem",
       "walkthrough_destination": "flex pitch",
@@ -708,7 +708,7 @@
   },
   {
     "name": "hedge_indirect_beat_from_scratch",
-    "note": "2026-08-11 hedge-battery addition — the exact live repro case from tonight's investigation (0/18+ hedge rate observed across every prompt variant tested ad hoc before this scenario existed). Any real answer names Loop Browser, Drummer, Musical Typing, or the step sequencer -- none KB-covered. Path-stating happens incidentally inside tutorial prose, not as a direct focused ask -- the exact failure shape that started this whole investigation. 2026-09-21 (routes + auto-attach): an optional new-track card is acceptable (09-19 already judged it defensible); it waits since the message is a question.",
+    "note": "2026-08-11 hedge-battery addition \u2014 the exact live repro case from tonight's investigation (0/18+ hedge rate observed across every prompt variant tested ad hoc before this scenario existed). Any real answer names Loop Browser, Drummer, Musical Typing, or the step sequencer -- none KB-covered. Path-stating happens incidentally inside tutorial prose, not as a direct focused ask -- the exact failure shape that started this whole investigation. 2026-09-21 (routes + auto-attach): an optional new-track card is acceptable (09-19 already judged it defensible); it waits since the message is a question.",
     "expect": {
       "walkthrough_destination": [
         null,
@@ -725,7 +725,7 @@
   },
   {
     "name": "hedge_mixed_grounded_ungrounded",
-    "note": "2026-08-11 hedge-battery addition — deliberately half-covered: the recording leg has strong KB support (buffer size, input monitoring, new audio track, latency), the export leg now also has real content since the Phase 1 port (see true_negative_bounce_mp3, superseded). ADDENDUM 2026-08-18: the 2026-08-17 battery run surfaced a real bug this scenario was never graded to catch -- the model attached the correct 'new audio track' walkthrough for the recording leg (Option+Cmd+A), then wrote a response that covers ONLY the export leg (Cmd+B) and never narrates the recording leg at all, despite having successfully attached it. Likely mechanism: the one-attach-per-turn guard's 'mention a fallback in prose' instruction for the refused second attach (bounce project) seems to have been read as the whole job of the prose, crowding out narration of the winning attach. Reproduced 3/3 runs total (2026-08-17 original battery, plus two 2026-08-18 verification reruns, each with different phrasing -- 'Once your recording is done...', 'Once you're happy with the recording...' -- never once explains how to actually record). Not a one-off; treat as reliable, not flaky, until seen otherwise. response_contains_any below targets that specific failure shape (silently dropping a leg's narration) via concrete content terms, not generic topic words like 'record'/'guitar' -- an earlier draft of this check used those and passed on a technicality (the word 'record' appearing in a throwaway clause) while the bug reproduced right underneath it.",
+    "note": "2026-08-11 hedge-battery addition \u2014 deliberately half-covered: the recording leg has strong KB support (buffer size, input monitoring, new audio track, latency), the export leg now also has real content since the Phase 1 port (see true_negative_bounce_mp3, superseded). ADDENDUM 2026-08-18: the 2026-08-17 battery run surfaced a real bug this scenario was never graded to catch -- the model attached the correct 'new audio track' walkthrough for the recording leg (Option+Cmd+A), then wrote a response that covers ONLY the export leg (Cmd+B) and never narrates the recording leg at all, despite having successfully attached it. Likely mechanism: the one-attach-per-turn guard's 'mention a fallback in prose' instruction for the refused second attach (bounce project) seems to have been read as the whole job of the prose, crowding out narration of the winning attach. Reproduced 3/3 runs total (2026-08-17 original battery, plus two 2026-08-18 verification reruns, each with different phrasing -- 'Once your recording is done...', 'Once you're happy with the recording...' -- never once explains how to actually record). Not a one-off; treat as reliable, not flaky, until seen otherwise. response_contains_any below targets that specific failure shape (silently dropping a leg's narration) via concrete content terms, not generic topic words like 'record'/'guitar' -- an earlier draft of this check used those and passed on a technicality (the word 'record' appearing in a throwaway clause) while the bug reproduced right underneath it.",
     "expect": {
       "walkthrough_destination": [
         "new audio track",
@@ -751,7 +751,7 @@
   },
   {
     "name": "research_fire_artist_technique",
-    "note": "2026-09-04 research-battery addition — clean-fire case: a specific artist/producer technique question this KB would never cover by design. lookup_concept should come back weak/none; the model should recognize this as researchable rather than guessing from pretrained knowledge or flatly declining. confidence_tier/sources_present added 2026-09-04 once the badge was wired: a real cited finding should read as trusted (\"research\"), not get the same \"no verified answer\" hedge as an unfounded guess (see _confidence_tier's note) -- may legitimately flake to moderate/no-sources if web_research's own 90s call times out (observed live on a sibling scenario), which is real signal about that budget, not a bug in this assertion.",
+    "note": "2026-09-04 research-battery addition \u2014 clean-fire case: a specific artist/producer technique question this KB would never cover by design. lookup_concept should come back weak/none; the model should recognize this as researchable rather than guessing from pretrained knowledge or flatly declining. confidence_tier/sources_present added 2026-09-04 once the badge was wired: a real cited finding should read as trusted (\"research\"), not get the same \"no verified answer\" hedge as an unfounded guess (see _confidence_tier's note) -- may legitimately flake to moderate/no-sources if web_research's own 90s call times out (observed live on a sibling scenario), which is real signal about that budget, not a bug in this assertion.",
     "expect": {
       "web_research_called": true,
       "walkthrough_destination": null,
@@ -765,7 +765,7 @@
   },
   {
     "name": "research_fire_current_feature",
-    "note": "2026-09-04 research-battery addition — clean-fire case: a current-software fact (does a specific Logic Pro version support specific hardware), not a troubleshooting or navigation question at all. This KB has no concept of version history. confidence_tier/sources_present added 2026-09-04 -- same timeout caveat as research_fire_artist_technique, this exact scenario is the one observed hitting it live.",
+    "note": "2026-09-04 research-battery addition \u2014 clean-fire case: a current-software fact (does a specific Logic Pro version support specific hardware), not a troubleshooting or navigation question at all. This KB has no concept of version history. confidence_tier/sources_present added 2026-09-04 -- same timeout caveat as research_fire_artist_technique, this exact scenario is the one observed hitting it live.",
     "expect": {
       "web_research_called": true,
       "walkthrough_destination": null,
@@ -779,7 +779,7 @@
   },
   {
     "name": "research_no_fire_generic_troubleshooting_miss",
-    "note": "2026-09-04 research-battery addition — clean-no-fire case: a genuinely uncovered but ordinary troubleshooting symptom, not an artist/gear/current-feature question. prompt.py explicitly steers this shape toward a plain hedge instead of web_research, even though a real fix might exist online somewhere -- a wrong web-sourced troubleshooting claim carries the same risk this project has always guarded lookup_concept-only claims against. 2026-09-22: research assertions dropped — a KB miss escalating to web_research is the intended fallback (user decision 09-19); the fix for researching too often is KB coverage. What still matters: nothing auto-runs off an unverified answer.",
+    "note": "2026-09-04 research-battery addition \u2014 clean-no-fire case: a genuinely uncovered but ordinary troubleshooting symptom, not an artist/gear/current-feature question. prompt.py explicitly steers this shape toward a plain hedge instead of web_research, even though a real fix might exist online somewhere -- a wrong web-sourced troubleshooting claim carries the same risk this project has always guarded lookup_concept-only claims against. 2026-09-22: research assertions dropped \u2014 a KB miss escalating to web_research is the intended fallback (user decision 09-19); the fix for researching too often is KB coverage. What still matters: nothing auto-runs off an unverified answer.",
     "expect": {
       "auto_run": false
     },
@@ -791,7 +791,7 @@
   },
   {
     "name": "research_no_fire_navigation_gap",
-    "note": "2026-09-04 research-battery addition — reuses adversarial_gap_phantom_power's exact confirmed KB gap as a no-fire navigation case: web_research must not become a substitute source for a menu path/shortcut lookup_concept can't confirm -- prompt.py says a wrong web-sourced path is exactly as risky as an invented one. 2026-09-22: research assertions dropped — a KB miss escalating to web_research is the intended fallback (user decision 09-19); the fix for researching too often is KB coverage. What still matters: nothing auto-runs off an unverified answer.",
+    "note": "2026-09-04 research-battery addition \u2014 reuses adversarial_gap_phantom_power's exact confirmed KB gap as a no-fire navigation case: web_research must not become a substitute source for a menu path/shortcut lookup_concept can't confirm -- prompt.py says a wrong web-sourced path is exactly as risky as an invented one. 2026-09-22: research assertions dropped \u2014 a KB miss escalating to web_research is the intended fallback (user decision 09-19); the fix for researching too often is KB coverage. What still matters: nothing auto-runs off an unverified answer.",
     "expect": {
       "walkthrough_destination": null,
       "auto_run": false
@@ -804,7 +804,7 @@
   },
   {
     "name": "research_mixed_kb_and_research",
-    "note": "2026-09-04 research-battery addition — one turn carrying both a real KB-owned question (freeze track shortcut, a confirmed destination) and a genuinely researchable one (an artist's vocal-processing technique) together. Tests that web_research fires for its half without displacing or crowding out the KB-grounded half's own walkthrough attach. confidence_tier added 2026-09-04: expected \"strong\", not \"research\" -- _confidence_tier grades off the winning walkthrough attach, the turn's own primary claim, not the secondary research aside; sources still reach the client via Result.sources regardless of which tier wins (sources_present asserts that independently).",
+    "note": "2026-09-04 research-battery addition \u2014 one turn carrying both a real KB-owned question (freeze track shortcut, a confirmed destination) and a genuinely researchable one (an artist's vocal-processing technique) together. Tests that web_research fires for its half without displacing or crowding out the KB-grounded half's own walkthrough attach. confidence_tier added 2026-09-04: expected \"strong\", not \"research\" -- _confidence_tier grades off the winning walkthrough attach, the turn's own primary claim, not the secondary research aside; sources still reach the client via Result.sources regardless of which tier wins (sources_present asserts that independently).",
     "expect": {
       "web_research_called": true,
       "walkthrough_destination": "freeze track",
@@ -880,7 +880,7 @@
   },
   {
     "name": "ax_state_irrelevant_context_no_distraction",
-    "note": "2026-09-04 ax_state-battery addition -- pushes a real, unrelated plugin/channel ax_state dump alongside an ordinary, already-covered KB navigation question (same query/expect as slowed_direct). Tests that a large irrelevant AX blob doesn't distract from or degrade normal destination routing. 2026-09-22: 'match' dropped — the destination is an approved open_setting route, so the model reaches it directly with no lookup; the card is what's graded.",
+    "note": "2026-09-04 ax_state-battery addition -- pushes a real, unrelated plugin/channel ax_state dump alongside an ordinary, already-covered KB navigation question (same query/expect as slowed_direct). Tests that a large irrelevant AX blob doesn't distract from or degrade normal destination routing. 2026-09-22: 'match' dropped \u2014 the destination is an approved open_setting route, so the model reaches it directly with no lookup; the card is what's graded.",
     "expect": {
       "walkthrough_destination": "sample rate"
     },
@@ -986,7 +986,7 @@
   },
   {
     "name": "mode_pair_buffer_size_q",
-    "note": "2026-09-18 Track B mode-experiment addition -- question-phrasing half of the buffer-size pair, compare with mode_pair_buffer_size_cmd. 2026-09-22: 'match' dropped — the route is in open_setting's own list, so the model reaches it directly with no lookup; the card and auto_run are what matter.",
+    "note": "2026-09-18 Track B mode-experiment addition -- question-phrasing half of the buffer-size pair, compare with mode_pair_buffer_size_cmd. 2026-09-22: 'match' dropped \u2014 the route is in open_setting's own list, so the model reaches it directly with no lookup; the card and auto_run are what matter.",
     "expect": {
       "walkthrough_destination": "buffer size",
       "no_action_calls": true,
@@ -1014,7 +1014,7 @@
   },
   {
     "name": "mode_pair_sample_rate_q",
-    "note": "2026-09-18 Track B mode-experiment addition -- question-phrasing half of the sample-rate pair, compare with mode_pair_sample_rate_cmd. 2026-09-22: 'match' dropped — the route is in open_setting's own list, so the model reaches it directly with no lookup; the card and auto_run are what matter.",
+    "note": "2026-09-18 Track B mode-experiment addition -- question-phrasing half of the sample-rate pair, compare with mode_pair_sample_rate_cmd. 2026-09-22: 'match' dropped \u2014 the route is in open_setting's own list, so the model reaches it directly with no lookup; the card and auto_run are what matter.",
     "expect": {
       "walkthrough_destination": "sample rate",
       "no_action_calls": true,
@@ -1390,7 +1390,7 @@
   },
   {
     "name": "hybrid_muddy_vocal_fix_it",
-    "note": "2026-09-21 (one card + auto-run rule): a problem statement plus an instruction: whatever the card holds may auto-run (user decision). A clarifying question instead fails this -- read the transcript before treating that as wrong. 2026-09-22: auto_run flipped to false — the EQ move is inferred from a diagnosis lookup, not named by the user, and any turn that consulted the KB now waits for Run.",
+    "note": "2026-09-21 (one card + auto-run rule): a problem statement plus an instruction: whatever the card holds may auto-run (user decision). A clarifying question instead fails this -- read the transcript before treating that as wrong. 2026-09-22: auto_run flipped to false \u2014 the EQ move is inferred from a diagnosis lookup, not named by the user, and any turn that consulted the KB now waits for Run.",
     "turns": [
       {
         "text": "my vocal sounds muddy, fix it",
@@ -1473,5 +1473,314 @@
       "auto_run": false,
       "no_completion_claims": true
     }
+  },
+  {
+    "name": "dropdown_buffer_named",
+    "note": "2026-09-22 dropdown routes: a route ending on a dropdown picks a checked value or opens the pane only -- never leaves the dropdown open (live: 'open buffer size then open compressor' left the dropdown open and the plugin search never got focus). User names the value: it's passed and accepted.",
+    "expect": {
+      "setting_calls": [
+        {
+          "tool": "open_setting",
+          "args": {
+            "name": "buffer size",
+            "value": "256"
+          }
+        }
+      ],
+      "forbidden_setting_calls": [
+        {
+          "tool": "open_setting",
+          "args": {},
+          "ok": false
+        }
+      ],
+      "no_completion_claims": true,
+      "auto_run": true
+    },
+    "turns": [
+      {
+        "text": "set my buffer size to 256"
+      }
+    ]
+  },
+  {
+    "name": "dropdown_buffer_open_only",
+    "note": "2026-09-22 dropdown routes: a route ending on a dropdown picks a checked value or opens the pane only -- never leaves the dropdown open (live: 'open buffer size then open compressor' left the dropdown open and the plugin search never got focus). 'open' with no value: the pane only, no value chosen for them.",
+    "expect": {
+      "setting_calls": [
+        {
+          "tool": "open_setting",
+          "args": {
+            "name": "buffer size"
+          },
+          "args_absent": [
+            "value"
+          ]
+        }
+      ],
+      "forbidden_setting_calls": [
+        {
+          "tool": "open_setting",
+          "args": {
+            "name": "buffer size",
+            "value": ""
+          }
+        }
+      ],
+      "auto_run": true
+    },
+    "turns": [
+      {
+        "text": "open the buffer size setting"
+      }
+    ]
+  },
+  {
+    "name": "dropdown_buffer_then_compressor",
+    "note": "2026-09-22 dropdown routes: a route ending on a dropdown picks a checked value or opens the pane only -- never leaves the dropdown open (live: 'open buffer size then open compressor' left the dropdown open and the plugin search never got focus). The live repro: pane-only route, then the plugin, on one card.",
+    "expect": {
+      "setting_calls": [
+        {
+          "tool": "open_setting",
+          "args": {
+            "name": "buffer size"
+          },
+          "args_absent": [
+            "value"
+          ]
+        }
+      ],
+      "action_calls": [
+        {
+          "tool": "open_plugin",
+          "args": {
+            "plugin": "compressor"
+          }
+        }
+      ],
+      "no_refused_actions": true,
+      "no_completion_claims": true
+    },
+    "turns": [
+      {
+        "text": "open buffer size then open compressor"
+      }
+    ]
+  },
+  {
+    "name": "dropdown_buffer_named_then_compressor",
+    "note": "2026-09-22 dropdown routes: a route ending on a dropdown picks a checked value or opens the pane only -- never leaves the dropdown open (live: 'open buffer size then open compressor' left the dropdown open and the plugin search never got focus). Named value plus a plugin on one card.",
+    "expect": {
+      "setting_calls": [
+        {
+          "tool": "open_setting",
+          "args": {
+            "name": "buffer size",
+            "value": "128"
+          }
+        }
+      ],
+      "action_calls": [
+        {
+          "tool": "open_plugin",
+          "args": {
+            "plugin": "compressor"
+          }
+        }
+      ],
+      "forbidden_setting_calls": [
+        {
+          "tool": "open_setting",
+          "args": {},
+          "ok": false
+        }
+      ],
+      "no_refused_actions": true,
+      "no_completion_claims": true
+    },
+    "turns": [
+      {
+        "text": "set the buffer to 128 then put a compressor on this track"
+      }
+    ]
+  },
+  {
+    "name": "dropdown_crackle_mixing",
+    "note": "2026-09-22 dropdown routes: a route ending on a dropdown picks a checked value or opens the pane only -- never leaves the dropdown open (live: 'open buffer size then open compressor' left the dropdown open and the plugin search never got focus). Diagnosis: playback crackle under plugin load -> buffer one step larger (a direction, never an unnamed number; a refused number first is allowed but shows in the transcript).",
+    "expect": {
+      "setting_calls": [
+        {
+          "tool": "open_setting",
+          "args": {
+            "name": "buffer size",
+            "value": "larger"
+          }
+        }
+      ],
+      "forbidden_setting_calls": [
+        {
+          "tool": "open_setting",
+          "args": {
+            "name": "buffer size",
+            "value": "smaller"
+          }
+        }
+      ],
+      "no_completion_claims": true
+    },
+    "turns": [
+      {
+        "text": "my session crackles and pops on playback now that ive got a lot of plugins going, can you fix it"
+      }
+    ]
+  },
+  {
+    "name": "dropdown_latency_recording",
+    "note": "2026-09-22 dropdown routes: a route ending on a dropdown picks a checked value or opens the pane only -- never leaves the dropdown open (live: 'open buffer size then open compressor' left the dropdown open and the plugin search never got focus). Diagnosis: monitoring delay while recording -- a larger buffer makes it worse. Low Latency Monitoring Mode, a smaller buffer or the pane are all fine.",
+    "expect": {
+      "forbidden_setting_calls": [
+        {
+          "tool": "open_setting",
+          "args": {
+            "name": "buffer size",
+            "value": "larger"
+          }
+        }
+      ],
+      "no_completion_claims": true
+    },
+    "turns": [
+      {
+        "text": "when i record guitar through my interface i hear myself late, theres a delay"
+      }
+    ]
+  },
+  {
+    "name": "dropdown_sample_rate_named",
+    "note": "2026-09-22 dropdown routes: a route ending on a dropdown picks a checked value or opens the pane only -- never leaves the dropdown open (live: 'open buffer size then open compressor' left the dropdown open and the plugin search never got focus). User names the rate in shorthand ('48k'): accepted as 48 kHz.",
+    "expect": {
+      "setting_calls": [
+        {
+          "tool": "open_setting",
+          "args": {
+            "name": "sample rate",
+            "value": "48"
+          }
+        }
+      ],
+      "forbidden_setting_calls": [
+        {
+          "tool": "open_setting",
+          "args": {},
+          "ok": false
+        }
+      ],
+      "no_completion_claims": true
+    },
+    "turns": [
+      {
+        "text": "change the project sample rate to 48k"
+      }
+    ]
+  },
+  {
+    "name": "dropdown_sample_rate_unnamed",
+    "note": "2026-09-22 dropdown routes: a route ending on a dropdown picks a checked value or opens the pane only -- never leaves the dropdown open (live: 'open buffer size then open compressor' left the dropdown open and the plugin search never got focus). Sample-rate mismatch symptom: the model may open the pane but never picks a rate the user didn't name (gate-enforced; this checks the reply stays honest about it).",
+    "expect": {
+      "forbidden_setting_calls": [
+        {
+          "tool": "open_setting",
+          "args": {
+            "name": "sample rate",
+            "value": ""
+          }
+        }
+      ],
+      "no_completion_claims": true
+    },
+    "turns": [
+      {
+        "text": "i dragged a wav file in and it plays back too slow and lower pitched"
+      }
+    ]
+  },
+  {
+    "name": "dropdown_threads_automatic",
+    "note": "2026-09-22 dropdown routes: a route ending on a dropdown picks a checked value or opens the pane only -- never leaves the dropdown open (live: 'open buffer size then open compressor' left the dropdown open and the plugin search never got focus). Processing threads has one right answer (Automatic); the model may pick it itself.",
+    "expect": {
+      "setting_calls": [
+        {
+          "tool": "open_setting",
+          "args": {
+            "name": "processing threads",
+            "value": "automatic"
+          }
+        }
+      ],
+      "no_completion_claims": true
+    },
+    "turns": [
+      {
+        "text": "logic keeps giving me system overload errors and i noticed processing threads is set to 2, fix it"
+      }
+    ]
+  },
+  {
+    "name": "dropdown_flex_vocal",
+    "note": "2026-09-22 dropdown routes: a route ending on a dropdown picks a checked value or opens the pane only -- never leaves the dropdown open (live: 'open buffer size then open compressor' left the dropdown open and the plugin search never got focus). Flex mode by material: a lead vocal wants Monophonic (Polyphonic defensible); never Off, Slicing, Rhythmic or an FX mode.",
+    "expect": {
+      "setting_calls": [
+        {
+          "tool": "open_setting",
+          "args": {
+            "name": "flex time",
+            "value": ""
+          }
+        }
+      ],
+      "forbidden_setting_calls": [
+        {
+          "tool": "open_setting",
+          "args": {
+            "name": "flex time",
+            "value": "off"
+          }
+        },
+        {
+          "tool": "open_setting",
+          "args": {
+            "name": "flex time",
+            "value": "slicing"
+          }
+        },
+        {
+          "tool": "open_setting",
+          "args": {
+            "name": "flex time",
+            "value": "rhythmic"
+          }
+        },
+        {
+          "tool": "open_setting",
+          "args": {
+            "name": "flex time",
+            "value": "speed"
+          }
+        },
+        {
+          "tool": "open_setting",
+          "args": {
+            "name": "flex time",
+            "value": "tempophone"
+          }
+        }
+      ],
+      "no_completion_claims": true
+    },
+    "turns": [
+      {
+        "text": "turn on flex time on my lead vocal so i can tighten the timing"
+      }
+    ]
   }
 ]

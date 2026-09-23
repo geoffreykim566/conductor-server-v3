@@ -166,8 +166,13 @@ def _actual_outcome(trace: list[dict], response_text: str = "", confidence_tier:
     ]
     for c in trace:
         if c["tool"] in ("open_setting", "open_plugin", "set_param") and c["output"].get("attached"):
-            attached_solutions.extend(by_action.get(json.dumps([c["tool"], c["input"]], sort_keys=True), []))
+            # a dropdown value doesn't change which solution a route belongs to
+            inp = {"name": c["input"].get("name")} if c["tool"] == "open_setting" else c["input"]
+            attached_solutions.extend(by_action.get(json.dumps([c["tool"], inp], sort_keys=True), []))
     action_calls = _action_calls(trace)
+    setting_calls = [{"tool": "open_setting", "args": dict(c.get("input") or {}),
+                      "ok": bool((c.get("output") or {}).get("attached"))}
+                     for c in trace if c["tool"] == "open_setting"]
 
     return {
         "match": match,
@@ -181,6 +186,7 @@ def _actual_outcome(trace: list[dict], response_text: str = "", confidence_tier:
         "confidence_tier": confidence_tier,
         "sources_present": bool(sources),
         "action_calls": action_calls,
+        "setting_calls": setting_calls,
         "first_tool": trace[0]["tool"] if trace else None,
         "lookup_count": len(lookup_calls),
         # Whether the card may run without the user pressing Run (v041+;
@@ -227,6 +233,17 @@ def _grade(expect: dict, actual: dict) -> list[dict]:
             # those calls, in order, as a subsequence of what was called.
             got = actual["action_calls"]
             ok = got == [] if expected is None else _ordered_subsequence(expected, got)
+        elif key == "setting_calls":
+            # open_setting calls (name + dropdown value, 2026-09-22), graded
+            # like action_calls but kept apart from them: routes predate the
+            # action tools and existing scenarios grade them by destination.
+            got = actual["setting_calls"]
+            ok = _ordered_subsequence(expected, got)
+        elif key == "forbidden_setting_calls":
+            # None of these may be among the open_setting calls (a refused call
+            # only matches a spec that says ok: false).
+            got = [g for g in actual["setting_calls"] if any(_action_call_matches(e, g) for e in expected)]
+            ok = got == []
         elif key == "no_action_calls":
             got = actual["action_calls"]
             ok = (got == []) == bool(expected)

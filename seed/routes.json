@@ -53,7 +53,19 @@
         "type": "click_value_of",
         "value": "I/O Buffer Size"
       }
-    ]
+    ],
+    "choice": {
+      "options": [
+        "32",
+        "64",
+        "128",
+        "256",
+        "512",
+        "1024"
+      ],
+      "ordered": true,
+      "model_may_pick": []
+    }
   },
   "bypass control surfaces": {
     "desc": "Disables all control surface communication, including MIDI controllers Logic has detected as control surfaces",
@@ -152,7 +164,26 @@
           "Tempophone (FX)"
         ]
       }
-    ]
+    ],
+    "choice": {
+      "options": [
+        "Off",
+        "Monophonic",
+        "Slicing",
+        "Rhythmic",
+        "Polyphonic",
+        "Flex Pitch",
+        "Speed (FX)",
+        "Tempophone (FX)"
+      ],
+      "ordered": false,
+      "model_may_pick": [
+        "Monophonic",
+        "Slicing",
+        "Rhythmic",
+        "Polyphonic"
+      ]
+    }
   },
   "follow tempo": {
     "desc": "Region Inspector (select an audio region, press I)",
@@ -169,7 +200,12 @@
         "type": "click_value_of",
         "value": "Smart Tempo"
       }
-    ]
+    ],
+    "choice": {
+      "options": [],
+      "ordered": false,
+      "model_may_pick": []
+    }
   },
   "freeze track": {
     "desc": "Freeze renders the track's plugins to a temporary audio file and disables them, freeing CPU",
@@ -384,7 +420,16 @@
         "type": "click_value_of",
         "value": "Processing Threads"
       }
-    ]
+    ],
+    "choice": {
+      "options": [
+        "Automatic"
+      ],
+      "ordered": false,
+      "model_may_pick": [
+        "Automatic"
+      ]
+    }
   },
   "project recording settings": {
     "desc": "Turn on or enable count-in / pre-roll before recording starts, or change where recorded audio files are saved",
@@ -448,7 +493,19 @@
         "type": "click_value_of",
         "value": "Sample Rate"
       }
-    ]
+    ],
+    "choice": {
+      "options": [
+        "44.1 kHz",
+        "48 kHz",
+        "88.2 kHz",
+        "96 kHz",
+        "176.4 kHz",
+        "192 kHz"
+      ],
+      "ordered": false,
+      "model_may_pick": []
+    }
   },
   "show automation": {
     "desc": "Automation lanes revealed on all tracks",
@@ -487,7 +544,12 @@
         "type": "click_value_of",
         "value": "Set Imported Files To"
       }
-    ]
+    ],
+    "choice": {
+      "options": [],
+      "ordered": false,
+      "model_may_pick": []
+    }
   },
   "smart tempo settings": {
     "desc": "Project Settings window, Smart Tempo tab",

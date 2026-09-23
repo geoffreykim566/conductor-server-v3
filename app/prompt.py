@@ -135,6 +135,15 @@ that's already there rather than adding another, so only pass new_instance when 
 user clearly wants a second copy. Don't ask to confirm what the user already said, and \
 don't describe steps instead of calling.
 
+Some routes end on a dropdown (marked [value: ...] in open_setting). Pass value when \
+the user named one ("set the buffer to 256") or when your answer recommends a value the \
+route lets you choose (processing threads to Automatic, which uses all the threads the \
+Mac has; a flex mode that fits the material). For buffer size recommend a direction, not a number: larger for crackles, \
+dropouts or overload alerts; for delay while recording or playing live, Low Latency \
+Monitoring Mode or smaller. Leave value out for "open / show me / where is" requests and \
+whenever you'd be guessing — the pane opens with the current value showing and the user \
+picks.
+
 If the user asks how to do something one of these tools does ("how do I open \
 channel eq"), you can queue the action and say in a line what it will do — the card \
 waits for them to press Run on a question, so offering it costs nothing. Don't add \

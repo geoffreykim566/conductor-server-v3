@@ -165,7 +165,7 @@ async def test_auto_attach_strong_single() -> None:
     assert result.walkthrough_steps == _route("buffer size"), result.walkthrough_steps
     assert result.card_from_lookup is True and result.auto_run is False, (result.card_from_lookup, result.auto_run)
     look = next(c["output"] for c in result.trace if c["tool"] == "lookup_concept")
-    assert look["on_card_note"] == pipeline._ON_CARD_NOTE, look
+    assert look["on_card_note"] == pipeline._ON_CARD_NOTE + pipeline._PANE_ONLY_NOTE, look  # a dropdown route
     assert len(calls) == 2, "no extra decider call on an auto-attached turn"
     print("PASS: a strong single lookup queues its solution's action; a lookup-queued card never auto-runs.")
 
@@ -454,8 +454,158 @@ def test_executor_validation() -> None:
     print("PASS: executors validate names and parse values ('80hz'->'80', 'On'->'on'; '4:1' refused).")
 
 
+def _setting(name: str, value: str | None = None, said: str = "") -> dict:
+    token = tools.TURN_USER_TEXT.set(said)
+    try:
+        return tools.queue_open_setting({"name": name, **({"value": value} if value else {})})
+    finally:
+        tools.TURN_USER_TEXT.reset(token)
+
+
+def test_dropdown_routes() -> None:
+    # No value: the pane only -- the dropdown is never clicked open (found live
+    # 2026-09-22: the open menu swallowed the next step's keystrokes).
+    out = _setting("buffer size")
+    assert out["steps"] == [{"menu_path": ["Logic Pro", "Settings", "Audio"]}], out
+    assert "pane only" in out["note"], out
+    # A value the user named: the route, then a choose step carrying the route for revert.
+    out = _setting("buffer size", "256 samples", said="set my buffer to 256")
+    assert out["chooses"] == "256" and out["steps"][-1]["choose"] == "256", out
+    assert out["steps"][-1]["reopen"] == out["steps"][:-1] == [
+        {"menu_path": ["Logic Pro", "Settings", "Audio"]}, {"click_value_of": "I/O Buffer Size"}], out
+    # A number the user didn't name is refused; a direction is the model's to pick.
+    out = _setting("buffer size", "1024", said="my audio keeps crackling")
+    assert out["attached"] is False and "larger or smaller" in out["reason"], out
+    assert _setting("buffer size", "larger", said="my audio keeps crackling")["chooses"] == "larger"
+    assert _setting("buffer size", "Smaller")["chooses"] == "smaller"
+    out = _setting("buffer size", "2048", said="set buffer to 2048")
+    assert out["attached"] is False and "isn't one of" in out["reason"], out
+    # Sample rate: named in any common spelling, never chosen for the user, no direction.
+    assert _setting("sample rate", "48000", said="change the sample rate to 48k")["chooses"] == "48 kHz"
+    assert _setting("sample rate", "44.1", said="set it to 44100")["chooses"] == "44.1 kHz"
+    assert _setting("sample rate", "48 kHz", said="my file sounds slowed down")["attached"] is False
+    assert _setting("sample rate", "larger", said="set sample rate higher")["attached"] is False
+    # Options the model may pick itself.
+    assert _setting("processing threads", "automatic")["chooses"] == "Automatic"
+    assert _setting("flex time", "mono", said="the vocal timing is off")["chooses"] == "Monophonic"
+    assert _setting("flex time", "Speed (FX)", said="fix the timing")["attached"] is False
+    assert _setting("flex time", "Speed (FX)", said="set flex to speed")["chooses"] == "Speed (FX)"
+    # Unverified options: pane only, any value refused. A plain route takes no value.
+    assert _setting("follow tempo")["steps"] == [{"shortcut": "I"}, {"click_text": "Region"}]
+    assert _setting("follow tempo", "On", said="turn it on")["attached"] is False
+    out = _setting("mixer", "on")
+    assert out["attached"] is False and "no value" in out["reason"], out
+    assert "note" not in _setting("mixer") and _setting("mixer")["steps"] == [{"shortcut": "X"}]
+    print("PASS: dropdown routes pick a checked value or stop at the pane; plain routes unchanged.")
+
+
+async def test_dropdown_value_replaces_lookup_queued_pane() -> None:
+    # A lookup queues buffer size (pane only). The model tries an exact number
+    # the user never said -- refused, and the queued step stays put -- then
+    # sends a direction, which replaces the queued step instead of joining it.
+    lookups = [_single("CPU overload", {"open_setting": "buffer size"})]
+    result, _ = await _run([
+        _resp(_tool_use("lookup_concept", {"problem": "crackling"}, "l1")),
+        _resp(_tool_use("open_setting", {"name": "buffer size", "value": "1024"}, "w1")),
+        _resp(_tool_use("open_setting", {"name": "buffer size", "value": "larger"}, "w2")),
+        _resp(_text("done")),
+    ], lookups=lookups, messages=[{"role": "user", "content": "my playback keeps crackling"}])
+    look = next(c["output"] for c in result.trace if c["tool"] == "lookup_concept")
+    assert pipeline._PANE_ONLY_NOTE in look["on_card_note"], look
+    sets = [c for c in result.trace if c["tool"] == "open_setting" and not c.get("auto_from")]
+    assert sets[0]["output"]["attached"] is False and sets[1]["output"].get("already_queued"), sets
+    assert result.walkthrough_steps == _setting("buffer size", "larger")["steps"], result.walkthrough_steps
+    print("PASS: a refused dropdown value leaves the lookup's pane step queued; a valid one replaces it.")
+
+
+async def test_dropdown_value_is_still_an_alternative() -> None:
+    # A value doesn't make a second candidate from the same bucket a new request.
+    crackling = [_bucket("crackling", {"CPU overload": {"open_setting": "buffer size"},
+                                       "sample rate mismatch": {"open_setting": "sample rate"}})]
+    result, _ = await _run([
+        _resp(_tool_use("lookup_concept", {"problem": "crackling"}, "l1")),
+        _resp(_tool_use("open_setting", {"name": "sample rate"}, "w1"),
+              _tool_use("open_setting", {"name": "buffer size", "value": "larger"}, "w2")),
+        _resp(_text("done")),
+    ], lookups=crackling, messages=[{"role": "user", "content": "crackling"}])
+    outs = [c["output"] for c in result.trace if c["tool"] == "open_setting"]
+    assert outs[0]["attached"] and outs[1] == {"attached": False, "reason": pipeline._FALLBACK_REFUSAL}, outs
+    print("PASS: commit-to-one still refuses a same-bucket alternative that carries a value.")
+
+
+async def test_one_visit_per_setting() -> None:
+    # Two values for the same dropdown in one reply: the later call replaces
+    # the earlier one (found in the 2026-09-22 battery: both ran; then with
+    # "first stands", the card said Rhythmic while the reply said Monophonic).
+    result, _ = await _run([
+        _resp(_tool_use("open_setting", {"name": "flex time", "value": "Rhythmic"}, "w1"),
+              _tool_use("open_setting", {"name": "buffer size"}, "w2"),
+              _tool_use("open_setting", {"name": "flex time", "value": "Monophonic"}, "w3")),
+        _resp(_text("done")),
+    ], messages=[{"role": "user", "content": "flex my vocal"}])
+    outs = [c["output"] for c in result.trace if c["tool"] == "open_setting"]
+    assert outs[0].get("replaced") and outs[0]["attached"] is False, outs[0]
+    assert outs[2]["chooses"] == "Monophonic" and outs[2].get("replaces_earlier"), outs[2]
+    want = _setting("flex time", "Monophonic")["steps"] + _route("buffer size")
+    assert result.walkthrough_steps == want, result.walkthrough_steps
+    assert [ln.split(" -- ")[0] for ln in pipeline.card_descriptions(result.trace)] == ["opens buffer size", "opens flex time"]
+    print("PASS: a second call for a setting already on the card replaces it in place; one value per setting.")
+
+
+async def test_resume_keeps_replacements() -> None:
+    # A turn parked for research after endorsing a lookup's pane-only route
+    # with a value and re-visiting a setting: the resumed card is the one the
+    # live turn had built, not the lookup's original steps.
+    pane = _route("buffer size")
+    look = {**_single("CPU overload", {"open_setting": "buffer size"}),
+            "on_card": [{"tool": "open_setting", "input": {"name": "buffer size"},
+                         "output": {"attached": True, "destination": "buffer size", "steps": pane}}]}
+    larger = {**_setting("buffer size", "larger"), "already_queued": True}
+    rhythmic = _setting("flex time", "Rhythmic", said="rhythmic")
+    mono = {**_setting("flex time", "Monophonic"), "replaces_earlier": True}
+
+    def call(id_, name, inp):
+        return {"role": "assistant", "content": [{"type": "tool_use", "id": id_, "name": name, "input": inp}]}
+
+    def res(id_, out):
+        return {"role": "user", "content": [{"type": "tool_result", "tool_use_id": id_, "content": json.dumps(out)}]}
+    parked = [
+        {"role": "user", "content": "crackles, flex my vocal, and tell me about 1176s"},
+        call("l1", "lookup_concept", {"problem": "crackling"}), res("l1", look),
+        call("w1", "open_setting", {"name": "buffer size", "value": "larger"}), res("w1", larger),
+        call("w2", "open_setting", {"name": "flex time", "value": "Rhythmic"}), res("w2", rhythmic),
+        call("w3", "open_setting", {"name": "flex time", "value": "Monophonic"}), res("w3", mono),
+        call("r1", "web_research", {"query": "1176"}),
+    ]
+    with patch.object(pipeline.research, "web_research", new=AsyncMock(return_value={"findings": "x", "sources": []})):
+        result, _ = await _run([_resp(_text("done"))], messages=parked, resume="allow_research")
+    assert result.walkthrough_steps == larger["steps"] + mono["steps"], result.walkthrough_steps
+    print("PASS: a resumed turn rebuilds endorsed and replaced steps the way the live turn had them.")
+
+
+def test_card_descriptions_dropdowns() -> None:
+    trace = [
+        {"tool": "open_setting", "input": {"name": "buffer size", "value": "larger"},
+         "output": {"attached": True, "chooses": "larger"}},
+        {"tool": "open_setting", "input": {"name": "sample rate", "value": "48k"},
+         "output": {"attached": True, "chooses": "48 kHz"}},
+        {"tool": "open_setting", "input": {"name": "processing threads"}, "output": {"attached": True}},
+    ]
+    lines = pipeline.card_descriptions(trace)
+    assert lines[0].endswith("then moves it one step larger than whatever it's set to now"), lines
+    assert lines[1].endswith("then sets it to 48 kHz"), lines
+    assert lines[2].endswith("(opens the pane only -- no value is chosen; the user picks there)"), lines
+    print("PASS: the writer is told whether a dropdown route picks a value or stops at the pane.")
+
+
 async def main() -> None:
     test_executor_validation()
+    test_dropdown_routes()
+    test_card_descriptions_dropdowns()
+    await test_dropdown_value_replaces_lookup_queued_pane()
+    await test_dropdown_value_is_still_an_alternative()
+    await test_one_visit_per_setting()
+    await test_resume_keeps_replacements()
     test_is_question()
     test_card_descriptions()
     await test_actions_combine_same_response()

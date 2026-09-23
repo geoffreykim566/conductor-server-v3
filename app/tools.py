@@ -19,6 +19,7 @@ its action (see pipeline.py's auto-attach).
 import asyncio
 import json
 import re
+from contextvars import ContextVar
 from pathlib import Path
 
 from app import db
@@ -253,6 +254,39 @@ ROUTES: dict[str, dict] = json.loads(
     (Path(__file__).parent.parent / "seed" / "routes.json").read_text()
 )
 
+# A route that ends on a dropdown carries a `choice` block: the dropdown's
+# options, whether they're ordered (so larger/smaller means something), and
+# which options the model may pick on its own from a diagnosis -- any other
+# value has to be in the user's own message, checked here in code. Found live
+# 2026-09-22: these routes used to end by opening the dropdown and stopping,
+# and the open menu swallowed the next step's keystrokes ("open buffer size
+# then open compressor": the plugin search never got focus). Now a dropdown
+# route either picks a value or stops at the pane -- it never leaves a menu
+# open. An empty `options` list means not verified yet: pane only.
+RELATIVE_VALUES = ("larger", "smaller")
+
+# The current turn's user message (lowercased, see pipeline._last_user_text),
+# set by pipeline._respond -- what "the user named this value" is checked against.
+TURN_USER_TEXT: ContextVar[str] = ContextVar("turn_user_text", default="")
+
+
+def _route_line(name: str, route: dict) -> str:
+    line = f"- {name}: {route['desc']}"
+    choice = route.get("choice")
+    if choice is None:
+        return line
+    options = choice.get("options") or []
+    if not options:
+        return line + " [opens the pane only; no value]"
+    values = " | ".join(options) + (" | larger | smaller" if choice.get("ordered") else "")
+    free = choice.get("model_may_pick") or []
+    who = (f"you may choose {' or '.join(free)} yourself; any other value only if the user named it"
+           if free else "an exact value only if the user named it")
+    if choice.get("ordered"):
+        who += "; larger/smaller move one step from its current value"
+    return line + f" [value: {values} -- {who}]"
+
+
 OPEN_SETTING_SCHEMA = {
     "name": "open_setting",
     "description": (
@@ -261,14 +295,21 @@ OPEN_SETTING_SCHEMA = {
         "reply, when they press Run (it has NOT happened when you write your reply). Use it for a "
         "direct request to open or go to one of these; name must be one of the routes listed. If "
         "what the user wants isn't listed, don't pick the nearest one -- say you don't have a "
-        "verified route for it.\n\nRoutes:\n"
-        + "\n".join(f"- {name}: {route['desc']}" for name, route in sorted(ROUTES.items()))
+        "verified route for it. A route marked [value: ...] ends on a dropdown: pass value to "
+        "choose one of its options, or omit it to open the pane with the current value showing "
+        "and let the user pick.\n\nRoutes:\n"
+        + "\n".join(_route_line(name, route) for name, route in sorted(ROUTES.items()))
     ),
     "strict": True,
     "input_schema": {
         "type": "object",
         "properties": {
             "name": {"type": "string", "enum": sorted(ROUTES), "description": "One of the approved routes."},
+            "value": {
+                "type": "string",
+                "description": "Only for a route marked [value: ...]: one of its listed options, or "
+                               "larger / smaller where listed. Omit to just open the pane.",
+            },
         },
         "required": ["name"],
         "additionalProperties": False,
@@ -512,9 +553,88 @@ def queue_open_setting(inp: dict, ax_fixture: dict | None = None) -> dict:
     steps = path_to_walkthrough_steps(route["path"])
     if not steps:
         return {"attached": False, "reason": "route has no executable steps"}
+    choice = route.get("choice")
+    value = str(inp.get("value") or "").strip()
+    chosen = None
+    if value and choice is None:
+        return {"attached": False, "reason": f"{name!r} has no value to choose -- call it without value"}
+    if choice is not None:
+        if not value:
+            steps = steps[:-1]   # the pane only: never click the dropdown open
+        else:
+            chosen, reason = _resolve_choice(value, choice, TURN_USER_TEXT.get())
+            if chosen is None:
+                return {"attached": False, "reason": reason}
+            # `reopen`: the route's own steps, so the client's revert can get
+            # back to this dropdown and pick the old value again.
+            steps = steps + [{"choose": chosen, "reopen": list(steps)}]
     # `destination` keeps the result shape pipeline._backfill_walkthrough
     # recognises (attached + destination + steps).
-    return {"attached": True, "action": "open_setting", "destination": name, "steps": steps}
+    out = {"attached": True, "action": "open_setting", "destination": name, "steps": steps}
+    if chosen:
+        out["chooses"] = chosen
+    elif choice is not None:
+        out["note"] = "opens the pane only -- no value is chosen; the user picks there"
+    return out
+
+
+def _number(text: str) -> float | None:
+    m = re.search(r"\d+(?:\.\d+)?", text)
+    return float(m.group(0)) if m else None
+
+
+def _match_option(value: str, options: list[str]) -> str | None:
+    """The option a model-sent value means: exact (any case), same number
+    ("256 samples" -> "256", "48000" -> "48 kHz"), or a unique prefix
+    ("mono" -> "Monophonic")."""
+    v = value.strip().lower()
+    exact = next((o for o in options if o.lower() == v), None)
+    if exact:
+        return exact
+    n = _number(v)
+    if n is not None:
+        for cand in (n, n / 1000):
+            hits = [o for o in options if _number(o) == cand]
+            if len(hits) == 1:
+                return hits[0]
+        return None
+    hits = [o for o in options if o.lower().startswith(v)]
+    return hits[0] if len(hits) == 1 else None
+
+
+def _user_named(option: str, user_text: str) -> bool:
+    """Whether the user's own message names this option ("set buffer to 256",
+    "48k", "44100", "slicing")."""
+    n = _number(option)
+    if n is not None:
+        forms = {f"{n:g}"} | ({f"{n * 1000:g}"} if "khz" in option.lower() else set())
+        return any(re.search(rf"(?<![\d.]){re.escape(f)}(?![\d.])", user_text) for f in forms)
+    word = re.sub(r"\s*\(.*?\)", "", option).strip().lower()
+    return bool(word) and re.search(rf"\b{re.escape(word)}\b", user_text) is not None
+
+
+def _resolve_choice(value: str, choice: dict, user_text: str) -> tuple[str | None, str | None]:
+    """(option to choose, None) or (None, refusal reason for the model)."""
+    options = choice.get("options") or []
+    ordered = bool(choice.get("ordered"))
+    if not options:
+        return None, ("this setting's options aren't verified yet -- call it without value to open "
+                      "the pane, and let the user pick there")
+    if value.lower() in RELATIVE_VALUES:
+        if not ordered:
+            return None, (f"{value!r} only works on a setting with ordered sizes -- pass one of "
+                          f"{', '.join(options)}, or no value to just open the pane")
+        return value.lower(), None
+    pick = _match_option(value, options)
+    if pick is None:
+        return None, (f"{value!r} isn't one of this setting's options ({', '.join(options)}) -- pass one "
+                      "of those" + (", or larger / smaller" if ordered else "") + ", or no value to just "
+                      "open the pane")
+    if pick not in (choice.get("model_may_pick") or []) and not _user_named(pick, user_text):
+        alt = "pass larger or smaller" if ordered else "call it without value to open the pane"
+        return None, (f"the user didn't name {pick!r} -- don't choose an exact value for them here; "
+                      f"{alt}, or ask them which they want")
+    return pick, None
 
 
 def action_calls(action) -> list[tuple[str, dict]]:

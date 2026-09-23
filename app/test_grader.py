@@ -109,6 +109,24 @@ def test_completion_claims() -> None:
     print("PASS: completion-claim check flags past-tense claims, not future/imperative phrasing.")
 
 
+def test_setting_calls() -> None:
+    def call(inp, ok=True):
+        return {"tool": "open_setting", "input": inp, "output": {"attached": ok}}
+    trace = [call({"name": "buffer size", "value": "1024"}, ok=False), call({"name": "buffer size", "value": "larger"}),
+             {"tool": "open_plugin", "input": {"plugin": "Compressor"}, "output": {"attached": True}}]
+    larger = {"tool": "open_setting", "args": {"name": "buffer size", "value": "larger"}}
+    assert not _failed(_grade({"setting_calls": [larger]}, _actual_outcome(trace)))
+    assert _failed(_grade({"forbidden_setting_calls": [larger]}, _actual_outcome(trace))) == {"forbidden_setting_calls"}
+    # a refused call doesn't count as made; open_setting stays out of action_calls
+    assert not _failed(_grade({"forbidden_setting_calls": [{"tool": "open_setting", "args": {"value": "1024"}}],
+                               "action_calls": [{"tool": "open_plugin", "args": {"plugin": "compressor"}}]},
+                              _actual_outcome(trace)))
+    pane = {"tool": "open_setting", "args": {"name": "buffer size"}, "args_absent": ["value"]}
+    assert _failed(_grade({"setting_calls": [pane]}, _actual_outcome(trace[1:2]))) == {"setting_calls"}
+    assert not _failed(_grade({"setting_calls": [pane]}, _actual_outcome([call({"name": "buffer size"})])))
+    print("PASS: setting_calls / forbidden_setting_calls grade open_setting name + value; refusals don't count.")
+
+
 def main() -> None:
     test_0918_false_pass_now_fails()
     test_typed_tools_pass()
@@ -116,6 +134,7 @@ def main() -> None:
     test_order_matters()
     test_true_negative()
     test_completion_claims()
+    test_setting_calls()
 
 
 if __name__ == "__main__":

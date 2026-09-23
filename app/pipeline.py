@@ -100,6 +100,11 @@ _ON_CARD_NOTE = (
     "This solution's action is already on the reply's card -- it waits for the user "
     "to press Run. Don't call it again, and don't describe it as done."
 )
+_PANE_ONLY_NOTE = (
+    " It opens the setting's pane only, with no value chosen. If your answer recommends a "
+    "value it can take, call open_setting for the same route with that value -- that "
+    "replaces the queued step rather than adding one."
+)
 _PICK_NUDGE = (
     "A lookup this turn returned solutions that map to an action. If your answer "
     "recommends one, call its action so the user gets it on the card; if you can't tell "
@@ -187,6 +192,14 @@ def _endorse_key(name: str, inp: dict) -> str:
     return _attach_key(name, inp)
 
 
+def _cand_key(name: str, inp: dict) -> str:
+    """Which candidate a call is, for commit-to-one: an open_setting call is its
+    route whatever value it picks (a lookup's candidate never carries one)."""
+    if name == "open_setting":
+        return _attach_key(name, {"name": inp.get("name")})
+    return _attach_key(name, inp)
+
+
 def _bucket_candidates(trace: list[dict]) -> dict[str, str]:
     """attach key of each candidate's action -> its problem bucket, for every
     multi-candidate ('problem') lookup this turn, plus moderate single matches
@@ -210,7 +223,7 @@ def _bucket_candidates(trace: list[dict]) -> dict[str, str]:
             continue
         for sol in o.get("solutions") or []:
             for tool, inp in tools.action_calls(sol.get("action")):
-                out.setdefault(_attach_key(tool, inp), o.get("problem"))
+                out.setdefault(_cand_key(tool, inp), o.get("problem"))
     return out
 
 
@@ -218,16 +231,35 @@ def _is_alternative_pick(name: str, inp: dict, trace: list[dict]) -> bool:
     """True if this action is a candidate from a bucket another of whose
     candidates is already on the card -- a fallback, not a second request."""
     cands = _bucket_candidates(trace)
-    key = _attach_key(name, inp)
+    key = _cand_key(name, inp)
     problem = cands.get(key)
     if problem is None:
         return False
     return any(
         c["tool"] in _ATTACH_TOOLS and c["output"].get("attached")
-        and cands.get(_attach_key(c["tool"], c["input"])) == problem
-        and _attach_key(c["tool"], c["input"]) != key
+        and cands.get(_cand_key(c["tool"], c["input"])) == problem
+        and _cand_key(c["tool"], c["input"]) != key
         for c in trace
     )
+
+
+def _replace_span(card_steps: list, start: int, end: int, new: list, *span_maps: dict) -> None:
+    """Swap card_steps[start:end] for `new` and shift every recorded span after it."""
+    card_steps[start:end] = new
+    shift = len(new) - (end - start)
+    if shift:
+        for spans in span_maps:
+            for k, (a, b) in list(spans.items()):
+                if a >= end:
+                    spans[k] = (a + shift, b + shift)
+
+
+def _mark_replaced(trace: list[dict], name: str) -> None:
+    """The earlier open_setting call(s) for this route no longer describe the
+    card -- the writer (card_descriptions) and the grader stop counting them."""
+    for c in trace:
+        if c["tool"] == "open_setting" and c["input"].get("name") == name and c["output"].get("attached"):
+            c["output"] = {**c["output"], "attached": False, "replaced": True}
 
 
 def _needs_pick(trace: list[dict], card: list) -> bool:
@@ -799,7 +831,15 @@ def card_descriptions(trace: list[dict]) -> list[str]:
             out.append(f"sets {inp.get('plugin')} {inp.get('param')} to {inp.get('value')}{where}")
         elif c["tool"] == "open_setting":
             route = tools.ROUTES.get(inp.get("name"), {})
-            out.append(f"opens {inp.get('name')} -- {route.get('desc', '')}".rstrip(" -"))
+            line = f"opens {inp.get('name')} -- {route.get('desc', '')}".rstrip(" -")
+            chosen = c["output"].get("chooses")
+            if chosen in tools.RELATIVE_VALUES:
+                line += f", then moves it one step {chosen} than whatever it's set to now"
+            elif chosen:
+                line += f", then sets it to {chosen}"
+            elif route.get("choice") is not None:
+                line += " (opens the pane only -- no value is chosen; the user picks there)"
+            out.append(line)
     return out
 
 
@@ -1058,6 +1098,7 @@ def _restore_turn_state(tail: list[dict]) -> dict:
     card_steps: list = []
     attach_keys: set = set()
     queued_by_lookup: dict[str, tuple[int, int]] = {}
+    route_spans: dict[str, tuple[int, int]] = {}
     calls: dict[str, dict] = {}
     for m in tail:
         content = m.get("content")
@@ -1097,16 +1138,30 @@ def _restore_turn_state(tail: list[dict]) -> dict:
                         attach_keys.add(_attach_key(auto["tool"], auto["input"]))
                         queued_by_lookup[_endorse_key(auto["tool"], auto["input"])] = (start, len(card_steps))
                 if call["tool"] in _ATTACH_TOOLS and output.get("attached"):
-                    if output.get("already_queued"):
-                        # Endorsed a lookup-queued step: it's model-called now.
-                        queued_by_lookup.pop(_endorse_key(call["tool"], call["input"]), None)
+                    key = _endorse_key(call["tool"], call["input"])
+                    new = output.get("steps") or []
+                    if output.get("already_queued") or output.get("replaces_earlier"):
+                        # Endorsed a lookup-queued step (it's model-called now) or
+                        # re-visited a setting: the new version replaces the old
+                        # span, as it did live.
+                        span = queued_by_lookup.pop(key, None) or route_spans.get(key)
+                        if span:
+                            _replace_span(card_steps, *span, new, queued_by_lookup, route_spans)
+                            if call["tool"] == "open_setting":
+                                route_spans[key] = (span[0], span[0] + len(new))
+                        if output.get("replaces_earlier"):
+                            _mark_replaced(trace[:-1], call["input"].get("name"))
+                        attach_keys.add(_attach_key(call["tool"], call["input"]))
                         continue
-                    card_steps.extend(output.get("steps") or [])
+                    start = len(card_steps)
+                    card_steps.extend(new)
                     attach_keys.add(_attach_key(call["tool"], call["input"]))
+                    if call["tool"] == "open_setting":
+                        route_spans[key] = (start, len(card_steps))
     return {
         "trace": trace, "text_parts": text_parts, "lookups_counted": lookups_counted,
         "buckets_seen": buckets_seen, "card_steps": card_steps, "attach_keys": attach_keys,
-        "queued_by_lookup": queued_by_lookup,
+        "queued_by_lookup": queued_by_lookup, "route_spans": route_spans,
     }
 
 
@@ -1152,6 +1207,8 @@ async def _respond(
         pending_tool_uses = _pending_tool_uses(msgs)
         if not pending_tool_uses:
             raise ValueError("resume: history does not end in a pending tool call")
+    # What open_setting checks "the user named this value" against.
+    tools.TURN_USER_TEXT.set(_last_user_text(messages))
 
     # Screenshots are fresh, per-turn context (see api.py's ChatRequest) --
     # spliced into the newest user turn only for this turn's own model calls
@@ -1217,6 +1274,7 @@ async def _respond(
     card_steps: list = []        # every attach this turn, in call order (one card)
     attach_keys: set = set()
     queued_by_lookup: dict[str, tuple[int, int]] = {}   # endorse key -> its slice of card_steps
+    route_spans: dict[str, tuple[int, int]] = {}        # model-called open_setting -> its slice
     pick_forced = False          # the one pick-or-ask re-call per turn (see _needs_pick)
     # Text the model writes alongside a tool call (not just the final,
     # tool-free iteration) is a real part of the answer, not scratch
@@ -1238,6 +1296,7 @@ async def _respond(
         card_steps = restored["card_steps"]
         attach_keys = restored["attach_keys"]
         queued_by_lookup = restored["queued_by_lookup"]
+        route_spans = restored["route_spans"]
 
     # Pushed, not pulled: live state (when known for this turn) is handed to the
     # model automatically rather than waiting on it to decide to call a tool for
@@ -1417,19 +1476,37 @@ async def _respond(
                 # agreement, not a second request. Its version (which may name a
                 # track) replaces the queued step, and the step stops counting as
                 # lookup-queued, so an instruction-shaped turn can auto-run.
-                start, end = queued_by_lookup.pop(_endorse_key(tu.name, tu.input))
                 result = await _EXECUTORS[tu.name](tu.input, ax_fixture)
                 if result.get("attached"):
+                    # Popped only on success: a refused version (a dropdown value
+                    # the user didn't name) leaves the queued step as it was, so
+                    # a corrected call still replaces it instead of joining it.
+                    key = _endorse_key(tu.name, tu.input)
+                    start, end = queued_by_lookup.pop(key)
                     new = result.get("steps") or []
-                    card_steps[start:end] = new
-                    shift = len(new) - (end - start)
-                    if shift:
-                        queued_by_lookup = {k: (a + shift if a >= end else a, b + shift if b >= end else b)
-                                            for k, (a, b) in queued_by_lookup.items()}
+                    _replace_span(card_steps, start, end, new, queued_by_lookup, route_spans)
+                    if tu.name == "open_setting":
+                        route_spans[key] = (start, start + len(new))
                     attach_keys.add(_attach_key(tu.name, tu.input))
                     result = {**result, "already_queued": True}
             elif tu.name in _ATTACH_TOOLS and _attach_key(tu.name, tu.input) in attach_keys:
                 result = {"attached": False, "reason": _DUPLICATE_ATTACH_REFUSAL}
+            elif tu.name == "open_setting" and _endorse_key(tu.name, tu.input) in route_spans:
+                # One visit per setting per card, and the later call wins: two
+                # values for one dropdown both ran, and "first stands" put
+                # Rhythmic on the card while the reply said Monophonic (both
+                # found in the 2026-09-22 battery, calls in the same reply). The
+                # later call is the correction the prose follows.
+                result = await _EXECUTORS[tu.name](tu.input, ax_fixture)
+                if result.get("attached"):
+                    key = _endorse_key(tu.name, tu.input)
+                    start, end = route_spans[key]
+                    new = result.get("steps") or []
+                    _replace_span(card_steps, start, end, new, queued_by_lookup, route_spans)
+                    route_spans[key] = (start, start + len(new))
+                    _mark_replaced(trace, tu.input.get("name"))
+                    attach_keys.add(_attach_key(tu.name, tu.input))
+                    result = {**result, "replaces_earlier": True}
             elif tu.name in _ATTACH_TOOLS and len(attach_keys) >= MAX_ATTACHES_PER_TURN:
                 result = {"attached": False, "reason": _ATTACH_CAP_REFUSAL}
             elif tu.name in _ATTACH_TOOLS and _is_alternative_pick(tu.name, tu.input, trace):
@@ -1463,7 +1540,8 @@ async def _respond(
                 sol = (result.get("solutions") or [{}])[0]
                 for tool, inp in tools.action_calls(sol.get("action")):
                     key = _attach_key(tool, inp)
-                    if key in attach_keys or len(attach_keys) >= MAX_ATTACHES_PER_TURN:
+                    if (key in attach_keys or len(attach_keys) >= MAX_ATTACHES_PER_TURN
+                            or (tool == "open_setting" and _endorse_key(tool, inp) in route_spans)):
                         continue
                     if _is_alternative_pick(tool, inp, trace):
                         # Same commit-to-one rule as a model-made pick: don't let
@@ -1481,8 +1559,11 @@ async def _respond(
                         queued_by_lookup[_endorse_key(tool, inp)] = (start, len(card_steps))
                 if on_card:
                     refused = [o["output"].get("reason") for o in on_card if not o["output"].get("attached")]
+                    note = _ON_CARD_NOTE
+                    if any(o["tool"] == "open_setting" and o["output"].get("note") for o in on_card):
+                        note += _PANE_ONLY_NOTE
                     result = {**result, "on_card": on_card,
-                              "on_card_note": _ON_CARD_NOTE if not refused else
+                              "on_card_note": note if not refused else
                               "This solution's action was NOT queued: " + "; ".join(r for r in refused if r)}
             trace.append({"tool": tu.name, "input": tu.input, "output": result})
             trace.extend({**o, "auto_from": result.get("problem")} for o in on_card)
@@ -1490,9 +1571,13 @@ async def _respond(
                 if COUNT_ALL_LOOKUPS or _lookup_is_unproductive(result, buckets_seen):
                     lookups_counted += 1
                 buckets_seen.add(result.get("problem"))
-            if tu.name in _ATTACH_TOOLS and result.get("attached") and not result.get("already_queued"):
+            if (tu.name in _ATTACH_TOOLS and result.get("attached")
+                    and not result.get("already_queued") and not result.get("replaces_earlier")):
+                start = len(card_steps)
                 card_steps.extend(result.get("steps") or [])
                 attach_keys.add(_attach_key(tu.name, tu.input))
+                if tu.name == "open_setting":
+                    route_spans[_endorse_key(tu.name, tu.input)] = (start, len(card_steps))
             tool_results.append({
                 "type": "tool_result",
                 "tool_use_id": tu.id,
