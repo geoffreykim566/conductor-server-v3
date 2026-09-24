@@ -136,7 +136,8 @@
           "Rhythmic",
           "Polyphonic",
           "Speed (FX)",
-          "Tempophone (FX)"
+          "Tempophone (FX)",
+          "Flex Pitch"
         ]
       },
       {
@@ -161,13 +162,14 @@
           "Rhythmic",
           "Polyphonic",
           "Speed (FX)",
-          "Tempophone (FX)"
+          "Tempophone (FX)",
+          "Flex Pitch"
         ]
       }
     ],
     "choice": {
       "options": [
-        "Off",
+        "Automatic (Polyphonic)",
         "Monophonic",
         "Slicing",
         "Rhythmic",
