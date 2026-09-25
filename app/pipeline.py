@@ -28,6 +28,14 @@ log = logging.getLogger(__name__)
 
 MAX_ITERATIONS = 6
 
+# Decider-only request knobs, applied in _call_model to every call except the
+# writer's; None omits the param. Module-level so run_latency_variants can swap
+# them, along with MODEL, per variant. Effort "medium" (2026-09-24): vs the
+# default "high", same graded quality over 3 full-battery passes, ~1s faster
+# median, ~7% cheaper; "low" was no faster and failed across more scenarios.
+DECIDER_EFFORT: str | None = "medium"
+DECIDER_THINKING: dict | None = None
+
 # Whether a "moderate" confidence tier also injects the "say you don't have a
 # verified answer" instruction into the writer's facts (_finalize_answer).
 # Off since 2026-09-12 together with the client badge -- see api.py's done
@@ -995,7 +1003,7 @@ async def _call_model(
     msgs: list[dict],
     on_chunk: OnChunk | None,
     tool_choice: dict | None = None,
-    model: str = MODEL,
+    model: str | None = None,
 ):
     """One messages.create call, or the streamed equivalent when on_chunk is given.
 
@@ -1014,8 +1022,17 @@ async def _call_model(
 
     model defaults to the decider's MODEL; the writer call (_write_response)
     passes WRITER_MODEL instead -- the one place this loop's model varies.
+    Resolved at call time, not bound as the default, so a runtime MODEL swap
+    reaches every decider call. DECIDER_EFFORT / DECIDER_THINKING apply to
+    decider calls only.
     """
+    decider = model is None
+    model = MODEL if decider else model
     kwargs = dict(model=model, max_tokens=MAX_TOKENS, system=system, messages=msgs)
+    if decider and DECIDER_EFFORT is not None:
+        kwargs["output_config"] = {"effort": DECIDER_EFFORT}
+    if decider and DECIDER_THINKING is not None:
+        kwargs["thinking"] = DECIDER_THINKING
     if tools_param is not None:
         kwargs["tools"] = tools_param
     if tool_choice is not None:
