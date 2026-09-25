@@ -486,7 +486,10 @@ def test_dropdown_routes() -> None:
     assert _setting("sample rate", "48 kHz", said="my file sounds slowed down")["attached"] is False
     assert _setting("sample rate", "larger", said="set sample rate higher")["attached"] is False
     # Options the model may pick itself.
-    assert _setting("processing threads", "automatic")["chooses"] == "Automatic"
+    # Threads: the KB says max rather than Automatic on Apple Silicon, and the
+    # route can't pick a number yet -- Automatic only when the user names it.
+    assert _setting("processing threads", "automatic", said="system overload on my M3")["attached"] is False
+    assert _setting("processing threads", "automatic", said="set processing threads to automatic")["chooses"] == "Automatic"
     assert _setting("flex time", "mono", said="the vocal timing is off")["chooses"] == "Monophonic"
     assert _setting("flex time", "Speed (FX)", said="fix the timing")["attached"] is False
     assert _setting("flex time", "Speed (FX)", said="set flex to speed")["chooses"] == "Speed (FX)"

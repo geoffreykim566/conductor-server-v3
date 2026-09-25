@@ -428,9 +428,7 @@
         "Automatic"
       ],
       "ordered": false,
-      "model_may_pick": [
-        "Automatic"
-      ]
+      "model_may_pick": []
     }
   },
   "project recording settings": {

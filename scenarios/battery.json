@@ -1705,10 +1705,18 @@
     ]
   },
   {
-    "name": "dropdown_threads_automatic",
-    "note": "2026-09-22 dropdown routes: a route ending on a dropdown picks a checked value or opens the pane only -- never leaves the dropdown open (live: 'open buffer size then open compressor' left the dropdown open and the plugin search never got focus). Processing threads has one right answer (Automatic); the model may pick it itself.",
+    "name": "dropdown_threads_pane_not_automatic",
+    "note": "2026-09-22 dropdown routes, revised 2026-09-24: the KB says max threads rather than Automatic on Apple Silicon, and the route can't pick a number yet (no 'largest' on the client), so the card opens the pane and the reply says to pick the highest. Automatic is only chosen when the user names it.",
     "expect": {
       "setting_calls": [
+        {
+          "tool": "open_setting",
+          "args": {
+            "name": "processing threads"
+          }
+        }
+      ],
+      "forbidden_setting_calls": [
         {
           "tool": "open_setting",
           "args": {
