@@ -36,6 +36,12 @@ MAX_ITERATIONS = 6
 DECIDER_EFFORT: str | None = "medium"
 DECIDER_THINKING: dict | None = None
 
+# End the turn right after an iteration whose tool calls were all successful
+# card actions, skipping the decider's prose-only follow-up call (see the
+# early-exit block in respond()). Direct actions only (2026-09-24): commands
+# and "where is X" drop from ~5s to ~2.5-3s; diagnostic turns keep the call.
+EARLY_EXIT_ON_ACTION = True
+
 # Whether a "moderate" confidence tier also injects the "say you don't have a
 # verified answer" instruction into the writer's facts (_finalize_answer).
 # Off since 2026-09-12 together with the client badge -- see api.py's done
@@ -1088,6 +1094,22 @@ def _last_user_text_index(msgs: list[dict]) -> int | None:
     return None
 
 
+def _prior_turn_looked_up(msgs: list[dict]) -> bool:
+    """Whether the turn before the current one called lookup_concept. A
+    follow-up that adds evidence mid-diagnosis ("spotify went silent too")
+    tends to skip its own lookup because the last one is still in history --
+    so for EARLY_EXIT_ON_ACTION it counts as a diagnostic turn, not a command."""
+    cur = _last_user_text_index(msgs)
+    if cur is None:
+        return False
+    prev = _last_user_text_index(msgs[:cur])
+    for m in msgs[(prev or 0):cur]:
+        if m.get("role") == "assistant" and isinstance(m.get("content"), list):
+            if any(b.get("type") == "tool_use" and b.get("name") == "lookup_concept" for b in m["content"]):
+                return True
+    return False
+
+
 def _pending_tool_uses(msgs: list[dict]) -> list:
     """tool_use blocks of a parked transcript's final assistant message, as
     objects with the .name/.input/.id the dispatch loop reads off SDK blocks.
@@ -1601,6 +1623,29 @@ async def _respond(
                 "content": json.dumps(result),
             })
         msgs.append({"role": "user", "content": tool_results})
+
+        # Early exit (A/B, 2026-09-24): an iteration that called only action
+        # tools, all attached, has nothing left to decide -- the next decider
+        # call would only write prose the writer then rewrites (~2.5s median).
+        # Any refusal or error keeps looping so the decider can react to it.
+        # Direct actions only: after a lookup, that next call is where the
+        # decider explains the diagnosis and next steps, and skipping it lost
+        # them (battery review, 2026-09-24). Same for a follow-up to a turn
+        # that looked something up (see _prior_turn_looked_up).
+        if (EARLY_EXIT_ON_ACTION and tool_uses
+                and all(tu.name in _ATTACH_TOOLS for tu in tool_uses)
+                and all(json.loads(tr["content"]).get("attached") for tr in tool_results)
+                and not any(t["tool"] == "lookup_concept" for t in trace)
+                and not _prior_turn_looked_up(messages)):
+            text = "\n\n".join(text_parts)
+            text, tier = await _finalize_answer(
+                trace, (list(card_steps) or None), text, messages, on_chunk, usage,
+                attached_solution, live_state=live_state, had_screenshots=screenshot_idx is not None,
+                has_actions=bool(card_steps),
+            )
+            return Result(text=text, walkthrough_steps=(list(card_steps) or None),
+                          trace=trace, messages=msgs, usage=usage, confidence_tier=tier,
+                          sources=_collect_sources(trace), card_from_lookup=bool(queued_by_lookup))
 
         # ask_clarifying_question ends the turn immediately, same as the
         # no-tool-uses path above -- it's not "not the final answer, keep

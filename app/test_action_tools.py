@@ -68,10 +68,12 @@ def _fake_lookup(outputs: list[dict]):
 
 
 async def _run(responses: list, lookups: list[dict] | None = None, messages: list[dict] | None = None,
-               **kwargs):  # noqa: D401
+               early_exit: bool = False, **kwargs):  # noqa: D401
     """Drive respond() through scripted decider responses. Decider calls pass
     tools=; the writer call doesn't, so it gets a plain text reply and the
-    decider script isn't consumed by it. Returns (result, decider_kwargs)."""
+    decider script isn't consumed by it. Returns (result, decider_kwargs).
+    EARLY_EXIT_ON_ACTION is off unless asked for: these scripts keep the
+    decider going after an action, which is what most tests here exercise."""
     decider_calls: list[dict] = []
 
     async def fake_create(**kw):
@@ -82,7 +84,8 @@ async def _run(responses: list, lookups: list[dict] | None = None, messages: lis
 
     stubs = {"lookup_concept": _fake_lookup(lookups or [{"match": "none"}])}
     with patch.object(pipeline._client.messages, "create", new=AsyncMock(side_effect=fake_create)), \
-         patch.dict(pipeline._EXECUTORS, stubs):
+         patch.dict(pipeline._EXECUTORS, stubs), \
+         patch.object(pipeline, "EARLY_EXIT_ON_ACTION", early_exit):
         result = await pipeline.respond(messages or [{"role": "user", "content": "test"}], **kwargs)
     return result, decider_calls
 
@@ -118,6 +121,39 @@ async def test_actions_combine_across_iterations() -> None:
         {"ax_set_param": {"plugin": "Compressor", "param": "Threshold", "value": "-18"}},
     ], result.walkthrough_steps
     print("PASS: actions in separate iterations concatenate; track carried on the wire step.")
+
+
+async def test_early_exit_direct_action() -> None:
+    result, calls = await _run([_resp(_open("Compressor", "a1")), _resp(_text("done"))], early_exit=True)
+    assert len(calls) == 1, len(calls)
+    assert result.walkthrough_steps == [{"ax_open_plugin": "Compressor"}], result.walkthrough_steps
+    print("PASS: early exit -- a direct action that attached ends the turn without another decider call.")
+
+
+async def test_early_exit_not_on_refusal() -> None:
+    _, calls = await _run([_resp(_tool_use("open_setting", {"name": "no such route"}, "a1")),
+                           _resp(_text("done"))], early_exit=True)
+    assert len(calls) == 2, len(calls)
+    print("PASS: early exit -- a refused action keeps looping so the decider can react.")
+
+
+async def test_early_exit_not_after_lookup() -> None:
+    _, calls = await _run([_resp(_tool_use("lookup_concept", {"problem": "harsh"}, "l1")),
+                           _resp(_open("Channel EQ", "a1")), _resp(_text("done"))],
+                          lookups=[{"match": "none"}], early_exit=True)
+    assert len(calls) == 3, len(calls)
+    history = [
+        {"role": "user", "content": "no sound"},
+        {"role": "assistant", "content": [{"type": "tool_use", "id": "l0", "name": "lookup_concept",
+                                           "input": {"problem": "no sound"}}]},
+        {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "l0", "content": "{}"}]},
+        {"role": "assistant", "content": [{"type": "text", "text": "check the output"}]},
+        {"role": "user", "content": "spotify went silent too"},
+    ]
+    _, calls = await _run([_resp(_tool_use("open_setting", {"name": "audio settings"}, "a1")),
+                           _resp(_text("core audio"))], messages=history, early_exit=True)
+    assert len(calls) == 2, len(calls)
+    print("PASS: early exit -- not on a turn that looked something up, or right after one that did.")
 
 
 async def test_action_cap() -> None:
@@ -613,6 +649,9 @@ async def main() -> None:
     test_card_descriptions()
     await test_actions_combine_same_response()
     await test_actions_combine_across_iterations()
+    await test_early_exit_direct_action()
+    await test_early_exit_not_on_refusal()
+    await test_early_exit_not_after_lookup()
     await test_action_cap()
     await test_duplicate_action_refused()
     await test_route_and_action_share_the_card()
