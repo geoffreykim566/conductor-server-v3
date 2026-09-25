@@ -36,7 +36,29 @@ from app import run_graded_battery as battery
 VARIANTS: dict[str, dict] = {
     "A": {},                              # pipeline as is
     "A3": {"LOOKUP_ATTEMPT_LIMIT": 3},    # one fewer lookup before the cap
+    # Decider model / effort A/B (2026-09-24). Each pins both knobs, since
+    # the pipeline defaults moved to medium + early exit after this A/B.
+    # Writer and web_research's own nested call are untouched in all of
+    # these. Haiku 4.5 rejects effort and runs without thinking by default.
+    "S5": {"DECIDER_EFFORT": None, "EARLY_EXIT_ON_ACTION": False},
+    "S5med": {"DECIDER_EFFORT": "medium", "EARLY_EXIT_ON_ACTION": False},
+    "S5low": {"DECIDER_EFFORT": "low", "EARLY_EXIT_ON_ACTION": False},
+    "H45": {"MODEL": "claude-haiku-4-5-20251001", "DECIDER_EFFORT": None, "EARLY_EXIT_ON_ACTION": False},
+    "S5medEE": {"DECIDER_EFFORT": "medium", "EARLY_EXIT_ON_ACTION": True},
 }
+
+# $/MTok (input, output); cache read 0.1x input, cache write 1.25x (5m TTL).
+PRICES = {"sonnet": (2.0, 10.0), "haiku": (1.0, 5.0)}
+
+
+def _call_usd(model: str, u) -> float:
+    p_in, p_out = PRICES["haiku" if "haiku" in model else "sonnet"]
+    return (
+        (getattr(u, "input_tokens", 0) or 0) * p_in
+        + (getattr(u, "cache_read_input_tokens", 0) or 0) * p_in * 0.1
+        + (getattr(u, "cache_creation_input_tokens", 0) or 0) * p_in * 1.25
+        + (getattr(u, "output_tokens", 0) or 0) * p_out
+    ) / 1e6
 
 # Diverse subset of the battery: direct / indirect / ambiguous in-KB, long
 # rambling distinguishers (raw-text embedding stress), collisions, KB gaps and
@@ -77,12 +99,15 @@ _orig_call_model = pipeline._call_model
 _orig_embed = tools.embed
 
 
-async def _timed_call_model(system, tools_param, msgs, on_chunk, tool_choice=None, model=pipeline.MODEL):
+async def _timed_call_model(system, tools_param, msgs, on_chunk, tool_choice=None, model=None):
     t0 = time.monotonic()
     resp = await _orig_call_model(system, tools_param, msgs, on_chunk, tool_choice, model)
     u = getattr(resp, "usage", None)
+    resolved = model or pipeline.MODEL
     _model_calls.append({
-        "model": model.split("-")[1] if "-" in model else model,
+        "model": resolved.split("-")[1] if "-" in resolved else resolved,
+        "role": "decider" if model is None else "writer",
+        "usd": round(_call_usd(resolved, u), 6),
         "s": round(time.monotonic() - t0, 2),
         "in": getattr(u, "input_tokens", None),
         "cache_read": getattr(u, "cache_read_input_tokens", 0) or 0,
@@ -127,6 +152,7 @@ async def _timed_respond(messages, **kwargs):
         "other_s": round(wall - model_s - embed_s, 2),
         "model_calls": list(_model_calls),
         "n_model_calls": len(_model_calls),
+        "usd": round(sum(c["usd"] for c in _model_calls), 5),
         "n_embeds": len(_embeds),
         "n_429": sum(1 for e in _embeds if e["status"] == 429),
         "n_lookups": sum(1 for c in result.trace if c["tool"] == "lookup_concept"),
@@ -189,9 +215,9 @@ async def run(variants: list[str], runs: int, out_dir: Path) -> None:
                         + (f"  ERROR={err}" if err else ""))
                     for ti, tr in enumerate(_turn_records, 1):
                         calls = " ".join(
-                            f"{c['model'][:1]}{'F' if c['forced'] else ''}{c['s']}s(cr{c['cache_read']}/cw{c['cache_write']}/in{c['in']}/out{c['out']})"
+                            f"{c['role'][:1].upper()}{c['model'][:1]}{'F' if c['forced'] else ''}{c['s']}s(cr{c['cache_read']}/cw{c['cache_write']}/in{c['in']}/out{c['out']})"
                             for c in tr["model_calls"])
-                        out(f"# turn {ti}: wall={tr['wall_s']}s model={tr['model_s']}s embed={tr['embed_s']}s other={tr['other_s']}s "
+                        out(f"# turn {ti}: wall={tr['wall_s']}s usd={tr['usd']} model={tr['model_s']}s embed={tr['embed_s']}s other={tr['other_s']}s "
                             f"calls={tr['n_model_calls']} lookups={tr['n_lookups']} 429s={tr['n_429']} "
                             f"attached={tr['attached']} tier={tr['tier']} first_lookup={tr['first_lookup_match']}/{tr['first_lookup_conf']}")
                         out(f"#   model calls: {calls}")
@@ -207,7 +233,7 @@ async def run(variants: list[str], runs: int, out_dir: Path) -> None:
 
         # ---- summary ----
         out(f"\n\n{'=' * 100}\nSUMMARY  (per turn means; embed = Voyage call time only, retry sleeps land in 'other')")
-        out(f"{'variant':8s} {'turns':>5s} {'wall':>7s} {'model':>7s} {'embed':>7s} {'other':>7s} {'calls':>6s} {'lookups':>8s} {'429s':>5s} {'attached':>9s} {'graded':>9s}")
+        out(f"{'variant':8s} {'turns':>5s} {'wall':>7s} {'model':>7s} {'embed':>7s} {'other':>7s} {'calls':>6s} {'$/turn':>8s} {'lookups':>8s} {'429s':>5s} {'attached':>9s} {'graded':>9s}")
         for v in variants:
             rs = [r for r in records if r["variant"] == v]
             if not rs:
@@ -215,7 +241,7 @@ async def run(variants: list[str], runs: int, out_dir: Path) -> None:
             verd = [x for r in rs for x in r["verdicts"]]
             out(f"{v:8s} {len(rs):5d} {statistics.mean(r['wall_s'] for r in rs):7.1f} "
                 f"{statistics.mean(r['model_s'] for r in rs):7.1f} {statistics.mean(r['embed_s'] for r in rs):7.1f} "
-                f"{statistics.mean(r['other_s'] for r in rs):7.1f} {statistics.mean(r['n_model_calls'] for r in rs):6.1f} "
+                f"{statistics.mean(r['other_s'] for r in rs):7.1f} {statistics.mean(r['n_model_calls'] for r in rs):6.1f} {statistics.mean(r['usd'] for r in rs):8.4f} "
                 f"{statistics.mean(r['n_lookups'] for r in rs):8.1f} {sum(r['n_429'] for r in rs):5d} "
                 f"{sum(1 for r in rs if r['attached']):9d} {sum(1 for x in verd if x['pass']):4d}/{len(verd):<4d}")
 
@@ -268,7 +294,12 @@ def main() -> None:
     if "--out" in args:
         out_dir = Path(args[args.index("--out") + 1])
     if "--scenarios" in args:
-        SCENARIOS[:] = args[args.index("--scenarios") + 1].split(",")
+        sel = args[args.index("--scenarios") + 1]
+        SCENARIOS[:] = ([s["name"] for s in json.loads(battery.SCENARIOS_FILE.read_text())]
+                        if sel == "all" else sel.split(","))
+    if "--shard" in args:  # i/N, 0-based: every Nth scenario starting at i
+        i, n = map(int, args[args.index("--shard") + 1].split("/"))
+        SCENARIOS[:] = SCENARIOS[i::n]
     unknown = [v for v in variants if v not in VARIANTS]
     if unknown:
         sys.exit(f"unknown variants {unknown}; known: {list(VARIANTS)}")
