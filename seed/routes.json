@@ -188,7 +188,8 @@
     }
   },
   "follow tempo": {
-    "desc": "Region Inspector (select an audio region, press I)",
+    "desc": "Smart Tempo dropdown in the Region Inspector. It edits the selected region(s); with nothing selected it edits Audio Defaults for new regions -- tell the user to select the region to change (or clear the selection to change the default) before pressing Run",
+    "wait_for_run": true,
     "path": [
       {
         "type": "shortcut",
@@ -204,9 +205,20 @@
       }
     ],
     "choice": {
-      "options": [],
+      "options": [
+        "Off",
+        "On",
+        "On + Align Bars",
+        "On + Align Bars and Beats"
+      ],
       "ordered": false,
-      "model_may_pick": []
+      "model_may_pick": [
+        "Off"
+      ],
+      "shows": {
+        "On + Align Bars": "Bars",
+        "On + Align Bars and Beats": "Beats"
+      }
     }
   },
   "freeze track": {

@@ -223,8 +223,9 @@ def _grade(expect: dict, actual: dict) -> list[dict]:
         elif key == "walkthrough_destination_absent":
             # This route must NOT be on the card -- e.g. live state rules the
             # candidate out (ax_override_critical_test).
+            # A list: none of them may be on it.
             got = actual["attached_destinations"]
-            ok = expected not in got
+            ok = not set(expected if isinstance(expected, list) else [expected]) & set(got)
         elif key == "walkthrough_solution":
             got = actual["attached_solutions"]
             ok = _membership_pass(expected, got)

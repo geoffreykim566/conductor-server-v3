@@ -262,12 +262,18 @@ ROUTES: dict[str, dict] = json.loads(
 # and the open menu swallowed the next step's keystrokes ("open buffer size
 # then open compressor": the plugin search never got focus). Now a dropdown
 # route either picks a value or stops at the pane -- it never leaves a menu
-# open. An empty `options` list means not verified yet: pane only.
+# open. An empty `options` list means not verified yet: pane only. `shows`
+# maps an option to the shorter text the control displays once picked
+# (Region Smart Tempo: "On + Align Bars" reads "Bars"), for the client's read-back.
 RELATIVE_VALUES = ("larger", "smaller")
 
 # The current turn's user message (lowercased, see pipeline._last_user_text),
 # set by pipeline._respond -- what "the user named this value" is checked against.
 TURN_USER_TEXT: ContextVar[str] = ContextVar("turn_user_text", default="")
+# The reply the user is answering (lowercased): an option it offered counts as
+# the user's pick once they answer ("yes", "the last one") -- they shouldn't have
+# to type the option out (user call 2026-09-28). Set with TURN_USER_TEXT.
+TURN_OFFERED_TEXT: ContextVar[str] = ContextVar("turn_offered_text", default="")
 
 
 def _route_line(name: str, route: dict) -> str:
@@ -560,14 +566,21 @@ def queue_open_setting(inp: dict, ax_fixture: dict | None = None) -> dict:
         return {"attached": False, "reason": f"{name!r} has no value to choose -- call it without value"}
     if choice is not None:
         if not value:
-            steps = steps[:-1]   # the pane only: never click the dropdown open
+            dropped, steps = steps[-1], steps[:-1]   # the pane only: never click the dropdown open
+            # A disclosure click (Region Inspector's "Region") toggles: the dropped
+            # row showing means it's already open, so the client skips the click.
+            if steps and "click_value_of" in dropped and "click_text" in steps[-1]:
+                steps[-1] = {**steps[-1], "expect": [dropped["click_value_of"]]}
         else:
-            chosen, reason = _resolve_choice(value, choice, TURN_USER_TEXT.get())
+            chosen, reason = _resolve_choice(value, choice, TURN_USER_TEXT.get(), TURN_OFFERED_TEXT.get())
             if chosen is None:
                 return {"attached": False, "reason": reason}
             # `reopen`: the route's own steps, so the client's revert can get
             # back to this dropdown and pick the old value again.
-            steps = steps + [{"choose": chosen, "reopen": list(steps)}]
+            pick = {"choose": chosen, "reopen": list(steps)}
+            if choice.get("shows"):   # the control's shorter display, for the read-back
+                pick["shows"] = dict(choice["shows"])
+            steps = steps + [pick]
     # `destination` keeps the result shape pipeline._backfill_walkthrough
     # recognises (attached + destination + steps).
     out = {"attached": True, "action": "open_setting", "destination": name, "steps": steps}
@@ -583,12 +596,14 @@ def _number(text: str) -> float | None:
     return float(m.group(0)) if m else None
 
 
-def _match_option(value: str, options: list[str]) -> str | None:
-    """The option a model-sent value means: exact (any case), same number
+def _match_option(value: str, options: list[str], shows: dict | None = None) -> str | None:
+    """The option a model-sent value means: exact (any case), what the control
+    displays for it ("beats" -> "On + Align Bars and Beats"), same number
     ("256 samples" -> "256", "48000" -> "48 kHz"), or a unique prefix
     ("mono" -> "Monophonic")."""
     v = value.strip().lower()
-    exact = next((o for o in options if o.lower() == v), None)
+    exact = next((o for o in options if o.lower() == v), None) or next(
+        (o for o, d in (shows or {}).items() if d.lower() == v and o in options), None)
     if exact:
         return exact
     n = _number(v)
@@ -602,9 +617,11 @@ def _match_option(value: str, options: list[str]) -> str | None:
     return hits[0] if len(hits) == 1 else None
 
 
-def _user_named(option: str, user_text: str) -> bool:
+def _user_named(option: str, user_text: str, shown: str | None = None) -> bool:
     """Whether the user's own message names this option ("set buffer to 256",
-    "48k", "44100", "slicing")."""
+    "48k", "44100", "slicing"), or what the control displays for it ("beats")."""
+    if shown and re.search(rf"\b{re.escape(shown.lower())}\b", user_text):
+        return True
     n = _number(option)
     if n is not None:
         forms = {f"{n:g}"} | ({f"{n * 1000:g}"} if "khz" in option.lower() else set())
@@ -613,7 +630,8 @@ def _user_named(option: str, user_text: str) -> bool:
     return bool(word) and re.search(rf"\b{re.escape(word)}\b", user_text) is not None
 
 
-def _resolve_choice(value: str, choice: dict, user_text: str) -> tuple[str | None, str | None]:
+def _resolve_choice(value: str, choice: dict, user_text: str,
+                    offered_text: str = "") -> tuple[str | None, str | None]:
     """(option to choose, None) or (None, refusal reason for the model)."""
     options = choice.get("options") or []
     ordered = bool(choice.get("ordered"))
@@ -625,12 +643,14 @@ def _resolve_choice(value: str, choice: dict, user_text: str) -> tuple[str | Non
             return None, (f"{value!r} only works on a setting with ordered sizes -- pass one of "
                           f"{', '.join(options)}, or no value to just open the pane")
         return value.lower(), None
-    pick = _match_option(value, options)
+    shows = choice.get("shows") or {}
+    pick = _match_option(value, options, shows)
     if pick is None:
         return None, (f"{value!r} isn't one of this setting's options ({', '.join(options)}) -- pass one "
                       "of those" + (", or larger / smaller" if ordered else "") + ", or no value to just "
                       "open the pane")
-    if pick not in (choice.get("model_may_pick") or []) and not _user_named(pick, user_text):
+    if (pick not in (choice.get("model_may_pick") or [])
+            and not any(_user_named(pick, t, shows.get(pick)) for t in (user_text, offered_text) if t)):
         alt = "pass larger or smaller" if ordered else "call it without value to open the pane"
         return None, (f"the user didn't name {pick!r} -- don't choose an exact value for them here; "
                       f"{alt}, or ask them which they want")
