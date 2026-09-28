@@ -149,6 +149,23 @@ def _last_user_text(messages: list[dict]) -> str:
     return ""
 
 
+def _offered_text(messages: list[dict]) -> str:
+    """The reply the newest user message answers -- see tools.TURN_OFFERED_TEXT.
+    Options are often offered as a statement ("you can choose between X or Y"),
+    so any reply counts; a first turn has none, so the model still can't pick
+    a value there that the user didn't name."""
+    i = _last_user_text_index(messages)
+    for m in reversed(messages[:i] if i is not None else []):
+        if m.get("role") != "assistant":
+            continue
+        c = m.get("content")
+        text = c if isinstance(c, str) else " ".join(
+            b.get("text", "") for b in c if isinstance(b, dict) and b.get("type") == "text") if isinstance(c, list) else ""
+        if text.strip():
+            return text.lower()
+    return ""
+
+
 def _is_question(text: str) -> bool:
     if _POLITE_REQUEST.match(text):
         return bool(_QUESTION_ANYWHERE.search(text))
@@ -284,7 +301,11 @@ async def respond(messages: list[dict], **kwargs) -> "Result":
     # to run by itself. Only actions the user actually asked for -- a direct
     # command with no lookup behind it -- may auto-run.
     inferred = result.card_from_lookup or any(c["tool"] == "lookup_concept" for c in result.trace)
-    result.auto_run = (not inferred) and _auto_run_ok(messages, result.walkthrough_steps)
+    # Routes whose target depends on the user's selection (`wait_for_run`) always
+    # wait, so the reply's "select it first" comes before anything runs.
+    waits = any(c["tool"] == "open_setting" and tools.ROUTES.get((c.get("input") or {}).get("name"), {}).get("wait_for_run")
+                for c in result.trace)
+    result.auto_run = (not inferred) and not waits and _auto_run_ok(messages, result.walkthrough_steps)
     return result
 
 
@@ -1209,6 +1230,7 @@ async def _respond(
             raise ValueError("resume: history does not end in a pending tool call")
     # What open_setting checks "the user named this value" against.
     tools.TURN_USER_TEXT.set(_last_user_text(messages))
+    tools.TURN_OFFERED_TEXT.set(_offered_text(messages))
 
     # Screenshots are fresh, per-turn context (see api.py's ChatRequest) --
     # spliced into the newest user turn only for this turn's own model calls

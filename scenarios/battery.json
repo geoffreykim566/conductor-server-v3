@@ -1790,5 +1790,120 @@
         "text": "turn on flex time on my lead vocal so i can tighten the timing"
       }
     ]
+  },
+  {
+    "name": "dropdown_region_smart_tempo_named",
+    "note": "2026-09-28 Region Smart Tempo route (options verified live on 12.3): it edits whatever region is selected, or Audio Defaults with none, so the route is wait_for_run (never auto-runs) and the reply must ask the user to select the region first. User names a non-default option: passed exactly, not 'On'.",
+    "expect": {
+      "setting_calls": [
+        {
+          "tool": "open_setting",
+          "args": {
+            "name": "follow tempo",
+            "value": "On + Align Bars"
+          }
+        }
+      ],
+      "forbidden_setting_calls": [
+        {
+          "tool": "open_setting",
+          "args": {},
+          "ok": false
+        },
+        {
+          "tool": "open_setting",
+          "args": {
+            "value": "beats"
+          }
+        }
+      ],
+      "response_contains_any": [
+        "select"
+      ],
+      "no_completion_claims": true,
+      "auto_run": false
+    },
+    "turns": [
+      {
+        "text": "set smart tempo to on + align bars for this region"
+      }
+    ]
+  },
+  {
+    "name": "dropdown_region_smart_tempo_stretching",
+    "note": "2026-09-28 Region Smart Tempo route (options verified live on 12.3): it edits whatever region is selected, or Audio Defaults with none, so the route is wait_for_run (never auto-runs) and the reply must ask the user to select the region first. Diagnosis turn: the model may pick Off itself.",
+    "expect": {
+      "setting_calls": [
+        {
+          "tool": "open_setting",
+          "args": {
+            "name": "follow tempo",
+            "value": "Off"
+          }
+        }
+      ],
+      "walkthrough_destination_absent": [
+        "sample rate",
+        "smart tempo settings"
+      ],
+      "response_contains_any": [
+        "select"
+      ],
+      "no_completion_claims": true,
+      "auto_run": false
+    },
+    "turns": [
+      {
+        "text": "one audio region i imported keeps stretching when i change the tempo, i want just that region to stop following the tempo"
+      }
+    ]
+  },
+  {
+    "name": "dropdown_region_smart_tempo_display_name",
+    "note": "2026-09-28 live: 'set smart tempo to beats' (the control's display name) wasn't recognised, the model asked, the user said 'yes', and the value was refused because 'yes' doesn't name it -- the card opened the pane only. Display names now name options, and an option the previous reply asked about counts as the user's pick.",
+    "expect": {
+      "setting_calls": [
+        {
+          "tool": "open_setting",
+          "args": {
+            "name": "follow tempo",
+            "value": "beats"
+          }
+        }
+      ],
+      "no_refused_actions": true,
+      "no_completion_claims": true,
+      "auto_run": false
+    },
+    "turns": [
+      {
+        "text": "set smart tempo to beats"
+      }
+    ]
+  },
+  {
+    "name": "dropdown_region_smart_tempo_pick_offered",
+    "note": "2026-09-28 live: 'set smart tempo to beats' (the control's display name) wasn't recognised, the model asked, the user said 'yes', and the value was refused because 'yes' doesn't name it -- the card opened the pane only. Display names now name options, and an option the previous reply asked about counts as the user's pick. Turn 1 is open-ended so the model offers options; turn 2 picks one without typing it.",
+    "expect": {
+      "setting_calls": [
+        {
+          "tool": "open_setting",
+          "args": {
+            "name": "follow tempo",
+            "value": "beats"
+          }
+        }
+      ],
+      "no_refused_actions": true,
+      "auto_run": false
+    },
+    "turns": [
+      {
+        "text": "i want smart tempo on this region to lock to the grid, what are my options"
+      },
+      {
+        "text": "the last one"
+      }
+    ]
   }
 ]

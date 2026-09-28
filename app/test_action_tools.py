@@ -296,6 +296,28 @@ async def test_a_lookup_turn_never_auto_runs() -> None:
     print("PASS: a card the KB led to waits for Run; the same action asked for directly auto-runs.")
 
 
+async def test_wait_for_run_route_never_auto_runs() -> None:
+    # A route whose target is whatever the user has selected (`wait_for_run`)
+    # waits even on a direct command, so "select the region first" comes first.
+    result, _ = await _run([_resp(_tool_use("open_setting", {"name": "follow tempo", "value": "Off"}, "w1")),
+                            _resp(_text("ok"))],
+                           messages=[{"role": "user", "content": "set smart tempo off on this region"}])
+    assert result.walkthrough_steps and result.auto_run is False, (result.walkthrough_steps, result.auto_run)
+    print("PASS: a wait_for_run route waits for Run on a direct command.")
+
+
+def test_offered_text() -> None:
+    # The reply the user answers offers its options, question or statement
+    # (live 2026-09-28: "you can choose between X or Y." then "the last one").
+    from app.pipeline import _offered_text
+    q = [{"role": "user", "content": "what are my smart tempo options"},
+         {"role": "assistant", "content": "You can choose between On + Align Bars or On + Align Bars and Beats."},
+         {"role": "user", "content": "the last one"}]
+    assert _offered_text(q).startswith("you can choose"), _offered_text(q)
+    assert _offered_text(q[:1]) == ""   # a first turn has nothing offered
+    print("PASS: the reply the user answers offers its options to the next turn; a first turn has none.")
+
+
 async def test_weak_bucket_does_not_force_a_pick() -> None:
     weak = [{"match": "problem", "problem": "something else", "match_confidence": "weak — likely not relevant",
              "solutions": [{"name": "buffer size", "action": {"open_setting": "buffer size"}}]}]
@@ -454,12 +476,13 @@ def test_executor_validation() -> None:
     print("PASS: executors validate names and parse values ('80hz'->'80', 'On'->'on'; '4:1' refused).")
 
 
-def _setting(name: str, value: str | None = None, said: str = "") -> dict:
-    token = tools.TURN_USER_TEXT.set(said)
+def _setting(name: str, value: str | None = None, said: str = "", offered: str = "") -> dict:
+    token, token2 = tools.TURN_USER_TEXT.set(said), tools.TURN_OFFERED_TEXT.set(offered)
     try:
         return tools.queue_open_setting({"name": name, **({"value": value} if value else {})})
     finally:
         tools.TURN_USER_TEXT.reset(token)
+        tools.TURN_OFFERED_TEXT.reset(token2)
 
 
 def test_dropdown_routes() -> None:
@@ -493,9 +516,31 @@ def test_dropdown_routes() -> None:
     assert _setting("flex time", "mono", said="the vocal timing is off")["chooses"] == "Monophonic"
     assert _setting("flex time", "Speed (FX)", said="fix the timing")["attached"] is False
     assert _setting("flex time", "Speed (FX)", said="set flex to speed")["chooses"] == "Speed (FX)"
-    # Unverified options: pane only, any value refused. A plain route takes no value.
-    assert _setting("follow tempo")["steps"] == [{"shortcut": "I"}, {"click_text": "Region"}]
-    assert _setting("follow tempo", "On", said="turn it on")["attached"] is False
+    # Region Smart Tempo: pane only keeps the dropped row as the Region click's
+    # `expect` (the client skips the toggling click when the row already shows).
+    assert _setting("follow tempo")["steps"] == [
+        {"shortcut": "I"}, {"click_text": "Region", "expect": ["Smart Tempo"]}]
+    assert _setting("follow tempo", "off", said="stop the region stretching")["chooses"] == "Off"
+    assert _setting("follow tempo", "On", said="fix the stretching")["attached"] is False
+    out = _setting("follow tempo", "On + Align Bars", said="set smart tempo to on + align bars")
+    assert out["steps"][-1]["shows"] == {"On + Align Bars": "Bars", "On + Align Bars and Beats": "Beats"}, out
+    assert "shows" not in _setting("buffer size", "256", said="set my buffer to 256")["steps"][-1]
+    assert out["chooses"] == "On + Align Bars" and out["steps"][-1]["reopen"] == [
+        {"shortcut": "I"}, {"click_text": "Region"}, {"click_value_of": "Smart Tempo"}], out
+    # What the control displays names the option ("beats" -> On + Align Bars and Beats).
+    assert _setting("follow tempo", "beats", said="set smart tempo to beats")["chooses"] == "On + Align Bars and Beats"
+    assert _setting("follow tempo", "On + Align Bars", said="set it to bars")["chooses"] == "On + Align Bars"
+    # An option the previous reply offered is the user's pick once they answer --
+    # they don't have to type it out. Without the offer it's still refused.
+    offer = "which one do you want: on, on + align bars, or on + align bars and beats?"
+    assert _setting("follow tempo", "On + Align Bars and Beats", said="the last one", offered=offer)["chooses"] == \
+        "On + Align Bars and Beats"
+    assert _setting("buffer size", "1024", said="yes", offered="want me to set it to 1024?")["chooses"] == "1024"
+    assert _setting("follow tempo", "On + Align Bars and Beats", said="the last one")["attached"] is False
+    assert _setting("sample rate", "48 kHz", said="still slow", offered="")["attached"] is False
+    # A pane-only route whose kept last step is a menu gets no expect.
+    assert "expect" not in _setting("buffer size")["steps"][-1]
+    # A plain route takes no value.
     out = _setting("mixer", "on")
     assert out["attached"] is False and "no value" in out["reason"], out
     assert "note" not in _setting("mixer") and _setting("mixer")["steps"] == [{"shortcut": "X"}]
@@ -604,6 +649,7 @@ def test_card_descriptions_dropdowns() -> None:
 async def main() -> None:
     test_executor_validation()
     test_dropdown_routes()
+    test_offered_text()
     test_card_descriptions_dropdowns()
     await test_dropdown_value_replaces_lookup_queued_pane()
     await test_dropdown_value_is_still_an_alternative()
@@ -625,6 +671,7 @@ async def main() -> None:
     await test_resume_restores_lookup_queued_action()
     await test_endorsing_a_lookup_queued_action()
     await test_a_lookup_turn_never_auto_runs()
+    await test_wait_for_run_route_never_auto_runs()
     await test_weak_bucket_does_not_force_a_pick()
     await test_auto_attach_respects_commit_to_one()
     await test_auto_run()
