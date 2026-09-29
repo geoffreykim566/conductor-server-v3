@@ -409,6 +409,9 @@ async def chat(request: Request, req: ChatRequest, user: asyncpg.Record = Depend
                 )
                 await queue.put(("result", result))
             except Exception as e:
+                # The client only gets "Type: message"; without this the traceback
+                # was lost (09-26: a missing migration failed every lookup silently).
+                log.exception("[turn_error] pipeline raised %s", type(e).__name__)
                 await queue.put(("error", e))
 
         turn_started = time.monotonic()
