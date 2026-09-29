@@ -590,8 +590,20 @@ def queue_open_setting(inp: dict, ax_fixture: dict | None = None) -> dict:
     if chosen:
         out["chooses"] = chosen
     elif choice is not None:
-        out["note"] = "opens the pane only -- no value is chosen; the user picks there"
+        out["note"] = "opens the pane only -- no value is chosen; " + pane_only_ask(choice)
     return out
+
+
+def pane_only_ask(choice: dict) -> str:
+    """What the reply does when a dropdown route stops at the pane: ask which
+    option, naming them exactly, so the user's answer can set it on the next
+    card (TURN_OFFERED_TEXT) -- user call 2026-09-29. A route with fewer than
+    two verified options (threads) can't be asked about: the user picks there."""
+    options = choice.get("options") or []
+    if len(options) < 2:
+        return "the user picks there"
+    return ("ask the user which one they want, naming the options exactly: " + " | ".join(options)
+            + " -- or, if your answer recommends one, name it and offer to set it")
 
 
 def _number(text: str) -> float | None:
@@ -656,9 +668,16 @@ def _resolve_choice(value: str, choice: dict, user_text: str,
     shows = choice.get("shows") or {}
     pick = _match_option(value, options, shows)
     if pick is None:
+        # "flex on" fits four import-default options: say so, so the reply asks
+        # instead of naming an option that doesn't exist (found live 2026-09-29).
+        fits = [o for o in options if _words(o).startswith(_words(value))] if _words(value) else []
+        if len(fits) > 1:
+            return None, (f"{value!r} could be any of: {' | '.join(fits)} -- don't choose one for them: call "
+                          "it without value to open the pane, and ask the user which they want, naming "
+                          "these exactly")
         return None, (f"{value!r} isn't one of this setting's options ({', '.join(options)}) -- pass one "
-                      "of those" + (", or larger / smaller" if ordered else "") + ", or no value to just "
-                      "open the pane")
+                      "of those" + (", or larger / smaller" if ordered else "") + ", or no value to "
+                      "open the pane and ask the user which one they want, naming the options exactly")
     if (pick not in (choice.get("model_may_pick") or [])
             and not any(_user_named(pick, t, shows.get(pick)) for t in (user_text, offered_text) if t)):
         alt = "pass larger or smaller" if ordered else "call it without value to open the pane"

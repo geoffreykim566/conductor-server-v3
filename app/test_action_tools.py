@@ -547,6 +547,22 @@ def test_dropdown_routes() -> None:
     assert _setting("smart tempo import default", "Flex On, Smart Tempo On",
                     said="turn smart tempo on for imports")["attached"] is False
     assert _setting("smart tempo import default", "Flex Off", said="stop my imports stretching")["chooses"] == "Flex Off"
+    # A value that fits several options is refused with those options, so the reply
+    # asks which one instead of naming one that doesn't exist ("flex on", live 09-29).
+    out = _setting("smart tempo import default", "Flex On", said="set imported files to flex on")
+    assert out["attached"] is False and "could be any of" in out["reason"], out
+    assert all(o in out["reason"] for o in ("Flex On, Smart Tempo Off", "Flex On, Smart Tempo On",
+                                            "Flex On, ST On + Align Bars", "Flex On, ST On + Align Bars and Beats")), out
+    assert "Flex Off" not in out["reason"], out
+    # The pane only: the reply asks which option, naming them -- unless there's
+    # fewer than two to name (threads).
+    assert "ask the user which one" in _setting("smart tempo import default")["note"]
+    assert "Flex On, Smart Tempo On" in _setting("smart tempo import default")["note"]
+    assert _setting("processing threads")["note"].endswith("the user picks there")
+    # Their answer to that question counts as naming the option.
+    ask = "which one do you want: flex off, flex on, smart tempo off, flex on, smart tempo on, ...?"
+    assert _setting("smart tempo import default", "Flex On, Smart Tempo On", said="smart tempo on",
+                    offered=ask)["chooses"] == "Flex On, Smart Tempo On"
     # A plain route takes no value.
     out = _setting("mixer", "on")
     assert out["attached"] is False and "no value" in out["reason"], out

@@ -141,7 +141,9 @@ route lets you choose yourself — which value comes from the lookup result when
 one, not from memory. For buffer size pass a direction (larger / smaller), not a number. \
 Leave value out for "open / show me / where is" requests, whenever you'd be guessing, and \
 when the value you recommend isn't one the route lets you choose — the pane opens with the \
-current value showing, and your answer says what to pick.
+current value showing, and your answer asks which option they want, naming the options \
+exactly (or, if you recommend one, names it and offers to set it) -- their answer lets the \
+next card set it.
 
 If the user asks how to do something one of these tools does ("how do I open \
 channel eq"), you can queue the action and say in a line what it will do — the card \

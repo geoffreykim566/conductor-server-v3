@@ -1905,5 +1905,74 @@
         "text": "the last one"
       }
     ]
+  },
+  {
+    "name": "dropdown_import_vague_value_asks",
+    "note": "2026-09-29 (user call): a dropdown value that fits several options, or none given, opens the pane and the reply asks which one, naming the real options -- the answer sets it on the next card (offered options count as the user's pick). Live, 'flex on' got no card and a reply naming a 'Flex On' option that doesn't exist.",
+    "turns": [
+      {
+        "text": "set imported files to flex on",
+        "expect": {
+          "setting_calls": [
+            {
+              "tool": "open_setting",
+              "args": {
+                "name": "smart tempo import default"
+              },
+              "args_absent": [
+                "value"
+              ]
+            }
+          ],
+          "response_contains_any": [
+            "smart tempo on",
+            "smart tempo off"
+          ],
+          "no_completion_claims": true
+        }
+      },
+      {
+        "text": "smart tempo on"
+      }
+    ],
+    "expect": {
+      "setting_calls": [
+        {
+          "tool": "open_setting",
+          "args": {
+            "name": "smart tempo import default",
+            "value": "Flex On, Smart Tempo On"
+          }
+        }
+      ],
+      "no_completion_claims": true
+    }
+  },
+  {
+    "name": "dropdown_import_no_value_asks",
+    "note": "2026-09-29 (user call): a dropdown value that fits several options, or none given, opens the pane and the reply asks which one, naming the real options -- the answer sets it on the next card (offered options count as the user's pick). Live, 'flex on' got no card and a reply naming a 'Flex On' option that doesn't exist.",
+    "expect": {
+      "setting_calls": [
+        {
+          "tool": "open_setting",
+          "args": {
+            "name": "smart tempo import default"
+          },
+          "args_absent": [
+            "value"
+          ]
+        }
+      ],
+      "response_contains_any": [
+        "smart tempo on",
+        "smart tempo off"
+      ],
+      "no_completion_claims": true
+    },
+    "turns": [
+      {
+        "text": "where do i change the smart tempo default for imported files"
+      }
+    ]
   }
 ]

@@ -103,7 +103,8 @@ _ON_CARD_NOTE = (
 _PANE_ONLY_NOTE = (
     " It opens the setting's pane only, with no value chosen. If your answer recommends a "
     "value it can take, call open_setting for the same route with that value -- that "
-    "replaces the queued step rather than adding one."
+    "replaces the queued step rather than adding one. Otherwise ask the user which option "
+    "they want, naming the options exactly."
 )
 _PICK_NUDGE = (
     "A lookup this turn returned solutions that map to an action. If your answer "
@@ -859,7 +860,7 @@ def card_descriptions(trace: list[dict]) -> list[str]:
             elif chosen:
                 line += f", then sets it to {chosen}"
             elif route.get("choice") is not None:
-                line += " (opens the pane only -- no value is chosen; the user picks there)"
+                line += f" (opens the pane only -- no value is chosen; {tools.pane_only_ask(route['choice'])})"
             out.append(line)
     return out
 
