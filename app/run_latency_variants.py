@@ -45,6 +45,15 @@ VARIANTS: dict[str, dict] = {
     "S5low": {"DECIDER_EFFORT": "low", "EARLY_EXIT_ON_ACTION": False},
     "H45": {"MODEL": "claude-haiku-4-5-20251001", "DECIDER_EFFORT": None, "EARLY_EXIT_ON_ACTION": False},
     "S5medEE": {"DECIDER_EFFORT": "medium", "EARLY_EXIT_ON_ACTION": True},
+    # Sonnet 5 vs 5.5, only the model differs (2026-09-28): both on the current
+    # pipeline (medium, early exit) with an auto first call, since Sonnet 5.5
+    # rejects forced tool_choice. S55med-retry adds one re-ask when the first
+    # call makes no tool call. Thinking: each model's default (adaptive).
+    "S5med-auto": {"DECIDER_EFFORT": "medium", "EARLY_EXIT_ON_ACTION": True, "FORCED_TOOL_CHOICE": None},
+    "S55med-auto": {"MODEL": "claude-sonnet-5-5", "DECIDER_EFFORT": "medium", "EARLY_EXIT_ON_ACTION": True,
+                    "FORCED_TOOL_CHOICE": None},
+    "S55med-retry": {"MODEL": "claude-sonnet-5-5", "DECIDER_EFFORT": "medium", "EARLY_EXIT_ON_ACTION": True,
+                     "FORCED_TOOL_CHOICE": None, "RETRY_NO_TOOL_FIRST_CALL": True},
 }
 
 # $/MTok (input, output); cache read 0.1x input, cache write 1.25x (5m TTL).

@@ -35,6 +35,19 @@ MAX_ITERATIONS = 6
 # median, ~7% cheaper; "low" was no faster and failed across more scenarios.
 DECIDER_EFFORT: str | None = "medium"
 DECIDER_THINKING: dict | None = None
+# The tool_choice for the decider calls that must call a tool (a turn's first
+# call, the pick re-ask). Sonnet 5.5 / Opus 5.5 / Fable 5.1 reject forced
+# "any"/"tool" with a 400, so a variant on those models sets None (= auto).
+FORCED_TOOL_CHOICE: dict | None = {"type": "any"}
+# With auto (FORCED_TOOL_CHOICE None), re-ask once when the turn's first call
+# made no tool call -- the docs' replacement for forced tool use ("check that
+# one was made and retry if it wasn't").
+RETRY_NO_TOOL_FIRST_CALL = False
+_TOOL_NUDGE = (
+    "Call a tool before you answer: lookup_concept for a Logic Pro question or problem, the "
+    "action the user asked for (each turn gets its own card, so queue it again even if an "
+    "earlier reply offered it), or ask_clarifying_question if you can't tell what they need."
+)
 
 # End the turn right after an iteration whose tool calls were all successful
 # card actions, skipping the decider's prose-only follow-up call (see the
@@ -1450,12 +1463,21 @@ async def _respond(
             if i == 0 and force_first_lookup:
                 tool_choice = (
                     {"type": "tool", "name": "lookup_concept"} if FORCE_FIRST_LOOKUP
-                    else {"type": "any"}
+                    else FORCED_TOOL_CHOICE
                 )
             resp = await _call_model(system, tools.TOOLS, _with_screenshots(msgs), None, tool_choice)
             usage.append(_usage_dict(resp.usage))
             tool_uses = [b for b in resp.content if b.type == "tool_use"]
             iter_text = "".join(b.text for b in resp.content if b.type == "text")
+            if (i == 0 and force_first_lookup and not tool_uses and tool_choice is None
+                    and RETRY_NO_TOOL_FIRST_CALL):
+                resp = await _call_model(
+                    system + [{"type": "text", "text": "\n\n" + _TOOL_NUDGE}],
+                    tools.TOOLS, _with_screenshots(msgs), None, None,
+                )
+                usage.append(_usage_dict(resp.usage))
+                tool_uses = [b for b in resp.content if b.type == "tool_use"]
+                iter_text = "".join(b.text for b in resp.content if b.type == "text")
             if not tool_uses and not pick_forced and _needs_pick(trace, card_steps):
                 # About to end on prose after a bucket lookup whose candidates
                 # all map to actions: once per turn, re-ask with a tool call
@@ -1465,7 +1487,7 @@ async def _respond(
                 pick_forced = True
                 resp = await _call_model(
                     system + [{"type": "text", "text": "\n\n" + _PICK_NUDGE}],
-                    tools.TOOLS, _with_screenshots(msgs), None, {"type": "any"},
+                    tools.TOOLS, _with_screenshots(msgs), None, FORCED_TOOL_CHOICE,
                 )
                 usage.append(_usage_dict(resp.usage))
                 tool_uses = [b for b in resp.content if b.type == "tool_use"]
