@@ -567,9 +567,12 @@ def queue_open_setting(inp: dict, ax_fixture: dict | None = None) -> dict:
     if choice is not None:
         if not value:
             dropped, steps = steps[-1], steps[:-1]   # the pane only: never click the dropdown open
-            # A disclosure click (Region Inspector's "Region") toggles: the dropped
-            # row showing means it's already open, so the client skips the click.
-            if steps and "click_value_of" in dropped and "click_text" in steps[-1]:
+            # The dropped row is the kept last step's `expect`. A disclosure click
+            # (Region Inspector's "Region") toggles: the row showing means it's
+            # already open, so the client skips the click. A menu: the client
+            # verifies on the row, not the tab name ("Audio" matched the Project
+            # Settings window once), and skips the menu when the row already shows.
+            if steps and "click_value_of" in dropped and ("click_text" in steps[-1] or "menu_path" in steps[-1]):
                 steps[-1] = {**steps[-1], "expect": [dropped["click_value_of"]]}
         else:
             chosen, reason = _resolve_choice(value, choice, TURN_USER_TEXT.get(), TURN_OFFERED_TEXT.get())
@@ -626,8 +629,15 @@ def _user_named(option: str, user_text: str, shown: str | None = None) -> bool:
     if n is not None:
         forms = {f"{n:g}"} | ({f"{n * 1000:g}"} if "khz" in option.lower() else set())
         return any(re.search(rf"(?<![\d.]){re.escape(f)}(?![\d.])", user_text) for f in forms)
-    word = re.sub(r"\s*\(.*?\)", "", option).strip().lower()
-    return bool(word) and re.search(rf"\b{re.escape(word)}\b", user_text) is not None
+    word = _words(re.sub(r"\s*\(.*?\)", "", option))
+    return bool(word) and re.search(rf"\b{re.escape(word)}\b", _words(user_text)) is not None
+
+
+def _words(text: str) -> str:
+    """Letters and digits only, so an option's punctuation needn't be typed
+    ("flex on smart tempo on" names "Flex On, Smart Tempo On"). Logic
+    abbreviates Smart Tempo as "ST" in the longer import-default options."""
+    return re.sub(r"\bsmart tempo\b", "st", " ".join(re.findall(r"[a-z0-9]+", text.lower())))
 
 
 def _resolve_choice(value: str, choice: dict, user_text: str,

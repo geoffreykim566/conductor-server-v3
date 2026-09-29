@@ -487,9 +487,10 @@ def _setting(name: str, value: str | None = None, said: str = "", offered: str =
 
 def test_dropdown_routes() -> None:
     # No value: the pane only -- the dropdown is never clicked open (found live
-    # 2026-09-22: the open menu swallowed the next step's keystrokes).
+    # 2026-09-22: the open menu swallowed the next step's keystrokes). The kept
+    # menu verifies on the dropped row, not the tab name.
     out = _setting("buffer size")
-    assert out["steps"] == [{"menu_path": ["Logic Pro", "Settings", "Audio"]}], out
+    assert out["steps"] == [{"menu_path": ["Logic Pro", "Settings", "Audio"], "expect": ["I/O Buffer Size"]}], out
     assert "pane only" in out["note"], out
     # A value the user named: the route, then a choose step carrying the route for revert.
     out = _setting("buffer size", "256 samples", said="set my buffer to 256")
@@ -538,8 +539,14 @@ def test_dropdown_routes() -> None:
     assert _setting("buffer size", "1024", said="yes", offered="want me to set it to 1024?")["chooses"] == "1024"
     assert _setting("follow tempo", "On + Align Bars and Beats", said="the last one")["attached"] is False
     assert _setting("sample rate", "48 kHz", said="still slow", offered="")["attached"] is False
-    # A pane-only route whose kept last step is a menu gets no expect.
-    assert "expect" not in _setting("buffer size")["steps"][-1]
+    # Options are named without their punctuation, and "smart tempo" names Logic's "ST".
+    assert _setting("smart tempo import default", "Flex On, Smart Tempo On",
+                    said="set imported files to flex on smart tempo on")["chooses"] == "Flex On, Smart Tempo On"
+    assert _setting("smart tempo import default", "Flex On, ST On + Align Bars",
+                    said="imported files: flex on, smart tempo on + align bars")["chooses"] == "Flex On, ST On + Align Bars"
+    assert _setting("smart tempo import default", "Flex On, Smart Tempo On",
+                    said="turn smart tempo on for imports")["attached"] is False
+    assert _setting("smart tempo import default", "Flex Off", said="stop my imports stretching")["chooses"] == "Flex Off"
     # A plain route takes no value.
     out = _setting("mixer", "on")
     assert out["attached"] is False and "no value" in out["reason"], out
