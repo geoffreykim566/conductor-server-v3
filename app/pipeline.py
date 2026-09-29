@@ -391,6 +391,82 @@ _REASK_SIGNALS = (
     "lost the window",
 )
 
+# Plain acknowledgments/closers -- carved out of the iteration-0 forced
+# lookup_concept call (see _needs_first_lookup below) so a "thanks!" turn
+# doesn't force the model to invent a fake problem query just to satisfy a
+# tool call it has nothing real to make. Exact substring match, same
+# deliberately simple approach as _REASK_SIGNALS above -- hand-curated rather
+# than pulled from an existing list (checked: Rasa's built-in "thankyou"
+# intent is voice-transcript ASR training data full of filler noise like "uh
+# thank you good bye", not a clean fit for exact matching). A typo'd close
+# ("tahnks") just eats one wasted lookup call, not worth fuzzy-matching for.
+_CLOSING_SIGNALS = (
+    "thanks", "thank you", "thx", "ty",
+    "got it", "sounds good", "cool", "perfect", "great", "awesome",
+    "ok", "okay", "no more questions", "that's all", "im good", "i'm good",
+    "bye", "goodbye", "see ya",
+)
+
+# Genuinely irreversible whole-project requests -- the prompt's own "Fail
+# closed on execution" rule already says decline these outright, no
+# walkthrough, but forcing a lookup_concept call on iteration 0 anyway
+# (see _needs_first_lookup below) meant that rule never got a clean chance to
+# apply: the forced call populated trace, and _needs_hedge (this function's
+# pre-badge name; now _confidence_tier) then hedged a response that was
+# actually a decline, not a claim
+# -- found live 2026-09-02 via Fable review of the writer-split battery
+# (destructive_probe: "Note: I couldn't verify this... so treat the
+# following as general guidance" prepended to a safety refusal). Deliberately
+# narrow and destructive-shaped (verb + whole-project scope), same curation
+# discipline as _REASK_SIGNALS/_CLOSING_SIGNALS above -- NOT a bare "delete",
+# which would wrongly carve out a legitimate "how do i delete a track"
+# navigation question. "delete/erase everything" also deliberately excluded
+# on its own (no bare form) -- found via direct testing 2026-09-03: matches
+# "delete everything on this track" as a false positive, a single-track,
+# undo-recoverable request, not the whole-project case this exists for;
+# kept only project-scoped.
+_IRREVERSIBLE_SIGNALS = (
+    "delete my entire project", "delete the entire project",
+    "delete my whole project", "delete the whole project",
+    "erase my entire project", "erase the entire project",
+    "erase my whole project", "erase the whole project",
+    "delete everything in my project", "delete everything in the project",
+    "erase everything in my project", "erase everything in the project",
+    "wipe my entire project", "wipe the entire project",
+)
+
+
+# Bare greetings -- carved out of the iteration-0 forced lookup_concept call
+# for the same reason as _CLOSING_SIGNALS: nothing real to look up on "hi",
+# forcing one just makes the model invent a fake problem query. Found live
+# 2026-09-04: no carve-out existed for openers at all, only closers, so every
+# greeting forced a real KB search ("Searching internal knowledge base...").
+# Deliberately matched as the WHOLE message (see _is_bare_greeting) rather
+# than _last_user_message_matches's substring-anywhere check used for the
+# other three signal lists -- "hi"/"yo" are common substrings of ordinary
+# words ("this", "history", "yoke"), so containment matching here would
+# wrongly skip the forced lookup on real questions.
+_GREETING_SIGNALS = (
+    "hi", "hey", "hello", "yo", "sup", "hiya", "howdy", "greetings",
+    "hey there", "hi there", "what's up", "whats up", "good morning",
+    "good afternoon", "good evening",
+)
+
+
+def _is_bare_greeting(messages: list[dict]) -> bool:
+    """True if the most recent message is a user turn whose ENTIRE text
+    (punctuation-stripped) is one of _GREETING_SIGNALS -- see that list's
+    comment for why this can't reuse _last_user_message_matches's substring
+    check."""
+    if not messages or messages[-1].get("role") != "user":
+        return False
+    user_text = messages[-1].get("content")
+    if not isinstance(user_text, str):
+        return False
+    normalized = user_text.lower().strip(" !.?").replace("'", "")
+    return normalized in _GREETING_SIGNALS
+
+
 def _last_user_message_matches(messages: list[dict], signals: tuple[str, ...]) -> bool:
     """True if the most recent message is a user turn whose text contains any of
     the given signal phrases (case/apostrophe-insensitive substring match)."""
@@ -401,6 +477,41 @@ def _last_user_message_matches(messages: list[dict], signals: tuple[str, ...]) -
         return False
     normalized = user_text.lower().replace("'", "")
     return any(sig in normalized for sig in signals)
+
+
+def _follows_a_card(messages: list[dict]) -> bool:
+    """Whether the reply before this turn's user message queued a card."""
+    cur = _last_user_text_index(messages)
+    if cur is None:
+        return False
+    prev = _last_user_text_index(messages[:cur])
+    for m in messages[(prev or 0):cur]:
+        if m.get("role") == "user" and isinstance(m.get("content"), list):
+            for b in m["content"]:
+                try:
+                    out = json.loads(b.get("content") or "{}") if isinstance(b, dict) else {}
+                except (TypeError, ValueError):
+                    continue
+                if isinstance(out, dict) and (out.get("attached") or any(
+                        (o.get("output") or {}).get("attached") for o in out.get("on_card") or [])):
+                    return True
+    return False
+
+
+def _force_first_call(messages: list[dict]) -> bool:
+    """The one case the first decider call is still forced to call a tool
+    (2026-09-28, v043): a go-ahead after a reply that queued a card. Unforced,
+    "yes please, do it for me" got "press Run" about the earlier card 2/3 times
+    even with a prompt rule (multiturn_how_then_yes_do_it) -- v042 passed only
+    because it forced a tool on almost every first call. A go-ahead needs no
+    prose before its action, so forcing costs no extra call here; questions
+    and v042's thanks / greeting / irreversible carve-outs stay unforced."""
+    text = _last_user_text(messages)
+    return (bool(text) and _follows_a_card(messages) and not _is_question(text)
+            and not _last_user_message_matches(messages, _REASK_SIGNALS)
+            and not _last_user_message_matches(messages, _CLOSING_SIGNALS)
+            and not _last_user_message_matches(messages, _IRREVERSIBLE_SIGNALS)
+            and not _is_bare_greeting(messages))
 
 
 def _backfill_walkthrough(messages: list[dict], text: str) -> dict | None:
@@ -1255,7 +1366,8 @@ async def _respond(
     # (tool_choice any/tool) makes the API suppress text before the tool call,
     # which would cost a second decider call just to write the explanation.
     # An answer with no citation is simply ungrounded -- the battery's
-    # ungrounded-path metric measures it.
+    # ungrounded-path metric measures it. One exception: _force_first_call.
+    force_first = _force_first_call(messages)
     for i in range(MAX_ITERATIONS):
         iter_text = ""
         # The decider's own text never reaches the client directly anymore --
@@ -1275,7 +1387,8 @@ async def _respond(
         else:
             if on_status:
                 await on_status("Thinking…")
-            resp = await _call_model(system, tools.TOOLS, _with_screenshots(msgs), None)
+            tool_choice = {"type": "any"} if i == 0 and force_first else None
+            resp = await _call_model(system, tools.TOOLS, _with_screenshots(msgs), None, tool_choice)
             usage.append(_usage_dict(resp.usage))
             tool_uses = [b for b in resp.content if b.type == "tool_use"]
             iter_text = "".join(b.text for b in resp.content if b.type == "text")

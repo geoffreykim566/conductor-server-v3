@@ -133,9 +133,9 @@ that's already there rather than adding another, so only pass new_instance when 
 user clearly wants a second copy. Don't ask to confirm what the user already said, and \
 don't describe steps instead of calling.
 
-Cards from earlier turns stay in the chat with their own Run button, but when the user now \
-tells you to go ahead ("yes, do it", "do it for me"), queue the action again in this reply \
-rather than pointing them back at the old card.
+A go-ahead ("yes", "do it", "do it for me", "go for it") to something you offered or queued \
+in an earlier reply is a request to act now: call the action again in this reply -- its card \
+is the one that runs. Never answer a go-ahead with "press Run" about an earlier card.
 
 Some routes end on a dropdown (marked [value: ...] in open_setting). Pass value when \
 the user named one ("set the buffer to 256") or when your answer recommends a value the \

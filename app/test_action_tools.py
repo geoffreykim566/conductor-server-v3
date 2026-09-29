@@ -423,8 +423,20 @@ def test_is_question() -> None:
 
 async def test_first_call_not_forced() -> None:
     _, calls = await _run([_resp(_text("hi"))])
-    assert "tool_choice" not in calls[0], calls[0].get("tool_choice")
-    print("PASS: the first decider call is free to answer, cite and act at once (no forced tool).")
+    assert calls[0].get("tool_choice") is None, calls[0].get("tool_choice")
+    card_turn = [
+        {"role": "user", "content": "how do i open channel eq"},
+        {"role": "assistant", "content": [{"type": "tool_use", "id": "a0", "name": "open_plugin",
+                                           "input": {"plugin": "Channel EQ"}}]},
+        {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "a0",
+                                      "content": json.dumps({"attached": True, "steps": []})}]},
+        {"role": "assistant", "content": [{"type": "text", "text": "This opens Channel EQ."}]},
+    ]
+    for text, forced in (("yes please, do it for me", True), ("thanks!", False), ("what does it do?", False)):
+        _, calls = await _run([_resp(_open("Channel EQ", "a1")), _resp(_text("ok"))],
+                              messages=card_turn + [{"role": "user", "content": text}])
+        assert (calls[0].get("tool_choice") == {"type": "any"}) == forced, (text, calls[0].get("tool_choice"))
+    print("PASS: the first call is free, except a go-ahead after a card (forced, so it re-queues).")
 
 
 async def test_resume_restores_actions() -> None:
