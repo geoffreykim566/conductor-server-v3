@@ -96,7 +96,11 @@ _model_calls: list[dict] = []
 _embeds: list[dict] = []
 
 _orig_call_model = pipeline._call_model
-_orig_embed = tools.embed
+# None on v043+ (KB in the prompt, no embeddings); the same harness file runs
+# on both sides of the 2026-09-28 A/B.
+_orig_embed = getattr(tools, "embed", None)
+# What counts as a "lookup" in the records: lookup_concept (v042) or cite_kb (v043).
+_KB_TOOLS = ("lookup_concept", "cite_kb")
 
 
 async def _timed_call_model(system, tools_param, msgs, on_chunk, tool_choice=None, model=None):
@@ -143,7 +147,7 @@ async def _timed_respond(messages, **kwargs):
     # not inside embed() so it shows up as wall - model - embed.
     model_s = sum(c["s"] for c in _model_calls)
     embed_s = sum(e["s"] for e in _embeds)
-    pre = next((c for c in result.trace if c["tool"] == "lookup_concept"), None)
+    pre = next((c for c in result.trace if c["tool"] in _KB_TOOLS), None)
     _turn_records.append({
         "text": messages[-1]["content"] if isinstance(messages[-1].get("content"), str) else "",
         "wall_s": round(wall, 2),
@@ -155,13 +159,16 @@ async def _timed_respond(messages, **kwargs):
         "usd": round(sum(c["usd"] for c in _model_calls), 5),
         "n_embeds": len(_embeds),
         "n_429": sum(1 for e in _embeds if e["status"] == 429),
-        "n_lookups": sum(1 for c in result.trace if c["tool"] == "lookup_concept"),
+        "n_lookups": sum(1 for c in result.trace if c["tool"] in _KB_TOOLS),
         "tools": [c["tool"] for c in result.trace],
-        "first_lookup_query": (pre or {}).get("input", {}).get("problem"),
+        "first_lookup_query": (pre or {}).get("input", {}).get("problem") or (pre or {}).get("input", {}).get("entries"),
         "first_lookup_conf": ((pre or {}).get("output") or {}).get("match_confidence"),
         "first_lookup_match": ((pre or {}).get("output") or {}).get("match"),
         "first_lookup_problem": ((pre or {}).get("output") or {}).get("problem"),
         "attached": result.walkthrough_steps is not None,
+        # Menu paths ("X > Y") the answer states that aren't in any KB text the
+        # turn consulted or an approved route (see battery.ungrounded_paths).
+        "ungrounded_paths": battery.ungrounded_paths(result.trace, result.text),
         "tier": result.confidence_tier,
         "response": result.text,
     })
@@ -180,10 +187,12 @@ async def run(variants: list[str], runs: int, out_dir: Path) -> None:
         sys.exit(f"scenarios not in battery.json: {missing}")
 
     pipeline._call_model = _timed_call_model
-    tools.embed = _timed_embed_ok
+    if _orig_embed is not None:
+        tools.embed = _timed_embed_ok
     battery.respond = _timed_respond
 
-    defaults = {attr: getattr(pipeline, attr) for v in VARIANTS.values() for attr in v}
+    # Only knobs this branch has: v043 dropped LOOKUP_ATTEMPT_LIMIT (A3).
+    defaults = {attr: getattr(pipeline, attr) for v in VARIANTS.values() for attr in v if hasattr(pipeline, attr)}
     records: list[dict] = []
     with log_path.open("w") as log, jsonl_path.open("w") as jl:
         def out(s: str = "") -> None:

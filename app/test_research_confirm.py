@@ -16,7 +16,7 @@ independently of whether the live model would call web_research at all.
   5. api.py: resume with no pending web_research in history -> None from
      _pending_research_query (the endpoint 422s on that).
 
-No DB needed: every model response is scripted, so lookup_concept never
+No DB needed: every model response is scripted, so cite_kb never
 actually executes. Run inside the app container:
     docker compose exec app python -m app.test_research_confirm
 """
@@ -90,7 +90,7 @@ def _parked_history_with_prior_attach() -> list[dict]:
     successful open_setting) BEFORE deciding to research something else."""
     return _USER + [
         {"role": "assistant", "content": [
-            {"type": "tool_use", "id": "call_l", "name": "lookup_concept", "input": {"problem": "sample rate"}},
+            {"type": "tool_use", "id": "call_l", "name": "cite_kb", "input": {"entries": ["sample rate mismatch"]}},
         ]},
         {"role": "user", "content": [
             {"type": "tool_result", "tool_use_id": "call_l", "content": json.dumps({"match": "problem"})},
@@ -114,7 +114,7 @@ async def test_resume_deny_skips_research_and_restores_state() -> None:
     result, research = await _run(parked, [_FINAL], resume="deny_research", research_confirm=True)
     assert research.await_count == 0, "deny must never run the research executor"
     tools_called = [c["tool"] for c in result.trace]
-    assert tools_called == ["lookup_concept", "open_setting", "web_research"], tools_called
+    assert tools_called == ["cite_kb", "open_setting", "web_research"], tools_called
     assert result.trace[-1]["output"] == pipeline._RESEARCH_DECLINED, result.trace[-1]["output"]
     assert result.walkthrough_steps == [["menu", "File"]], "attach made before the prompt must survive the resume"
     # The model sees the decline as a normal tool_result, so the transcript is API-valid.

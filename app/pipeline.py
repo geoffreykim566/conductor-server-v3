@@ -17,7 +17,7 @@ from typing import Awaitable, Callable
 
 from anthropic import AsyncAnthropic
 
-from app import research, tools
+from app import kb, research, tools
 from app.config import CENTRAL_ANTHROPIC_KEY, MAX_TOKENS, MODEL, RESEARCH_CALL_TIMEOUT_S, WRITER_MODEL
 from app.prompt import SYSTEM_PROMPT, WRITER_SYSTEM_PROMPT
 
@@ -61,34 +61,8 @@ _RESEARCH_DECLINED = {
     )
 }
 
-# Hard, code-enforced cap on lookup_concept calls within one turn — a prompt
-# instruction to "stop retrying" is a request, not a guarantee. Found live
-# 2026-07-30: a genuinely absent topic ("wheres the monitor button") kept
-# returning a *different* wrong match on every retried phrasing, so the model
-# never hit a clean, repeated "nothing here" signal and just kept trying new
-# wording until it hit the overall iteration ceiling with no answer at all.
-# This intervenes explicitly before that happens, distinct from the overall
-# MAX_ITERATIONS safety net below (which covers any tool, not just this one).
-LOOKUP_ATTEMPT_LIMIT = 4
-# What LOOKUP_ATTEMPT_LIMIT counts. Every lookup, as it always did: the
-# 2026-09-21 "only unproductive ones" variant was measured on 09-22 and
-# reverted -- an off-KB turn returned a DIFFERENT wrong bucket at moderate on
-# every rephrasing, each one "productive" by that rule, so the cap never bound
-# and the turn escalated to web_research (research_no_fire_* 3/3). The reason
-# for the change is gone anyway: compound commands call action tools now and
-# don't spend lookups. False counts only unproductive ones (kept for A/B).
-COUNT_ALL_LOOKUPS = True
-
-# First decider call on a turn that needs grounding (_needs_first_lookup):
-# "any" = must call SOME tool, so a real question still can't be answered from
-# memory with zero tool calls (the 2026-08-09 tool-skip gap), but a direct
-# command can go straight to an action tool instead of paying a KB lookup for
-# something that isn't in the KB. True restores forcing lookup_concept itself
-# (the pre-2026-09-21 behaviour; kept for the harness's before/after).
-FORCE_FIRST_LOOKUP = False
-
 # One card per turn (2026-09-21). Every action -- called directly by the model
-# or queued because a lookup landed on a solution that maps to it -- is a step
+# or queued because a cited solution maps to it -- is a step
 # on the same card, in call order. What commit-to-one was for stays: acting
 # on a second candidate from the SAME problem bucket is an alternative fix,
 # not a second request (2026-08-05: the last candidate silently won), and is
@@ -96,12 +70,14 @@ FORCE_FIRST_LOOKUP = False
 MAX_ATTACHES_PER_TURN = 6
 _ATTACH_TOOLS = tools.ACTION_TOOLS
 
-# A lookup that lands on ONE solution with a strong match queues that
-# solution's action itself (2026-09-21): deciding whether to also attach was
-# the single biggest failure point -- the model looked the answer up, said it,
-# and never made the second call (09-21 baseline: most walkthrough misses).
-# Weaker or multi-candidate results leave the choice to the model, which then
-# has to act on one or ask (see _needs_pick).
+# A cited solution that maps to an action gets it queued if the model didn't
+# call it (2026-09-21 as a lookup rule, cite_kb since 2026-09-28): deciding
+# whether to also attach was the single biggest failure point -- the model
+# found the answer, said it, and never made the second call (09-21 baseline:
+# most walkthrough misses). A cited bucket with no pick leaves the choice to
+# the model, which then has to act on one or ask (see _needs_pick).
+# PICK_ON_MODERATE_SINGLE is from the lookup era (cite_kb results are always
+# "strong"); kept only because _bucket_candidates still reads it.
 # Moderate single matches get pick-or-ask too (not auto-attach): e.g. "how do
 # i change the recording bit depth" lands on 'recording settings' at moderate,
 # and was a 09-21 walkthrough miss. The confidence bands (0.40/0.60) were
@@ -120,12 +96,11 @@ _PANE_ONLY_NOTE = (
     "replaces the queued step rather than adding one."
 )
 _PICK_NUDGE = (
-    "A lookup this turn returned solutions that map to an action. If your answer "
+    "You cited a problem whose candidate fixes map to actions. If your answer "
     "recommends one, call its action so the user gets it on the card; if you can't tell "
-    "which applies, ask the one question that would decide it (ask_clarifying_question); "
-    "if the match isn't actually what they asked about, look up something more specific. "
-    "If the candidate you recommend has no action of its own, call lookup_concept with its "
-    "name -- don't queue a different candidate's action instead."
+    "which applies, ask the one question that would decide it (ask_clarifying_question). "
+    "If the candidate you recommend has no action of its own, cite it with cite_kb "
+    "-- don't queue a different candidate's action instead."
 )
 
 _ATTACH_CAP_REFUSAL = (
@@ -193,17 +168,6 @@ def _auto_run_ok(messages: list[dict], card: list | None) -> bool:
     return bool(text) and not _is_question(text) and not any(sig in text for sig in _BULK_SIGNALS)
 
 
-def _lookup_is_unproductive(output: dict, buckets_seen: set) -> bool:
-    """See COUNT_ALL_LOOKUPS. A capped/errored call isn't a lookup result at all."""
-    if "error" in output:
-        return False
-    if output.get("match") == "none":
-        return True
-    if str(output.get("match_confidence", "")).startswith("weak"):
-        return True
-    return output.get("problem") in buckets_seen
-
-
 def _attach_key(name: str, inp: dict) -> str:
     return json.dumps([name, inp], sort_keys=True, default=str)
 
@@ -239,7 +203,7 @@ def _bucket_candidates(trace: list[dict]) -> dict[str, str]:
     _needs_pick checks."""
     out: dict[str, str] = {}
     for c in trace:
-        o = c["output"] if c["tool"] == "lookup_concept" else {}
+        o = c["output"] if c["tool"] == "cite_kb" else {}
         conf = str(o.get("match_confidence", ""))
         moderate_single = (
             PICK_ON_MODERATE_SINGLE and o.get("match") == "single" and conf.startswith("moderate")
@@ -307,14 +271,15 @@ async def respond(messages: list[dict], **kwargs) -> "Result":
     """The turn loop (_respond), plus whether its card may auto-run -- decided
     here, once, from the user's own message for every return path."""
     result = await _respond(messages, **kwargs)
-    # Any turn that consulted the KB waits for Run, whoever called the action:
+    # Any turn that cited the KB waits for Run, whoever called the action:
     # the fix was inferred from a diagnosis, not asked for. Found live
     # 2026-09-22 (research_no_fire_generic_troubleshooting_miss): on a turn
     # whose own answer was "I don't have a verified fix", the model queued
     # "bypass control surfaces" off a moderate match and the card was cleared
     # to run by itself. Only actions the user actually asked for -- a direct
     # command with no lookup behind it -- may auto-run.
-    inferred = result.card_from_lookup or any(c["tool"] == "lookup_concept" for c in result.trace)
+    inferred = result.card_from_lookup or any(
+        c["tool"] == "cite_kb" and (c.get("output") or {}).get("cited") for c in result.trace)
     # Routes whose target depends on the user's selection (`wait_for_run`) always
     # wait, so the reply's "select it first" comes before anything runs.
     waits = any(c["tool"] == "open_setting" and tools.ROUTES.get((c.get("input") or {}).get("name"), {}).get("wait_for_run")
@@ -343,7 +308,7 @@ def _format_duration(seconds: float) -> str:
 # means "Thinking..." (already showing from this iteration's top) just carries
 # through the attach uninterrupted instead of a message appearing only to
 # immediately vanish.
-_TOOL_STATUS_PRIORITY = ["web_research", "lookup_concept"]
+_TOOL_STATUS_PRIORITY = ["web_research"]
 
 
 def _status_for_tools(tool_uses: list) -> str | None:
@@ -353,8 +318,6 @@ def _status_for_tools(tool_uses: list) -> str | None:
             continue
         if name == "web_research":
             return "Searching the web for a verified answer…"
-        if name == "lookup_concept":
-            return "Searching internal knowledge base…"
     return None
 
 async def _ack_clarifying_question() -> dict:
@@ -374,7 +337,7 @@ async def _now(result: dict) -> dict:
 _EXECUTORS = {
     "open_plugin": lambda inp, fixture: _now(tools.queue_open_plugin(inp)),
     "set_param": lambda inp, fixture: _now(tools.queue_set_param(inp)),
-    "lookup_concept": lambda inp, fixture: tools.lookup_concept(inp["problem"]),
+    "cite_kb": lambda inp, fixture: _now(kb.cite(inp.get("entries") or [])),
     "open_setting": lambda inp, fixture: _now(tools.queue_open_setting(inp, fixture)),
     "ask_clarifying_question": lambda inp, fixture: _ack_clarifying_question(),
     "web_research": lambda inp, fixture: research.web_research(inp["query"]),
@@ -428,82 +391,6 @@ _REASK_SIGNALS = (
     "lost the window",
 )
 
-# Plain acknowledgments/closers -- carved out of the iteration-0 forced
-# lookup_concept call (see _needs_first_lookup below) so a "thanks!" turn
-# doesn't force the model to invent a fake problem query just to satisfy a
-# tool call it has nothing real to make. Exact substring match, same
-# deliberately simple approach as _REASK_SIGNALS above -- hand-curated rather
-# than pulled from an existing list (checked: Rasa's built-in "thankyou"
-# intent is voice-transcript ASR training data full of filler noise like "uh
-# thank you good bye", not a clean fit for exact matching). A typo'd close
-# ("tahnks") just eats one wasted lookup call, not worth fuzzy-matching for.
-_CLOSING_SIGNALS = (
-    "thanks", "thank you", "thx", "ty",
-    "got it", "sounds good", "cool", "perfect", "great", "awesome",
-    "ok", "okay", "no more questions", "that's all", "im good", "i'm good",
-    "bye", "goodbye", "see ya",
-)
-
-# Genuinely irreversible whole-project requests -- the prompt's own "Fail
-# closed on execution" rule already says decline these outright, no
-# walkthrough, but forcing a lookup_concept call on iteration 0 anyway
-# (see _needs_first_lookup below) meant that rule never got a clean chance to
-# apply: the forced call populated trace, and _needs_hedge (this function's
-# pre-badge name; now _confidence_tier) then hedged a response that was
-# actually a decline, not a claim
-# -- found live 2026-09-02 via Fable review of the writer-split battery
-# (destructive_probe: "Note: I couldn't verify this... so treat the
-# following as general guidance" prepended to a safety refusal). Deliberately
-# narrow and destructive-shaped (verb + whole-project scope), same curation
-# discipline as _REASK_SIGNALS/_CLOSING_SIGNALS above -- NOT a bare "delete",
-# which would wrongly carve out a legitimate "how do i delete a track"
-# navigation question. "delete/erase everything" also deliberately excluded
-# on its own (no bare form) -- found via direct testing 2026-09-03: matches
-# "delete everything on this track" as a false positive, a single-track,
-# undo-recoverable request, not the whole-project case this exists for;
-# kept only project-scoped.
-_IRREVERSIBLE_SIGNALS = (
-    "delete my entire project", "delete the entire project",
-    "delete my whole project", "delete the whole project",
-    "erase my entire project", "erase the entire project",
-    "erase my whole project", "erase the whole project",
-    "delete everything in my project", "delete everything in the project",
-    "erase everything in my project", "erase everything in the project",
-    "wipe my entire project", "wipe the entire project",
-)
-
-
-# Bare greetings -- carved out of the iteration-0 forced lookup_concept call
-# for the same reason as _CLOSING_SIGNALS: nothing real to look up on "hi",
-# forcing one just makes the model invent a fake problem query. Found live
-# 2026-09-04: no carve-out existed for openers at all, only closers, so every
-# greeting forced a real KB search ("Searching internal knowledge base...").
-# Deliberately matched as the WHOLE message (see _is_bare_greeting) rather
-# than _last_user_message_matches's substring-anywhere check used for the
-# other three signal lists -- "hi"/"yo" are common substrings of ordinary
-# words ("this", "history", "yoke"), so containment matching here would
-# wrongly skip the forced lookup on real questions.
-_GREETING_SIGNALS = (
-    "hi", "hey", "hello", "yo", "sup", "hiya", "howdy", "greetings",
-    "hey there", "hi there", "what's up", "whats up", "good morning",
-    "good afternoon", "good evening",
-)
-
-
-def _is_bare_greeting(messages: list[dict]) -> bool:
-    """True if the most recent message is a user turn whose ENTIRE text
-    (punctuation-stripped) is one of _GREETING_SIGNALS -- see that list's
-    comment for why this can't reuse _last_user_message_matches's substring
-    check."""
-    if not messages or messages[-1].get("role") != "user":
-        return False
-    user_text = messages[-1].get("content")
-    if not isinstance(user_text, str):
-        return False
-    normalized = user_text.lower().strip(" !.?").replace("'", "")
-    return normalized in _GREETING_SIGNALS
-
-
 def _last_user_message_matches(messages: list[dict], signals: tuple[str, ...]) -> bool:
     """True if the most recent message is a user turn whose text contains any of
     the given signal phrases (case/apostrophe-insensitive substring match)."""
@@ -514,39 +401,6 @@ def _last_user_message_matches(messages: list[dict], signals: tuple[str, ...]) -
         return False
     normalized = user_text.lower().replace("'", "")
     return any(sig in normalized for sig in signals)
-
-
-def _needs_first_lookup(messages: list[dict]) -> bool:
-    """Tool-skip gap fix: without this, the model is free to answer a real
-    question with zero lookup_concept calls, and _confidence_tier() (formerly
-    _needs_hedge()) deliberately falls through to "generic" on an empty trace
-    (can't tell that apart from a normal closing turn) -- so those answers ship
-    with full confidence and no KB grounding at all (found live 2026-08-09, the
-    "how do i make a beat" query). Fix is to force lookup_concept on the turn's
-    first iteration instead of leaving it to the model's judgment -- same
-    "code, not a prompt request" lesson as _confidence_tier itself.
-
-    Carved out for four different reasons, not one:
-    - _REASK_SIGNALS: forcing a fresh lookup here would starve
-      _backfill_walkthrough, which only fires on a turn with zero tool calls.
-    - _CLOSING_SIGNALS: nothing real to look up on a plain "thanks"/"ok" turn;
-      forcing one just makes the model invent a query to satisfy the tool.
-    - _IRREVERSIBLE_SIGNALS: a genuinely irreversible request should be
-      declined outright with no tool call at all -- forcing a lookup here
-      populates trace for no reason and causes _confidence_tier to mark
-      "moderate" what should be a plain decline (found live 2026-09-02, destructive_probe).
-    - _GREETING_SIGNALS: same reasoning as _CLOSING_SIGNALS, opener instead
-      of closer.
-    """
-    if _last_user_message_matches(messages, _REASK_SIGNALS):
-        return False
-    if _last_user_message_matches(messages, _CLOSING_SIGNALS):
-        return False
-    if _last_user_message_matches(messages, _IRREVERSIBLE_SIGNALS):
-        return False
-    if _is_bare_greeting(messages):
-        return False
-    return True
 
 
 def _backfill_walkthrough(messages: list[dict], text: str) -> dict | None:
@@ -640,7 +494,7 @@ def _attach_is_strong(trace: list[dict], attached_solution: str | None) -> bool:
     confidences = [
         c["output"].get("match_confidence")
         for c in trace
-        if c["tool"] == "lookup_concept"
+        if c["tool"] == "cite_kb"
         for sol in c["output"].get("solutions") or []
         if sol.get("name") == attached_solution
     ]
@@ -663,7 +517,7 @@ def _moderate_grounded_lookup_exists(trace: list[dict]) -> bool:
     back bare with no suffix ("moderate ..."/"weak ..." both carry trailing
     advisory text, see tools.py)."""
     return any(
-        c["tool"] == "lookup_concept"
+        c["tool"] == "cite_kb"
         and str(c["output"].get("match_confidence", "")).startswith(("strong", "moderate"))
         for c in trace
     )
@@ -681,7 +535,7 @@ def _strong_grounded_lookup_exists(trace: list[dict]) -> bool:
     old check only asked whether *some* lookup hit strong, never whether that
     match actually carried anything to be confident about."""
     return any(
-        c["tool"] == "lookup_concept"
+        c["tool"] == "cite_kb"
         and c["output"].get("match_confidence") == "strong"
         and any(s.get("action") for s in c["output"].get("solutions") or [])
         for c in trace
@@ -1042,10 +896,8 @@ async def _call_model(
     tests) this still calls _client.messages.create directly, unchanged, so
     existing mocks (which patch that exact method) keep working.
 
-    tool_choice forces a specific tool instead of leaving the model free to
-    answer with no tool call at all -- used for the iteration-0 forced
-    lookup_concept call (see _needs_first_lookup). Only meaningful alongside
-    tools_param; unset on every other call site.
+    tool_choice forces a tool call -- used only by the pick nudge (see
+    _needs_pick). Only meaningful alongside tools_param.
 
     model defaults to the decider's MODEL; the writer call (_write_response)
     passes WRITER_MODEL instead -- the one place this loop's model varies.
@@ -1115,22 +967,6 @@ def _last_user_text_index(msgs: list[dict]) -> int | None:
     return None
 
 
-def _prior_turn_looked_up(msgs: list[dict]) -> bool:
-    """Whether the turn before the current one called lookup_concept. A
-    follow-up that adds evidence mid-diagnosis ("spotify went silent too")
-    tends to skip its own lookup because the last one is still in history --
-    so for EARLY_EXIT_ON_ACTION it counts as a diagnostic turn, not a command."""
-    cur = _last_user_text_index(msgs)
-    if cur is None:
-        return False
-    prev = _last_user_text_index(msgs[:cur])
-    for m in msgs[(prev or 0):cur]:
-        if m.get("role") == "assistant" and isinstance(m.get("content"), list):
-            if any(b.get("type") == "tool_use" and b.get("name") == "lookup_concept" for b in m["content"]):
-                return True
-    return False
-
-
 def _pending_tool_uses(msgs: list[dict]) -> list:
     """tool_use blocks of a parked transcript's final assistant message, as
     objects with the .name/.input/.id the dispatch loop reads off SDK blocks.
@@ -1146,15 +982,13 @@ def _pending_tool_uses(msgs: list[dict]) -> list:
 
 def _restore_turn_state(tail: list[dict]) -> dict:
     """Rebuild what respond() had accumulated when it parked the turn --
-    trace, decider prose, a walkthrough attach, the lookup count -- from the
+    trace, decider prose, a walkthrough attach -- from the
     completed tool-loop iterations between the user message and the pending
     assistant message. Nothing is stored server-side, so this is the only
     way an attach made before the research prompt survives into the answer
     (research_mixed_kb_and_research is a real scenario shape)."""
     trace: list[dict] = []
     text_parts: list[str] = []
-    lookups_counted = 0
-    buckets_seen: set = set()
     card_steps: list = []
     attach_keys: set = set()
     queued_by_lookup: dict[str, tuple[int, int]] = {}
@@ -1182,12 +1016,9 @@ def _restore_turn_state(tail: list[dict]) -> dict:
                     output = {"raw": output}
                 entry = {"tool": call["tool"], "input": call["input"], "output": output}
                 trace.append(entry)
-                if call["tool"] == "lookup_concept":
-                    if COUNT_ALL_LOOKUPS or _lookup_is_unproductive(output, buckets_seen):
-                        lookups_counted += 1
-                    buckets_seen.add(output.get("problem"))
-                    # Actions this lookup queued itself (see _auto_attach) ride
-                    # in its own result, the only place they're recorded.
+                if call["tool"] == "cite_kb":
+                    # Actions a citation queued itself (see the auto-attach
+                    # block) ride in its own result, the only place they're recorded.
                     for auto in output.get("on_card") or []:
                         trace.append({"tool": auto["tool"], "input": auto["input"],
                                       "output": auto["output"], "auto_from": output.get("problem")})
@@ -1219,8 +1050,8 @@ def _restore_turn_state(tail: list[dict]) -> dict:
                     if call["tool"] == "open_setting":
                         route_spans[key] = (start, len(card_steps))
     return {
-        "trace": trace, "text_parts": text_parts, "lookups_counted": lookups_counted,
-        "buckets_seen": buckets_seen, "card_steps": card_steps, "attach_keys": attach_keys,
+        "trace": trace, "text_parts": text_parts,
+        "card_steps": card_steps, "attach_keys": attach_keys,
         "queued_by_lookup": queued_by_lookup, "route_spans": route_spans,
     }
 
@@ -1256,7 +1087,7 @@ async def _respond(
     research_authorized = resume == "allow_research"
     research_denied = resume == "deny_research"
     if resume:
-        # `messages` (used below by _needs_first_lookup, _backfill_walkthrough
+        # `messages` (used below by _backfill_walkthrough
         # and the writer's plain history) must end at this turn's user
         # message like it does on a fresh call -- the parked tool-loop tail
         # is replayed into msgs/trace/text_parts instead.
@@ -1330,8 +1161,6 @@ async def _respond(
 
     usage: list[dict] = []
     attached_solution: str | None = None   # no longer set; kept for _confidence_tier until tiers go
-    lookups_counted = 0          # toward LOOKUP_ATTEMPT_LIMIT; see COUNT_ALL_LOOKUPS
-    buckets_seen: set = set()
     card_steps: list = []        # every attach this turn, in call order (one card)
     attach_keys: set = set()
     queued_by_lookup: dict[str, tuple[int, int]] = {}   # endorse key -> its slice of card_steps
@@ -1352,8 +1181,6 @@ async def _respond(
         restored = _restore_turn_state(msgs[len(messages):-1])
         trace.extend(restored["trace"])
         text_parts.extend(restored["text_parts"])
-        lookups_counted = restored["lookups_counted"]
-        buckets_seen = restored["buckets_seen"]
         card_steps = restored["card_steps"]
         attach_keys = restored["attach_keys"]
         queued_by_lookup = restored["queued_by_lookup"]
@@ -1363,7 +1190,9 @@ async def _respond(
     # model automatically rather than waiting on it to decide to call a tool for
     # it -- a decision point it's already been observed skipping under real
     # conditions (found live 2026-08-04, the monitor-button hallucination).
-    system_text = SYSTEM_PROMPT
+    # The whole KB rides in the static, cached system block (2026-09-28, v043):
+    # identical on every call, so it's written to cache once and read after.
+    system_text = SYSTEM_PROMPT + "\n\n# Knowledge base\n\n" + kb.KB_TEXT
     # ax_fixture (dict) is the test battery's hand-authored, deterministic-gating
     # mechanism (see tools.py's toggle_ax_key/value_ax_key) -- never populated by
     # a real client request. ax_state (str) is the real thing: a live text dump
@@ -1421,14 +1250,14 @@ async def _respond(
             "cache_control": {"type": "ephemeral"},
         })
 
-    # Tool-skip gap fix: force lookup_concept on this turn's first iteration
-    # (see _needs_first_lookup) instead of leaving "call a tool at all" up to
-    # the model's judgment. Decided once, up front, against the original
-    # `messages` param -- same turn-defining message _backfill_walkthrough
-    # itself checks.
-    force_first_lookup = _needs_first_lookup(messages)
-
+    # No forced first tool call (2026-09-28, v043). With the KB in the prompt
+    # the first response can answer, cite and act at once; forcing a tool
+    # (tool_choice any/tool) makes the API suppress text before the tool call,
+    # which would cost a second decider call just to write the explanation.
+    # An answer with no citation is simply ungrounded -- the battery's
+    # ungrounded-path metric measures it.
     for i in range(MAX_ITERATIONS):
+        iter_text = ""
         # The decider's own text never reaches the client directly anymore --
         # only the writer call (see _finalize_answer) streams -- so every
         # decider call runs non-streaming regardless of whether this respond()
@@ -1446,18 +1275,12 @@ async def _respond(
         else:
             if on_status:
                 await on_status("Thinking…")
-            tool_choice = None
-            if i == 0 and force_first_lookup:
-                tool_choice = (
-                    {"type": "tool", "name": "lookup_concept"} if FORCE_FIRST_LOOKUP
-                    else {"type": "any"}
-                )
-            resp = await _call_model(system, tools.TOOLS, _with_screenshots(msgs), None, tool_choice)
+            resp = await _call_model(system, tools.TOOLS, _with_screenshots(msgs), None)
             usage.append(_usage_dict(resp.usage))
             tool_uses = [b for b in resp.content if b.type == "tool_use"]
             iter_text = "".join(b.text for b in resp.content if b.type == "text")
             if not tool_uses and not pick_forced and _needs_pick(trace, card_steps):
-                # About to end on prose after a bucket lookup whose candidates
+                # About to end on prose after citing a bucket whose candidates
                 # all map to actions: once per turn, re-ask with a tool call
                 # required, so the pick the answer makes reaches the card (or
                 # becomes a clarifying question). The prose-only reply is
@@ -1523,16 +1346,7 @@ async def _respond(
                 await on_status(status_text)
         tool_results = []
         for tu in tool_uses:
-            if tu.name == "lookup_concept" and lookups_counted >= LOOKUP_ATTEMPT_LIMIT:
-                result = {
-                    "error": (
-                        "Too many lookups without a clear answer. "
-                        "Stop searching now — answer from general Logic Pro knowledge if you're "
-                        "genuinely confident, or tell the user you don't have a verified answer "
-                        "for this. Do not call lookup_concept again this turn."
-                    )
-                }
-            elif tu.name in _ATTACH_TOOLS and _endorse_key(tu.name, tu.input) in queued_by_lookup:
+            if tu.name in _ATTACH_TOOLS and _endorse_key(tu.name, tu.input) in queued_by_lookup:
                 # The model called the action a lookup had already queued: that's
                 # agreement, not a second request. Its version (which may name a
                 # track) replaces the queued step, and the step stops counting as
@@ -1594,20 +1408,27 @@ async def _respond(
             if call_usage:
                 usage.append(call_usage)
             on_card: list[dict] = []
-            if (
-                tu.name == "lookup_concept" and result.get("match") == "single"
-                and str(result.get("match_confidence", "")).startswith("strong")
-            ):
-                sol = (result.get("solutions") or [{}])[0]
-                for tool, inp in tools.action_calls(sol.get("action")):
+            if tu.name == "cite_kb" and result.get("recommended"):
+                # Cited solutions' actions, in citation order. Commit-to-one
+                # holds inside one citation too: a second cited candidate from
+                # a bucket an earlier one already filled is an alternative.
+                sols = {sol["name"]: sol for sol in result.get("solutions") or []}
+                calls, used_buckets = [], set()
+                for name in result["recommended"]:
+                    sol = sols.get(name) or {}
+                    alt = sol.get("bucket") is not None and sol["bucket"] in used_buckets
+                    if sol.get("bucket") is not None:
+                        used_buckets.add(sol["bucket"])
+                    calls += [(tool, inp, alt) for tool, inp in tools.action_calls(sol.get("action"))]
+                for tool, inp, alt in calls:
                     key = _attach_key(tool, inp)
                     if (key in attach_keys or len(attach_keys) >= MAX_ATTACHES_PER_TURN
                             or (tool == "open_setting" and _endorse_key(tool, inp) in route_spans)):
                         continue
-                    if _is_alternative_pick(tool, inp, trace):
+                    if alt or _is_alternative_pick(tool, inp, trace):
                         # Same commit-to-one rule as a model-made pick: don't let
-                        # a by-name lookup of a second candidate ("sample rate"
-                        # after buffer size) slip a competing fix onto the card.
+                        # a second cited candidate ("sample rate" after buffer
+                        # size) slip a competing fix onto the card.
                         on_card.append({"tool": tool, "input": inp,
                                         "output": {"attached": False, "reason": _FALLBACK_REFUSAL}})
                         continue
@@ -1628,10 +1449,6 @@ async def _respond(
                               "This solution's action was NOT queued: " + "; ".join(r for r in refused if r)}
             trace.append({"tool": tu.name, "input": tu.input, "output": result})
             trace.extend({**o, "auto_from": result.get("problem")} for o in on_card)
-            if tu.name == "lookup_concept" and "error" not in result:
-                if COUNT_ALL_LOOKUPS or _lookup_is_unproductive(result, buckets_seen):
-                    lookups_counted += 1
-                buckets_seen.add(result.get("problem"))
             if (tu.name in _ATTACH_TOOLS and result.get("attached")
                     and not result.get("already_queued") and not result.get("replaces_earlier")):
                 start = len(card_steps)
@@ -1646,19 +1463,29 @@ async def _respond(
             })
         msgs.append({"role": "user", "content": tool_results})
 
-        # Early exit (A/B, 2026-09-24): an iteration that called only action
-        # tools, all attached, has nothing left to decide -- the next decider
-        # call would only write prose the writer then rewrites (~2.5s median).
-        # Any refusal or error keeps looping so the decider can react to it.
-        # Direct actions only: after a lookup, that next call is where the
-        # decider explains the diagnosis and next steps, and skipping it lost
-        # them (battery review, 2026-09-24). Same for a follow-up to a turn
-        # that looked something up (see _prior_turn_looked_up).
+        # Early exit (A/B, 2026-09-24; cite_kb 2026-09-28): an iteration that
+        # called only actions and/or cite_kb, every one of them accepted, has
+        # nothing left to decide -- the next decider call would only write
+        # prose the writer then rewrites (~2.5s median). Any refusal or error
+        # keeps looping so the decider can react to it. A citing iteration
+        # must also have written its explanation: on the lookup design the
+        # post-lookup call was where the diagnosis got written, and skipping
+        # it lost it (2026-09-24); with the KB in the prompt it can be written
+        # alongside the citation, and when it wasn't, the loop continues. A
+        # cited bucket with actionable candidates and nothing on the card
+        # also continues, so the pick nudge (_needs_pick) still gets its turn.
+        def _accepted(tr: dict) -> bool:
+            out = json.loads(tr["content"])
+            if "cited" in out:
+                return "error" not in out and all(o["output"].get("attached") for o in out.get("on_card") or [])
+            return bool(out.get("attached"))
+
+        citing = any(tu.name == "cite_kb" for tu in tool_uses)
         if (EARLY_EXIT_ON_ACTION and tool_uses
-                and all(tu.name in _ATTACH_TOOLS for tu in tool_uses)
-                and all(json.loads(tr["content"]).get("attached") for tr in tool_results)
-                and not any(t["tool"] == "lookup_concept" for t in trace)
-                and not _prior_turn_looked_up(messages)):
+                and all(tu.name in _ATTACH_TOOLS or tu.name == "cite_kb" for tu in tool_uses)
+                and all(_accepted(tr) for tr in tool_results)
+                and (iter_text.strip() or not citing)
+                and not _needs_pick(trace, card_steps)):
             text = "\n\n".join(text_parts)
             text, tier = await _finalize_answer(
                 trace, (list(card_steps) or None), text, messages, on_chunk, usage,
@@ -1676,6 +1503,11 @@ async def _respond(
         # is non-empty (this tool call itself is in it), and backfill only
         # ever applies to a turn with zero tool calls at all.
         if any(tu.name == "ask_clarifying_question" for tu in tool_uses):
+            # The question itself, when the decider didn't also write it as
+            # text -- otherwise the writer gets nothing and makes up an answer.
+            if not iter_text.strip():
+                text_parts += [str(tu.input.get("question")) for tu in tool_uses
+                               if tu.name == "ask_clarifying_question" and tu.input.get("question")]
             text = "\n\n".join(text_parts)
             text, tier = await _finalize_answer(
                 trace, (list(card_steps) or None), text, messages, on_chunk, usage,

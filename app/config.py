@@ -34,14 +34,6 @@ RESEARCH_CALL_TIMEOUT_S = float(os.environ.get("RESEARCH_CALL_TIMEOUT_S", "150.0
 # evidence (see v3-log.md 2026-08-22/24).
 WRITER_MODEL = "claude-haiku-4-5-20251001"
 
-VOYAGE_API_KEY = os.environ.get("VOYAGE_API_KEY", "")
-VOYAGE_MODEL = "voyage-3.5"  # 1024-dim; index and query must stay symmetric
-
-# Cosine distance ceiling for retrieval — same calibrated value as the real server
-# (raised 0.5 -> 0.65, see kb-log.md 2026-07-28), kept here for continuity, not
-# re-derived from scratch for this tiny seed set.
-RELEVANCE_FLOOR = float(os.environ.get("RELEVANCE_FLOOR", "0.65"))
-
 FREE_LIMIT = int(os.environ.get("FREE_LIMIT", "50"))
 
 # /admin dashboard basic auth. Unset ADMIN_PASSWORD fails closed (see

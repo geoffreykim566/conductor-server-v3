@@ -1,108 +1,51 @@
-"""v3 tools: lookup_concept (knowledge) and the action tools (open_plugin,
+"""v3 tools: cite_kb (knowledge) and the action tools (open_plugin,
 set_param, open_setting) that queue steps onto the reply's card.
 
-lookup_concept queries problems and solutions TOGETHER, in one ranked pass, and
-lets whichever is actually closest by distance win — same fix as the v2 pilot's
-combined-retrieval bug (a type checked first unconditionally starves a better
-match; found live 2026-07-30). If the top hit is a solution that belongs to a
-problem bucket, it always resolves as that bucket, never in isolation —
-otherwise raw embedding-distance noise can let a bucket member win the top-1
-slot and hide its siblings entirely (found live 2026-07-31,
-ax_override_critical_test resolving three different ways across three runs).
+Since 2026-09-28 (v043) the KB is in the decider's cached prompt (app/kb.py);
+cite_kb records which entries an answer relied on -- nothing is retrieved.
+lookup_concept's embedding search is gone.
 
 Since 2026-09-21 the KB holds knowledge only. A solution with a fix carries
 the action call it maps to (solutions.action); navigation paths live once, in
 seed/routes.json, reached only through open_setting -- never embedded, never
-matched against. get_walkthrough is gone: picking a solution is what queues
-its action (see pipeline.py's auto-attach).
+matched against. Citing a solution is what queues its action if the model
+didn't call it (see pipeline.py's auto-attach).
 """
-import asyncio
 import json
 import re
 from contextvars import ContextVar
 from pathlib import Path
 
-from app import db
-from app.embed import embed
+from app import kb
 from app.walkthrough import path_to_walkthrough_steps
 
-# Distance bands are advisory only — informing the model's own judgment, not a
-# hard filter. The old hard `RELEVANCE_FLOOR` SQL cutoff was a leftover from v1,
-# inconsistent with this project's own design direction (leave judgment calls to
-# the model, not a hand-tuned number) and directly implicated in a real bug: it
-# admitted a different wrong match on almost every retried phrasing for a topic
-# with no real KB coverage, which kept the model retrying instead of ever
-# cleanly recognizing "nothing relevant here." Found live 2026-07-30.
-_STRONG_MATCH = 0.40
-_MODERATE_MATCH = 0.60
-
-
-def _confidence_label(distance: float) -> str:
-    if distance <= _STRONG_MATCH:
-        return "strong"
-    if distance <= _MODERATE_MATCH:
-        return "moderate — treat with more skepticism, consider asking or trying a different phrasing"
-    return "weak — likely not actually relevant; don't treat this as a real match"
-
-
-def _confidence_short(distance: float) -> str:
-    """Plain strong/moderate/weak label for query_log — _confidence_label's
-    return value is the model-facing advisory sentence, not a clean value to
-    group/filter on."""
-    if distance <= _STRONG_MATCH:
-        return "strong"
-    if distance <= _MODERATE_MATCH:
-        return "moderate"
-    return "weak"
-
-
-async def _embed_with_retry(texts: list[str], input_type: str) -> list[list[float]]:
-    """Voyage rate-limits on bursty test runs — retry/backoff rather than letting
-    one transient 429 kill an entire scenario battery run. embed.py now also
-    proactively spaces calls to avoid triggering 429s in the first place; this is
-    the safety net for whatever gets through anyway. Widened 2026-08-06 after two
-    full-battery runs both exhausted the old 4-attempt/60s-total budget and died
-    mid-run -- 6 attempts, longer steps, ~4.5min total budget before giving up."""
-    for attempt in range(6):
-        try:
-            return await embed(texts, input_type=input_type)
-        except Exception as exc:
-            if attempt == 5:
-                raise
-            wait = 15 * (attempt + 1)
-            print(f"  [retry] embed() failed ({exc}); retrying in {wait}s")
-            await asyncio.sleep(wait)
-
-LOOKUP_CONCEPT_SCHEMA = {
-    "name": "lookup_concept",
+CITE_KB_SCHEMA = {
+    "name": "cite_kb",
     "description": (
-        "Call this before diagnosing any Logic Pro problem or naming any menu path, "
-        "shortcut, or settings location — never state one from memory. Results include "
-        "a match_confidence ('strong'/'moderate'/'weak') — this is advisory, not a "
-        "filter; judge for yourself whether a 'moderate' or 'weak' result is actually "
-        "relevant rather than treating it as grounded. If you already know the exact "
-        "name of a specific setting or destination (from a solution's own fix text, "
-        "from a bucket you were just given, or from your own knowledge), query with "
-        "that name directly rather than paraphrasing the user's original wording."
+        "Record which knowledge-base entries (the problems and solutions in your instructions) "
+        "your answer relies on. Call it in the same response as your answer and any action "
+        "call, whenever you diagnose a Logic Pro problem or state a fix, setting, menu path or "
+        "shortcut that comes from the KB -- never state one from memory. Cite the problem bucket "
+        "you diagnosed and the one solution you recommend; a cited solution that has an action "
+        "is queued on the reply's card if you don't call its action yourself. Don't cite a "
+        "candidate you only mention as the next thing to try. Pass an empty list when nothing in "
+        "the KB covers the question. Not needed for a plain command to open, add or set "
+        "something."
     ),
+    "strict": True,
     "input_schema": {
         "type": "object",
         "properties": {
-            "problem": {
-                "type": "string",
-                "description": (
-                    "Your own short (2-8 word) query — either a normalized description of the "
-                    "user's symptom (not their literal wording; recognize the underlying issue "
-                    "and phrase it the way this KB names things), or the exact name of a "
-                    "specific setting/destination you already know you want."
-                ),
+            "entries": {
+                "type": "array",
+                "items": {"type": "string", "enum": kb.ENTRY_NAMES},
+                "description": "Exact KB entry names (problem or solution headings), most important first.",
             }
         },
-        "required": ["problem"],
+        "required": ["entries"],
         "additionalProperties": False,
     },
 }
-
 
 # Pure structural signal, no side effect -- exists so "this turn makes no
 # claim" is a hard fact in trace, not something inferred from response text.
@@ -124,15 +67,26 @@ ASK_CLARIFYING_QUESTION_SCHEMA = {
         "Call this when your entire response for this turn is a clarifying question "
         "and nothing else -- no diagnosis, guidance, or claim alongside it. Marks the "
         "turn as making no claim, so it won't be hedged as an unconfirmed answer. Only "
-        "for the genuine-toss-up case this prompt already describes (a 'problem' result "
-        "with no distinguishing evidence yet). Never call this if you're also offering "
+        "for the genuine-toss-up case this prompt already describes (a KB problem with "
+        "several candidate causes and no distinguishing evidence yet). Never call this if you're also offering "
         "any guidance, even tentative guidance, in the same response -- that response "
         "should stand as a real (possibly hedged) answer, not a claim-free question. "
-        "Never call this alongside an action tool."
+        "Never call this alongside an action tool. If the question is about a KB problem, cite "
+        "it with cite_kb in the same response."
     ),
     "input_schema": {
         "type": "object",
-        "properties": {},
+        "properties": {
+            # Required since 2026-09-28 (v043): on a first call with the KB in
+            # the prompt, the model called this with no text at all, and the
+            # writer, handed nothing, invented an answer. The question now
+            # rides in the call itself (pipeline uses it when there's no text).
+            "question": {
+                "type": "string",
+                "description": "The exact clarifying question to ask the user, numbered options included.",
+            }
+        },
+        "required": ["question"],
         "additionalProperties": False,
     },
 }
@@ -142,17 +96,17 @@ ASK_CLARIFYING_QUESTION_SCHEMA = {
 # v1 split router.py's glue from research.py's actual call. Model-decided
 # trigger, not a deterministic gate: the description below is the only thing
 # telling the model when to call this (v3-log.md 2026-09-04 scoping note) --
-# a code-forced call on every weak/no-hit lookup_concept result was
-# considered and rejected as the costlier, more eager option.
+# a code-forced call on every question the KB doesn't cover was considered
+# and rejected as the costlier, more eager option.
 WEB_RESEARCH_SCHEMA = {
     "name": "web_research",
     "description": (
         "Search the web for information outside this KB's coverage -- specific artist/producer "
-        "techniques, gear, current Logic Pro features/changes, or anything else lookup_concept has "
-        "no real match for (its match_confidence came back 'weak' or there was no match at all). "
+        "techniques, gear, current Logic Pro features/changes, or anything else the knowledge base "
+        "doesn't cover. "
         "Call this instead of answering from pretrained knowledge when a question asks for "
         "something you'd otherwise have to guess at. Don't call it for ordinary troubleshooting or "
-        "navigation questions lookup_concept already covers -- this is for genuinely out-of-KB "
+        "navigation questions the knowledge base already covers -- this is for genuinely out-of-KB "
         "information, not a first resort."
     ),
     "input_schema": {
@@ -188,7 +142,7 @@ OPEN_PLUGIN_SCHEMA = {
         "window if that plugin is already on the track. It runs on the user's Mac after your "
         "reply, when they press Run -- it has NOT happened when you write your reply. Works for "
         "any installed plugin, Apple or third-party, whether or not the KB mentions it. Use it "
-        "for a direct request to add / put / load / open a plugin; no lookup_concept call is "
+        "for a direct request to add / put / load / open a plugin; no KB entry is "
         "needed first. Several action calls in one reply run in call order as one card."
     ),
     "strict": True,
@@ -329,128 +283,9 @@ OPEN_SETTING_SCHEMA = {
     "cache_control": {"type": "ephemeral"},
 }
 
-TOOLS = [LOOKUP_CONCEPT_SCHEMA, ASK_CLARIFYING_QUESTION_SCHEMA, WEB_RESEARCH_SCHEMA,
+TOOLS = [CITE_KB_SCHEMA, ASK_CLARIFYING_QUESTION_SCHEMA, WEB_RESEARCH_SCHEMA,
          OPEN_PLUGIN_SCHEMA, SET_PARAM_SCHEMA, OPEN_SETTING_SCHEMA]
 ACTION_TOOLS = {"open_plugin", "set_param", "open_setting"}
-
-
-def _content_summary(name: str, content: dict) -> str:
-    lines = [name]
-    for key, label in (
-        ("symptom", "Symptom"), ("cause", "Cause"), ("fix", "Fix"),
-        ("zone", "Zone"), ("remove_when", "Remove when"), ("remove_move", "Remove move"),
-        ("add_when", "Add when"), ("add_move", "Add move"), ("do_not", "Do not"),
-        ("opens", "Opens"),
-    ):
-        if content.get(key):
-            lines.append(f"{label}: {content[key]}")
-    return "\n".join(lines)
-
-
-async def lookup_concept(problem: str, _vec: list[float] | None = None) -> dict:
-    # _vec lets a caller that already embedded this exact text (probe_lookup.py's
-    # raw-top8 pass) skip a second, redundant Voyage call for the same query --
-    # found live 2026-08-18, probe runs were double-embedding every query and
-    # hitting far more 429s than the battery ever does for the same query count.
-    # Never passed by the real pipeline (model tool calls always start from raw text).
-    vec = _vec if _vec is not None else (await _embed_with_retry([problem], input_type="query"))[0]
-    rows = await db.pool().fetch(
-        """
-        select * from (
-            select 'problem'::text as kind, id, name, null::jsonb as content,
-                   null::jsonb as action, note,
-                   (embedding <=> $1) as distance
-            from problems
-            union all
-            select 'solution'::text as kind, id, name, content,
-                   action, null::text as note,
-                   (embedding <=> $1) as distance
-            from solutions
-        ) combined
-        order by distance
-        limit 5
-        """,
-        vec,
-    )
-    top_results = [
-        {"kind": r["kind"], "name": r["name"], "distance": float(r["distance"])}
-        for r in rows
-    ]
-    if not rows:
-        await db.insert_query_log(query=problem, confidence="none", top_results=[])
-        return {"match": "none"}
-
-    top = rows[0]
-    confidence = _confidence_label(top["distance"])
-    await db.insert_query_log(
-        query=problem, confidence=_confidence_short(top["distance"]), top_results=top_results
-    )
-
-    problem_id = problem_name = problem_note = None
-    if top["kind"] == "problem":
-        problem_id, problem_name, problem_note = top["id"], top["name"], top["note"]
-    else:
-        # A solution can belong to more than one bucket (e.g. `sample rate
-        # mismatch` is a candidate for both `song sounds slowed` and
-        # `crackling during playback`) -- when the top hit is the solution
-        # itself rather than either parent, pick deterministically by which
-        # bucket it's most strongly weighted in, not by unordered row order.
-        link = await db.pool().fetchrow(
-            """
-            select p.id, p.name, p.note
-            from problem_solutions ps
-            join problems p on p.id = ps.problem_id
-            where ps.solution_id = $1
-            order by ps.seed_weight desc nulls last
-            limit 1
-            """,
-            top["id"],
-        )
-        if link:
-            problem_id, problem_name, problem_note = link["id"], link["name"], link["note"]
-
-    if problem_id is not None:
-        links = await db.pool().fetch(
-            """
-            select s.name, s.content, s.action, ps.seed_weight, ps.distinguisher
-            from problem_solutions ps
-            join solutions s on s.id = ps.solution_id
-            where ps.problem_id = $1
-            order by ps.seed_weight desc nulls last
-            """,
-            problem_id,
-        )
-        solutions = [
-            {
-                "name": r["name"],
-                "seed_weight": r["seed_weight"],
-                "distinguisher": r["distinguisher"],
-                "summary": _content_summary(r["name"], r["content"] or {}),
-                "action": r["action"],
-            }
-            for r in links
-        ]
-        return {
-            "match": "problem",
-            "problem": problem_name,
-            "match_confidence": confidence,
-            "solutions": solutions,
-            "note": problem_note or "seed_weight is a population prior — override it on direct evidence.",
-        }
-
-    return {
-        "match": "single",
-        "problem": top["name"],
-        "match_confidence": confidence,
-        "solutions": [{
-            "name": top["name"],
-            "seed_weight": None,
-            "distinguisher": None,
-            "summary": _content_summary(top["name"], top["content"] or {}),
-            "action": top["action"],
-        }],
-        "note": None,
-    }
 
 
 def _is_truthy(value) -> bool:

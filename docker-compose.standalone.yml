@@ -4,7 +4,7 @@
 # checkout bind-mounted over the image's /srv with PYTHONPATH=/srv so edits
 # are live without a rebuild (the image pip-installs `app` into site-packages,
 # which otherwise wins -- found 2026-09-18). Own pgdata volume per project
-# name, so it must be seeded once: `exec app python -m app.embed_and_load`.
+# name. (v043: the KB is loaded from seed/problems.json at import -- no seeding.)
 #
 #   docker compose -p v034 -f docker-compose.yml -f docker-compose.standalone.yml up -d --build
 services:
