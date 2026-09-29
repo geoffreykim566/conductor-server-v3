@@ -38,11 +38,11 @@ DECIDER_THINKING: dict | None = None
 # The tool_choice for the decider calls that must call a tool (a turn's first
 # call, the pick re-ask). Sonnet 5.5 / Opus 5.5 / Fable 5.1 reject forced
 # "any"/"tool" with a 400, so a variant on those models sets None (= auto).
-FORCED_TOOL_CHOICE: dict | None = {"type": "any"}
+FORCED_TOOL_CHOICE: dict | None = None
 # With auto (FORCED_TOOL_CHOICE None), re-ask once when the turn's first call
 # made no tool call -- the docs' replacement for forced tool use ("check that
 # one was made and retry if it wasn't").
-RETRY_NO_TOOL_FIRST_CALL = False
+RETRY_NO_TOOL_FIRST_CALL = True
 _TOOL_NUDGE = (
     "Call a tool before you answer: lookup_concept for a Logic Pro question or problem, the "
     "action the user asked for (each turn gets its own card, so queue it again even if an "
@@ -244,8 +244,9 @@ def _cand_key(name: str, inp: dict) -> str:
     return _attach_key(name, inp)
 
 
-def _bucket_candidates(trace: list[dict]) -> dict[str, str]:
-    """attach key of each candidate's action -> its problem bucket, for every
+def _bucket_candidates(trace: list[dict]) -> dict[str, tuple[str, str]]:
+    """attach key of each candidate's action -> (its problem bucket, its
+    solution), for every
     multi-candidate ('problem') lookup this turn, plus moderate single matches
     (PICK_ON_MODERATE_SINGLE). What tells a second pick from the same bucket
     (an alternative, refused) apart from a separate request, and what
@@ -267,7 +268,10 @@ def _bucket_candidates(trace: list[dict]) -> dict[str, str]:
             continue
         for sol in o.get("solutions") or []:
             for tool, inp in tools.action_calls(sol.get("action")):
-                out.setdefault(_cand_key(tool, inp), o.get("problem"))
+                # keyed by solution too: one solution can list several actions
+                # ("do both": buffer size + low latency mode), which are one
+                # candidate, not alternatives (found 2026-09-28)
+                out.setdefault(_cand_key(tool, inp), (o.get("problem"), sol.get("name")))
     return out
 
 
@@ -276,15 +280,15 @@ def _is_alternative_pick(name: str, inp: dict, trace: list[dict]) -> bool:
     candidates is already on the card -- a fallback, not a second request."""
     cands = _bucket_candidates(trace)
     key = _cand_key(name, inp)
-    problem = cands.get(key)
-    if problem is None:
+    mine = cands.get(key)
+    if mine is None:
         return False
-    return any(
-        c["tool"] in _ATTACH_TOOLS and c["output"].get("attached")
-        and cands.get(_cand_key(c["tool"], c["input"])) == problem
-        and _cand_key(c["tool"], c["input"]) != key
-        for c in trace
-    )
+    for c in trace:
+        other = cands.get(_cand_key(c["tool"], c["input"])) if c["tool"] in _ATTACH_TOOLS else None
+        if (other and c["output"].get("attached") and _cand_key(c["tool"], c["input"]) != key
+                and other[0] == mine[0] and other[1] != mine[1]):
+            return True
+    return False
 
 
 def _replace_span(card_steps: list, start: int, end: int, new: list, *span_maps: dict) -> None:

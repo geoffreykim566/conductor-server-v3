@@ -37,7 +37,7 @@ import time as _time
 
 from anthropic import AsyncAnthropic
 
-from app.config import CENTRAL_ANTHROPIC_KEY, MODEL, RESEARCH_CALL_TIMEOUT_S
+from app.config import CENTRAL_ANTHROPIC_KEY, RESEARCH_CALL_TIMEOUT_S, RESEARCH_MODEL
 
 log = logging.getLogger(__name__)
 
@@ -168,7 +168,7 @@ async def web_research(query: str) -> dict:
         try:
             response = await asyncio.wait_for(
                 _client.messages.create(
-                    model=MODEL,
+                    model=RESEARCH_MODEL,
                     max_tokens=2048,
                     system=_RESEARCH_SYSTEM,
                     messages=api_messages,

@@ -66,6 +66,8 @@ async def main() -> None:
         calls = sol.get("action") or []
         for call in (calls if isinstance(calls, list) else [calls]):
             name = call.get("open_setting")
+            if isinstance(name, dict):
+                name = name.get("name")
             if name is not None and name not in routes:
                 raise ValueError(f"{sol['name']!r} maps to open_setting {name!r}, which isn't in routes.json")
 
