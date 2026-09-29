@@ -111,7 +111,9 @@ def _ordered_subsequence(expected: list[dict], got: list[dict]) -> bool:
 
 def _actual_outcome(trace: list[dict], response_text: str = "", confidence_tier: str = "", sources: list | None = None,
                     auto_run: bool | None = None) -> dict:
-    lookup_calls = [c for c in trace if c["tool"] == "lookup_concept"]
+    # cite_kb (v043, KB in the prompt) carries lookup_concept's result shape,
+    # so every lookup-graded field grades a citation the same way.
+    lookup_calls = [c for c in trace if c["tool"] in ("lookup_concept", "cite_kb")]
     walkthrough_calls = [c for c in trace if c["tool"] == "get_walkthrough"]
     # web_research_called: fire/no-fire grading for the new tool (v3-log.md
     # 2026-09-04) -- the trigger is entirely model-decided (prompt.py + the
@@ -193,6 +195,49 @@ def _actual_outcome(trace: list[dict], response_text: str = "", confidence_tier:
         # None on a build that predates it, which fails any auto_run assert).
         "auto_run": auto_run,
     }
+
+
+# A menu path as answers write it: "File > Project Settings > Audio". Items
+# start with a capital or digit; later words may be lowercase connectors.
+_PATH_ITEM = r"[A-Z0-9][\w&/.'’…-]*(?: (?:[A-Z0-9][\w&/.'’…-]*|and|of|to|in|for|as|or|with))*"
+_MENU_PATH = re.compile(_PATH_ITEM + r"(?:\s*>\s*" + _PATH_ITEM + r")+")
+_TRAILING = re.compile(r"(?: (?:and|of|to|in|for|as|or|with))+$")
+
+
+def _norm_path(text: str) -> str:
+    text = text.lower().replace("…", "").replace("...", "")
+    return re.sub(r"\s*>\s*", " > ", re.sub(r"\s+", " ", text)).strip()
+
+
+def _route_chains() -> list[str]:
+    from app import tools
+    chains = []
+    for route in tools.ROUTES.values():
+        menus = [st["value"] for st in route.get("path") or [] if st.get("type") == "menu"]
+        if len(menus) > 1:
+            chains.append(_norm_path(" > ".join(menus)))
+        chains.append(_norm_path(route.get("desc") or ""))
+    return chains
+
+
+def ungrounded_paths(trace: list[dict], response_text: str) -> list[str]:
+    """Menu paths ("X > Y") the answer states that appear neither in the text
+    of any tool result this turn (a lookup's or citation's KB entries, a route
+    card's steps) nor in an approved route. Reported for both sides of the
+    2026-09-28 KB-in-prompt A/B, not asserted: a path the model knew from the
+    KB but didn't cite counts as ungrounded, which is the point."""
+    source = _norm_path(" ".join(json.dumps(c.get("output"), ensure_ascii=False) for c in trace))
+    chains = _route_chains()
+    out = []
+    for m in _MENU_PATH.finditer(response_text or ""):
+        first, *rest = _norm_path(_TRAILING.sub("", m.group(0))).split(" > ")
+        # The first item can swallow sentence words ("Go to File > ..."), so
+        # every tail of it is tried: grounded if any version is.
+        words = first.split()
+        versions = [" > ".join([" ".join(words[k:])] + rest) for k in range(len(words))]
+        if not any(v in source or any(v in ch for ch in chains) for v in versions):
+            out.append(versions[-1])
+    return out
 
 
 def _membership_pass(expected, attached: list[str]) -> bool:
@@ -317,7 +362,7 @@ async def run_scenario(scenario: dict) -> dict:
         for call in result.trace:
             print(f"    tool call: {call['tool']}({call['input']})")
             out = call["output"]
-            if call["tool"] == "lookup_concept":
+            if call["tool"] in ("lookup_concept", "cite_kb"):
                 print(f"      -> match={out.get('match')!r} problem={out.get('problem')!r} confidence={out.get('match_confidence')!r}")
                 for sol in out.get("solutions", []):
                     print(f"         solution: {sol['name']!r} weight={sol.get('seed_weight')} "
