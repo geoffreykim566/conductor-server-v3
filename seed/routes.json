@@ -558,9 +558,15 @@
       }
     ],
     "choice": {
-      "options": [],
+      "options": [
+        "Flex Off",
+        "Flex On, Smart Tempo Off",
+        "Flex On, Smart Tempo On",
+        "Flex On, ST On + Align Bars",
+        "Flex On, ST On + Align Bars and Beats"
+      ],
       "ordered": false,
-      "model_may_pick": []
+      "model_may_pick": ["Flex Off"]
     }
   },
   "smart tempo settings": {
