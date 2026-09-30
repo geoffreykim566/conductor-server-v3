@@ -528,6 +528,14 @@ def test_dropdown_routes() -> None:
     assert _setting("flex time", "mono", said="the vocal timing is off")["chooses"] == "Monophonic"
     assert _setting("flex time", "Speed (FX)", said="fix the timing")["attached"] is False
     assert _setting("flex time", "Speed (FX)", said="set flex to speed")["chooses"] == "Speed (FX)"
+    # Flex pitch = the same popup, fixed option: it ends on a choose step (a plain
+    # click on the option lost the popup to the client's open-menu cleanup, live
+    # 09-30), carrying the route for Revert; it takes no value.
+    out = _setting("flex pitch")
+    assert out["chooses"] == "Flex Pitch" and out["steps"][-1]["choose"] == "Flex Pitch", out
+    assert out["steps"][-1]["reopen"] == out["steps"][:-1] and len(out["steps"]) == 3, out
+    assert not any(s.get("click_text") == "Flex Pitch" for s in out["steps"]), out
+    assert _setting("flex pitch", "Monophonic")["attached"] is False
     # Region Smart Tempo: pane only keeps the dropped row as the Region click's
     # `expect` (the client skips the toggling click when the row already shows).
     assert _setting("follow tempo")["steps"] == [

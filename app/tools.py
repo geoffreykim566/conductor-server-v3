@@ -584,6 +584,14 @@ def queue_open_setting(inp: dict, ax_fixture: dict | None = None) -> dict:
             if choice.get("shows"):   # the control's shorter display, for the read-back
                 pick["shows"] = dict(choice["shows"])
             steps = steps + [pick]
+    # A route whose target is one fixed option of a dropdown ("flex pitch" =
+    # the Flex mode popup's Flex Pitch) ends on a choose step, not a click on
+    # the option: the client closes any menu left open before every step but
+    # a choose (found live 2026-09-30 -- the click never saw the popup), and a
+    # choose reads back and ledgers the old value for Revert.
+    if route.get("picks") and choice is None:
+        chosen = route["picks"]
+        steps = steps + [{"choose": chosen, "reopen": list(steps)}]
     # `destination` keeps the result shape pipeline._backfill_walkthrough
     # recognises (attached + destination + steps).
     out = {"attached": True, "action": "open_setting", "destination": name, "steps": steps}

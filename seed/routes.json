@@ -139,12 +139,9 @@
           "Tempophone (FX)",
           "Flex Pitch"
         ]
-      },
-      {
-        "type": "click_text",
-        "value": "Flex Pitch"
       }
-    ]
+    ],
+    "picks": "Flex Pitch"
   },
   "flex time": {
     "desc": "Click the Flex button on the track header (or press Cmd+F) to open the Flex dropdown",
