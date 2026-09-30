@@ -21,9 +21,9 @@ DATABASE_URL = os.environ.get(
 # tool_choice, so the pipeline asks with auto and re-asks once when the first
 # call makes no tool call (pipeline.FORCED_TOOL_CHOICE / RETRY_NO_TOOL_FIRST_CALL).
 MODEL = "claude-sonnet-5-5"
-# web_research's nested call stays on Sonnet 5 until research is tested on 5.5
-# (the A/B only swapped the decider).
-RESEARCH_MODEL = "claude-sonnet-5"
+# web_research's nested call: Sonnet 5.5 too (2026-09-29, user call). On Sonnet 5
+# it timed out at 150 s on 4 of ~8 battery research calls (09-29 merged run).
+RESEARCH_MODEL = "claude-sonnet-5-5"
 MAX_TOKENS = 3072
 
 # web_research tool's own nested Sonnet + web_search call (see app/research.py).
