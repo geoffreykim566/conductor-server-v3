@@ -399,6 +399,17 @@ def test_is_question() -> None:
     print(f"PASS: _is_question on {len(questions)} questions and {len(instructions)} instructions.")
 
 
+def test_is_undo_request() -> None:
+    requests = ["undo that", "revert", "Revert it.", "can you undo that", "put it back", "change that back please"]
+    not_requests = ["how do i undo a cut in logic", "how do i revert an audio region back to how it was",
+                    "what does revert do", "undo that?", "set the buffer to 256"]
+    for t in requests:
+        assert pipeline._is_undo_request(pipeline._last_user_text([{"role": "user", "content": t}])), t
+    for t in not_requests:
+        assert not pipeline._is_undo_request(pipeline._last_user_text([{"role": "user", "content": t}])), t
+    print(f"PASS: _is_undo_request on {len(requests)} requests and {len(not_requests)} non-requests.")
+
+
 async def test_first_call_is_any() -> None:
     _, calls = await _run([_resp(_open("Compressor", "a1")), _resp(_text("done"))])
     assert calls[0]["tool_choice"] == {"type": "any"}, calls[0].get("tool_choice")
@@ -679,6 +690,7 @@ async def main() -> None:
     await test_one_visit_per_setting()
     await test_resume_keeps_replacements()
     test_is_question()
+    test_is_undo_request()
     test_card_descriptions()
     await test_actions_combine_same_response()
     await test_actions_combine_across_iterations()

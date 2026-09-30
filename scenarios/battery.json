@@ -1974,5 +1974,67 @@
         "text": "where do i change the smart tempo default for imported files"
       }
     ]
+  },
+  {
+    "name": "revert_typed_points_to_button",
+    "note": "2026-09-29 (user call): typed undo/revert is denied for now -- no action call; the reply says it can't yet and points at the card's Revert button. Live 09-26, typed 'revert' made the decider call set_param on 'Region Inspector' and the reply claimed Smart Tempo was turned off.",
+    "turns": [
+      {
+        "text": "set the buffer to 256"
+      },
+      {
+        "text": "undo that"
+      }
+    ],
+    "expect": {
+      "no_action_calls": true,
+      "response_contains_any": [
+        "revert"
+      ],
+      "no_completion_claims": true
+    }
+  },
+  {
+    "name": "revert_typed_nothing_changed",
+    "note": "2026-09-29 (user call): typed undo/revert is denied for now -- no action call; the reply says it can't yet and points at the card's Revert button. Live 09-26, typed 'revert' made the decider call set_param on 'Region Inspector' and the reply claimed Smart Tempo was turned off.",
+    "turns": [
+      {
+        "text": "revert"
+      }
+    ],
+    "expect": {
+      "no_action_calls": true,
+      "no_completion_claims": true
+    }
+  },
+  {
+    "name": "undo_howto_question_not_denied",
+    "note": "2026-09-29: the writer's typed-revert denial ('can't do that yet') must not fire on a how-to question about undoing something in Logic itself.",
+    "turns": [
+      {
+        "text": "how do i undo a cut in logic"
+      }
+    ],
+    "expect": {
+      "response_not_contains": [
+        "can't do that yet",
+        "press revert"
+      ]
+    }
+  },
+  {
+    "name": "revert_region_howto_not_denied",
+    "note": "2026-09-29: the writer's typed-revert denial ('can't do that yet') must not fire on a how-to question about undoing something in Logic itself.",
+    "turns": [
+      {
+        "text": "how do i revert an audio region back to how it was before i edited it"
+      }
+    ],
+    "expect": {
+      "response_not_contains": [
+        "can't do that yet",
+        "press revert"
+      ]
+    }
   }
 ]

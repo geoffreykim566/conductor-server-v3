@@ -173,6 +173,19 @@ def _is_question(text: str) -> bool:
     return text.endswith("?") or bool(_QUESTION_START.match(text) or _QUESTION_ANYWHERE.search(text))
 
 
+# Typed undo/revert is denied for now (user call 2026-09-29): the card's own
+# Revert button stays available. Only an instruction to Conductor counts --
+# "how do i undo a cut in logic" is a Logic question and answered normally
+# (a writer-prompt rule fired on it 2/2).
+_UNDO_REQUEST = re.compile(
+    r"\b(?:undo|revert|(?:put|change|set|switch|turn) (?:it|that|this|them|those) back)\b"
+)
+
+
+def _is_undo_request(text: str) -> bool:
+    return bool(text) and not _is_question(text) and bool(_UNDO_REQUEST.search(text))
+
+
 def _auto_run_ok(messages: list[dict], card: list | None) -> bool:
     if not card:
         return False
@@ -914,6 +927,13 @@ async def _finalize_answer(
             "the selected track\" / \"This opens Y\"), never as done, and don't list manual "
             "steps for it -- the card does it. Don't mention anything not listed above.\n\n"
             + text
+        )
+    if _is_undo_request(_last_user_text(prior_messages)):
+        facts = (
+            "The user asked you to undo or revert a change. You can't do that by message yet: "
+            "say so in one short sentence, and that they can scroll up to that change's card "
+            "and press Revert. Don't suggest any other way to undo it, and don't say anything "
+            "was undone.\n\n" + facts
         )
     # Only "moderate" gets the hedge facts injected below -- "research" is
     # trusted the same as "strong" (see _confidence_tier's 2026-09-04 note) and
