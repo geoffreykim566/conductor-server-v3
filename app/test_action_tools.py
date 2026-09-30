@@ -163,7 +163,9 @@ async def test_early_exit_after_citation() -> None:
     _, calls = await _run([_resp(_text("Could be a few things."), _tool_use("cite_kb", {"entries": ["crackling"]}, "l1")),
                            _resp(_text("prose")), _resp(_tool_use("ask_clarifying_question", {}, "q1"))],
                           lookups=crackling, early_exit=True)
-    assert len(calls) == 3 and calls[2]["tool_choice"] == {"type": "any"}, [c.get("tool_choice") for c in calls]
+    # the pick re-ask: pipeline.FORCED_TOOL_CHOICE (auto on Sonnet 5.5) + the nudge
+    assert len(calls) == 3 and calls[2].get("tool_choice") == pipeline.FORCED_TOOL_CHOICE, [c.get("tool_choice") for c in calls]
+    assert pipeline._PICK_NUDGE in calls[2]["system"][-1]["text"], calls[2]
     print("PASS: early exit -- a citation with its explanation ends the turn; no text or an unpicked bucket loops.")
 
 
@@ -236,7 +238,7 @@ async def test_pick_or_ask() -> None:
         _resp(_tool_use("open_setting", {"name": "buffer size"}, "w1")),
         _resp(_text("Raise the buffer size.")),
     ], lookups=crackling)
-    assert calls[2]["tool_choice"] == {"type": "any"} and pipeline._PICK_NUDGE in calls[2]["system"][-1]["text"], calls[2]
+    assert calls[2].get("tool_choice") == pipeline.FORCED_TOOL_CHOICE and pipeline._PICK_NUDGE in calls[2]["system"][-1]["text"], calls[2]
     assert result.walkthrough_steps == _route("buffer size"), result.walkthrough_steps
     # Asked once only: a second prose-only answer ends the turn with no card.
     result, calls = await _run([
@@ -251,6 +253,23 @@ async def test_pick_or_ask() -> None:
     ], lookups=crackling)
     assert len(calls) == 2, len(calls)
     print("PASS: after a bucket lookup the turn can't end on prose alone -- one forced re-ask; a question counts.")
+
+
+async def test_one_solutions_actions_are_not_alternatives() -> None:
+    # A solution whose fix is "do both" lists two actions; queuing the second
+    # isn't picking a competing candidate (found 2026-09-28: the latency fix's
+    # Low Latency Monitoring step was refused as an alternative to its buffer step).
+    both = [{"open_setting": {"name": "buffer size", "value": "smaller"}}, {"open_setting": "low latency monitoring mode"}]
+    lookups = [{"match": "problem", "problem": "high latency while monitoring", "match_confidence": "moderate",
+                "solutions": [{"name": "recording latency and monitoring delay", "action": both}]}]
+    result, _ = await _run([_resp(_tool_use("lookup_concept", {"problem": "x"}, "l1")),
+                            _resp(_tool_use("open_setting", {"name": "buffer size", "value": "smaller"}, "w1"),
+                                  _tool_use("open_setting", {"name": "low latency monitoring mode"}, "w2")),
+                            _resp(_text("ok"))], lookups=lookups,
+                           messages=[{"role": "user", "content": "i hear myself delayed when i sing"}])
+    refused = [c for c in result.trace if c["tool"] == "open_setting" and not c["output"].get("attached")]
+    assert not refused, refused
+    print("PASS: two actions of one solution both join the card; only another solution's action is an alternative.")
 
 
 async def test_alternative_pick_refused_separate_request_joins() -> None:
@@ -423,7 +442,7 @@ def test_is_question() -> None:
 
 async def test_first_call_not_forced() -> None:
     _, calls = await _run([_resp(_text("hi"))])
-    assert calls[0].get("tool_choice") is None, calls[0].get("tool_choice")
+    assert calls[0].get("tool_choice") is None and len(calls) == 1, calls[0].get("tool_choice")
     card_turn = [
         {"role": "user", "content": "how do i open channel eq"},
         {"role": "assistant", "content": [{"type": "tool_use", "id": "a0", "name": "open_plugin",
@@ -432,11 +451,28 @@ async def test_first_call_not_forced() -> None:
                                       "content": json.dumps({"attached": True, "steps": []})}]},
         {"role": "assistant", "content": [{"type": "text", "text": "This opens Channel EQ."}]},
     ]
-    for text, forced in (("yes please, do it for me", True), ("thanks!", False), ("what does it do?", False)):
-        _, calls = await _run([_resp(_open("Channel EQ", "a1")), _resp(_text("ok"))],
-                              messages=card_turn + [{"role": "user", "content": text}])
-        assert (calls[0].get("tool_choice") == {"type": "any"}) == forced, (text, calls[0].get("tool_choice"))
-    print("PASS: the first call is free, except a go-ahead after a card (forced, so it re-queues).")
+    go_ahead = card_turn + [{"role": "user", "content": "yes please, do it for me"}]
+    # Sonnet 5.5 (2026-09-28) rejects forced tool_choice: a go-ahead's first call
+    # is auto, and one that makes no tool call is re-asked once with a nudge.
+    result, calls = await _run([_resp(_text("Press Run.")), _resp(_open("Channel EQ", "a1")), _resp(_text("ok"))],
+                               messages=go_ahead)
+    assert calls[0].get("tool_choice") is None, calls[0].get("tool_choice")
+    assert pipeline._TOOL_NUDGE in str(calls[1].get("system")), calls[1].get("system")
+    assert result.walkthrough_steps, result.walkthrough_steps
+    # Not a go-ahead: no re-ask. Flag off: no re-ask either.
+    for text in ("thanks!", "what does it do?"):
+        _, calls = await _run([_resp(_text("ok"))], messages=card_turn + [{"role": "user", "content": text}])
+        assert len(calls) == 1, (text, len(calls))
+    with patch.object(pipeline, "RETRY_NO_TOOL_FIRST_CALL", False):
+        result, calls = await _run([_resp(_text("Press Run."))], messages=go_ahead)
+    assert len(calls) == 1 and not result.walkthrough_steps, len(calls)
+    # Sonnet 5 knob: forced any on the go-ahead only.
+    with patch.object(pipeline, "FORCED_TOOL_CHOICE", {"type": "any"}):
+        for text, forced in (("yes please, do it for me", True), ("thanks!", False)):
+            _, calls = await _run([_resp(_open("Channel EQ", "a1")), _resp(_text("ok"))],
+                                  messages=card_turn + [{"role": "user", "content": text}])
+            assert (calls[0].get("tool_choice") == {"type": "any"}) == forced, (text, calls[0].get("tool_choice"))
+    print("PASS: the first call is free; a go-ahead after a card is re-asked once without a tool call (forced any switchable).")
 
 
 async def test_resume_restores_actions() -> None:
@@ -670,6 +706,7 @@ async def main() -> None:
     await test_route_toggle_gate()
     await test_pick_or_ask()
     await test_alternative_pick_refused_separate_request_joins()
+    await test_one_solutions_actions_are_not_alternatives()
     await test_resume_restores_lookup_queued_action()
     await test_endorsing_a_lookup_queued_action()
     await test_a_lookup_turn_never_auto_runs()

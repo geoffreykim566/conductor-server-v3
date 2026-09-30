@@ -16,7 +16,14 @@ DAILY_BUDGET_USD = float(os.environ.get("DAILY_BUDGET_USD", "10"))
 DATABASE_URL = os.environ.get(
     "DATABASE_URL", "postgresql://conductor:conductor@localhost:5432/conductor"
 )
-MODEL = "claude-sonnet-5"
+# Decider model. Sonnet 5.5 (2026-09-28 A/B, log.md): same graded quality as
+# Sonnet 5 with forced tool_choice, ~30% faster decider calls. It rejects forced
+# tool_choice, so the pipeline asks with auto and re-asks once when the first
+# call makes no tool call (pipeline.FORCED_TOOL_CHOICE / RETRY_NO_TOOL_FIRST_CALL).
+MODEL = "claude-sonnet-5-5"
+# web_research's nested call stays on Sonnet 5 until research is tested on 5.5
+# (the A/B only swapped the decider).
+RESEARCH_MODEL = "claude-sonnet-5"
 MAX_TOKENS = 3072
 
 # web_research tool's own nested Sonnet + web_search call (see app/research.py).

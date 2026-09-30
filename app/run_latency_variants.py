@@ -34,17 +34,28 @@ from app import run_graded_battery as battery
 # any variant touches is reset to its import-time value before each turn, so
 # variants can't leak into each other.
 VARIANTS: dict[str, dict] = {
-    "A": {},                              # pipeline as is
+    "A": {},                              # pipeline as is (Sonnet 5.5 since 2026-09-28)
     "A3": {"LOOKUP_ATTEMPT_LIMIT": 3},    # one fewer lookup before the cap
     # Decider model / effort A/B (2026-09-24). Each pins both knobs, since
     # the pipeline defaults moved to medium + early exit after this A/B.
     # Writer and web_research's own nested call are untouched in all of
     # these. Haiku 4.5 rejects effort and runs without thinking by default.
-    "S5": {"DECIDER_EFFORT": None, "EARLY_EXIT_ON_ACTION": False},
-    "S5med": {"DECIDER_EFFORT": "medium", "EARLY_EXIT_ON_ACTION": False},
-    "S5low": {"DECIDER_EFFORT": "low", "EARLY_EXIT_ON_ACTION": False},
+    "S5": {"MODEL": "claude-sonnet-5", "FORCED_TOOL_CHOICE": {"type": "any"}, "RETRY_NO_TOOL_FIRST_CALL": False, "DECIDER_EFFORT": None, "EARLY_EXIT_ON_ACTION": False},
+    "S5med": {"MODEL": "claude-sonnet-5", "FORCED_TOOL_CHOICE": {"type": "any"}, "RETRY_NO_TOOL_FIRST_CALL": False, "DECIDER_EFFORT": "medium", "EARLY_EXIT_ON_ACTION": False},
+    "S5low": {"MODEL": "claude-sonnet-5", "FORCED_TOOL_CHOICE": {"type": "any"}, "RETRY_NO_TOOL_FIRST_CALL": False, "DECIDER_EFFORT": "low", "EARLY_EXIT_ON_ACTION": False},
     "H45": {"MODEL": "claude-haiku-4-5-20251001", "DECIDER_EFFORT": None, "EARLY_EXIT_ON_ACTION": False},
-    "S5medEE": {"DECIDER_EFFORT": "medium", "EARLY_EXIT_ON_ACTION": True},
+    "S5medEE": {"MODEL": "claude-sonnet-5", "FORCED_TOOL_CHOICE": {"type": "any"}, "RETRY_NO_TOOL_FIRST_CALL": False, "DECIDER_EFFORT": "medium", "EARLY_EXIT_ON_ACTION": True},
+    # Sonnet 5 vs 5.5, only the model differs (2026-09-28): both on the current
+    # pipeline (medium, early exit) with an auto first call, since Sonnet 5.5
+    # rejects forced tool_choice. S55med-retry adds one re-ask when the first
+    # call makes no tool call. Thinking: each model's default (adaptive).
+    "S5med-cur": {"MODEL": "claude-sonnet-5", "DECIDER_EFFORT": "medium", "EARLY_EXIT_ON_ACTION": True,
+                  "FORCED_TOOL_CHOICE": {"type": "any"}, "RETRY_NO_TOOL_FIRST_CALL": False},
+    "S5med-auto": {"MODEL": "claude-sonnet-5", "RETRY_NO_TOOL_FIRST_CALL": False, "DECIDER_EFFORT": "medium", "EARLY_EXIT_ON_ACTION": True, "FORCED_TOOL_CHOICE": None},
+    "S55med-auto": {"MODEL": "claude-sonnet-5-5", "DECIDER_EFFORT": "medium", "EARLY_EXIT_ON_ACTION": True,
+                    "FORCED_TOOL_CHOICE": None, "RETRY_NO_TOOL_FIRST_CALL": False},
+    "S55med-retry": {"MODEL": "claude-sonnet-5-5", "DECIDER_EFFORT": "medium", "EARLY_EXIT_ON_ACTION": True,
+                     "FORCED_TOOL_CHOICE": None, "RETRY_NO_TOOL_FIRST_CALL": True},
 }
 
 # $/MTok (input, output); cache read 0.1x input, cache write 1.25x (5m TTL).

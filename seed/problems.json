@@ -184,7 +184,10 @@
         "fix": "macOS System Settings > Privacy & Security > Microphone \u2014 toggle Logic Pro on. After granting access, quit and relaunch Logic Pro \u2014 macOS does not apply a newly granted permission to an already-running process."
       },
       "kind": "diagnosis",
-      "aliases": []
+      "aliases": [
+        "meters dont move at all",
+        "no input signal even with a different mic"
+      ]
     },
     {
       "name": "recording latency and monitoring delay",
@@ -192,14 +195,22 @@
       "content": {
         "symptom": "you can hear yourself delayed by 20\u201350ms or more when singing or playing through Logic with software monitoring active; recorded audio appears slightly late on the timeline",
         "cause": "the I/O buffer size is too large, or plugins with high latency in the channel strip are adding monitoring delay (PDC)",
-        "fix": "Step 1: Reduce the I/O buffer size to 64 or 128 samples. Step 2: Choose Record > Low Latency Monitoring Mode to bypass latency-adding plugins on record-enabled tracks. Step 3: If your interface supports direct monitoring, use that instead.",
+        "fix": "Do both while recording: lower the I/O buffer size (64 or 128 samples) and turn on Record > Low Latency Monitoring Mode, which bypasses latency-adding plugins on record-enabled tracks. A smaller buffer adds CPU load -- raise it again for mixing if the project starts to crackle or overload -- and bypassed plugins (reverb, tuning) won't be heard in the headphones while it's on. If the audio interface has direct monitoring, that avoids the delay entirely.",
         "do_not": "do not leave a large buffer and try to sing or play along to the delayed signal \u2014 the perceived delay will affect your performance and the recorded timing"
       },
       "kind": "diagnosis",
       "aliases": [],
-      "action": {
-        "open_setting": "low latency monitoring mode"
-      }
+      "action": [
+        {
+          "open_setting": {
+            "name": "buffer size",
+            "value": "smaller"
+          }
+        },
+        {
+          "open_setting": "low latency monitoring mode"
+        }
+      ]
     },
     {
       "name": "buffer size",
@@ -1468,6 +1479,24 @@
       "aliases": []
     },
     {
+      "name": "pitch correction plugin",
+      "tier": "established",
+      "content": {
+        "fix": "Load Logic's Pitch Correction plugin on the vocal track -- it corrects pitch automatically across the whole track in real time, the classic auto-tune approach. Set it to the song's key or scale; a fast response gives the hard, robotic auto-tune sound, a slower one a more natural correction.",
+        "do_not": "for fixing a few specific wrong notes by hand, use Flex Pitch instead -- Pitch Correction treats the whole track"
+      },
+      "kind": "diagnosis",
+      "aliases": [
+        "auto-tune plugin",
+        "autotune effect"
+      ],
+      "action": {
+        "open_plugin": {
+          "plugin": "Pitch Correction"
+        }
+      }
+    },
+    {
       "name": "flex pitch vocal tuning",
       "tier": "established",
       "content": {
@@ -1648,7 +1677,9 @@
         "cant hear my mic in logic",
         "recording isnt picking up any sound",
         "input meters not moving",
-        "mic not working in logic pro"
+        "mic not working in logic pro",
+        "no input signal at all",
+        "input meters dont move"
       ],
       "solutions": [
         {
@@ -2168,12 +2199,17 @@
         "pitch correct a vocal recording",
         "fix a wrong note in a vocal take"
       ],
-      "note": "single common cause \u2014 individual notes need pitch-by-pitch correction; Flex Pitch handles this without re-recording.",
+      "note": "two approaches: automatic whole-track correction or the auto-tune effect (Pitch Correction plugin), or fixing specific notes by hand (Flex Pitch).",
       "solutions": [
         {
+          "ref": "pitch correction plugin",
+          "seed_weight": 60,
+          "distinguisher": "wants auto-tune: automatic correction of the whole vocal, or the hard-tuned effect"
+        },
+        {
           "ref": "flex pitch vocal tuning",
-          "seed_weight": 100,
-          "distinguisher": null
+          "seed_weight": 40,
+          "distinguisher": "wants to fix specific notes by hand (one flat note, a wrong pitch in a take)"
         }
       ]
     },

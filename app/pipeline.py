@@ -35,6 +35,19 @@ MAX_ITERATIONS = 6
 # median, ~7% cheaper; "low" was no faster and failed across more scenarios.
 DECIDER_EFFORT: str | None = "medium"
 DECIDER_THINKING: dict | None = None
+# The tool_choice for the decider calls that must call a tool (a go-ahead's
+# first call -- see _force_first_call -- and the pick re-ask). Sonnet 5.5 / Opus 5.5 / Fable 5.1 reject forced
+# "any"/"tool" with a 400, so a variant on those models sets None (= auto).
+FORCED_TOOL_CHOICE: dict | None = None
+# With auto (FORCED_TOOL_CHOICE None), re-ask once when the turn's first call
+# made no tool call -- the docs' replacement for forced tool use ("check that
+# one was made and retry if it wasn't").
+RETRY_NO_TOOL_FIRST_CALL = True
+_TOOL_NUDGE = (
+    "Call a tool before you answer: the action the user just agreed to (each turn gets its own "
+    "card, so queue it again even if an earlier reply offered it), or ask_clarifying_question "
+    "if you can't tell what they want run."
+)
 
 # End the turn right after an iteration whose tool calls were all successful
 # card actions, skipping the decider's prose-only follow-up call (see the
@@ -195,8 +208,9 @@ def _cand_key(name: str, inp: dict) -> str:
     return _attach_key(name, inp)
 
 
-def _bucket_candidates(trace: list[dict]) -> dict[str, str]:
-    """attach key of each candidate's action -> its problem bucket, for every
+def _bucket_candidates(trace: list[dict]) -> dict[str, tuple[str, str]]:
+    """attach key of each candidate's action -> (its problem bucket, its
+    solution), for every
     multi-candidate ('problem') lookup this turn, plus moderate single matches
     (PICK_ON_MODERATE_SINGLE). What tells a second pick from the same bucket
     (an alternative, refused) apart from a separate request, and what
@@ -218,7 +232,10 @@ def _bucket_candidates(trace: list[dict]) -> dict[str, str]:
             continue
         for sol in o.get("solutions") or []:
             for tool, inp in tools.action_calls(sol.get("action")):
-                out.setdefault(_cand_key(tool, inp), o.get("problem"))
+                # keyed by solution too: one solution can list several actions
+                # ("do both": buffer size + low latency mode), which are one
+                # candidate, not alternatives (found 2026-09-28)
+                out.setdefault(_cand_key(tool, inp), (o.get("problem"), sol.get("name")))
     return out
 
 
@@ -227,15 +244,15 @@ def _is_alternative_pick(name: str, inp: dict, trace: list[dict]) -> bool:
     candidates is already on the card -- a fallback, not a second request."""
     cands = _bucket_candidates(trace)
     key = _cand_key(name, inp)
-    problem = cands.get(key)
-    if problem is None:
+    mine = cands.get(key)
+    if mine is None:
         return False
-    return any(
-        c["tool"] in _ATTACH_TOOLS and c["output"].get("attached")
-        and cands.get(_cand_key(c["tool"], c["input"])) == problem
-        and _cand_key(c["tool"], c["input"]) != key
-        for c in trace
-    )
+    for c in trace:
+        other = cands.get(_cand_key(c["tool"], c["input"])) if c["tool"] in _ATTACH_TOOLS else None
+        if (other and c["output"].get("attached") and _cand_key(c["tool"], c["input"]) != key
+                and other[0] == mine[0] and other[1] != mine[1]):
+            return True
+    return False
 
 
 def _replace_span(card_steps: list, start: int, end: int, new: list, *span_maps: dict) -> None:
@@ -1366,7 +1383,8 @@ async def _respond(
     # (tool_choice any/tool) makes the API suppress text before the tool call,
     # which would cost a second decider call just to write the explanation.
     # An answer with no citation is simply ungrounded -- the battery's
-    # ungrounded-path metric measures it. One exception: _force_first_call.
+    # ungrounded-path metric measures it. One exception: _force_first_call
+    # (re-asked once via RETRY_NO_TOOL_FIRST_CALL when FORCED_TOOL_CHOICE is None).
     force_first = _force_first_call(messages)
     for i in range(MAX_ITERATIONS):
         iter_text = ""
@@ -1387,11 +1405,20 @@ async def _respond(
         else:
             if on_status:
                 await on_status("Thinking…")
-            tool_choice = {"type": "any"} if i == 0 and force_first else None
+            tool_choice = FORCED_TOOL_CHOICE if i == 0 and force_first else None
             resp = await _call_model(system, tools.TOOLS, _with_screenshots(msgs), None, tool_choice)
             usage.append(_usage_dict(resp.usage))
             tool_uses = [b for b in resp.content if b.type == "tool_use"]
             iter_text = "".join(b.text for b in resp.content if b.type == "text")
+            if (i == 0 and force_first and not tool_uses and tool_choice is None
+                    and RETRY_NO_TOOL_FIRST_CALL):
+                resp = await _call_model(
+                    system + [{"type": "text", "text": "\n\n" + _TOOL_NUDGE}],
+                    tools.TOOLS, _with_screenshots(msgs), None, None,
+                )
+                usage.append(_usage_dict(resp.usage))
+                tool_uses = [b for b in resp.content if b.type == "tool_use"]
+                iter_text = "".join(b.text for b in resp.content if b.type == "text")
             if not tool_uses and not pick_forced and _needs_pick(trace, card_steps):
                 # About to end on prose after citing a bucket whose candidates
                 # all map to actions: once per turn, re-ask with a tool call
@@ -1401,7 +1428,7 @@ async def _respond(
                 pick_forced = True
                 resp = await _call_model(
                     system + [{"type": "text", "text": "\n\n" + _PICK_NUDGE}],
-                    tools.TOOLS, _with_screenshots(msgs), None, {"type": "any"},
+                    tools.TOOLS, _with_screenshots(msgs), None, FORCED_TOOL_CHOICE,
                 )
                 usage.append(_usage_dict(resp.usage))
                 tool_uses = [b for b in resp.content if b.type == "tool_use"]
