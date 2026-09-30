@@ -6,7 +6,7 @@
       "content": {
         "symptom": "the entire project plays back sped up or slowed down and pitched up or down accordingly (like a record at the wrong RPM) \u2014 not just one region, and not fixed by changing tempo or Smart Tempo settings",
         "cause": "the project's sample rate doesn't match the audio interface's actual output sample rate \u2014 Logic's engine and the interface disagree on how many samples per second make up a second of audio, so playback runs at the wrong rate",
-        "fix": "Step 1: Open File > Project Settings > Audio and check the project's Sample Rate. Step 2: Open macOS Audio MIDI Setup (Spotlight search) and confirm the interface's own sample rate matches \u2014 some interfaces have a hardware switch or their own control panel that can override what Logic requests. Step 3: Set both to the same value (44.1 kHz and 48 kHz are the most common) and restart playback.",
+        "fix": "Step 1: Open the Project Settings Audio tab and check the project's Sample Rate. Step 2: Open macOS Audio MIDI Setup (Spotlight search) and confirm the interface's own sample rate matches \u2014 some interfaces have a hardware switch or their own control panel that can override what Logic requests. Step 3: Set both to the same value (44.1 kHz and 48 kHz are the most common) and restart playback.",
         "do_not": "do not chase this as a tempo or Smart Tempo problem \u2014 tempo changes preserve pitch (time-stretching), a true sample-rate mismatch does not; if speed and pitch are both off together, it's the sample rate, not the tempo"
       },
       "kind": "diagnosis",
@@ -21,14 +21,17 @@
       "content": {
         "symptom": "a sample or recorded audio region sounds warped, sped up, or slowed down after being imported or after changing the project tempo",
         "cause": "Logic's Smart Tempo is set to 'Keep' or 'Automatic' and is stretching the audio to match the project tempo",
-        "fix": "To fix one region: select it, open the Region Inspector (press I), click the 'Region:' disclosure header to expand it if needed, and set the 'Smart Tempo' dropdown to Off. To prevent it for all future imports: File > Project Settings > Smart Tempo > set 'Set Imported Files To' to Flex Off.",
+        "fix": "To fix one region: select it, open the Region Inspector (press I), click the 'Region:' disclosure header to expand it if needed, and set the 'Smart Tempo' dropdown to Off. To prevent it for all future imports: in the Project Settings Smart Tempo tab, set 'Set Imported Files To' to Flex Off.",
         "do_not": "do not change the project tempo to try to match the audio \u2014 this affects the whole project"
       },
       "kind": "diagnosis",
       "aliases": [],
       "action": {
         "open_setting": "follow tempo"
-      }
+      },
+      "where": [
+        "smart tempo import default"
+      ]
     },
     {
       "name": "muddy bass",
@@ -110,7 +113,7 @@
       "content": {
         "symptom": "meters move but no audio from speakers or headphones",
         "cause": "output routing mismatch, muted master, or wrong audio device selected",
-        "fix": "check the master fader is not muted; open Logic Pro > Settings > Audio and confirm the Output Device matches your interface or headphones; check the stereo output channel strip in the Mixer is not muted",
+        "fix": "check the master fader is not muted; open the Audio settings and confirm the Output Device matches your interface or headphones; check the stereo output channel strip in the Mixer is not muted",
         "do_not": "do not adjust track faders or EQ before confirming the output routing is correct"
       },
       "kind": "diagnosis",
@@ -125,7 +128,7 @@
       "content": {
         "symptom": "Logic's meters show activity and playback runs normally, but there is no sound from speakers or headphones; other apps may also go silent at the same time",
         "cause": "macOS Core Audio has entered a bad state and lost its connection to the output device \u2014 a known macOS bug",
-        "fix": "Toggle Core Audio off and back on: Logic Pro > Settings > Audio > Devices tab > uncheck 'Enable Core Audio', wait 2 seconds, then re-enable it. If other apps are also silent, restart the Mac.",
+        "fix": "Toggle Core Audio off and back on: in the Audio settings, Devices tab, uncheck 'Enable Core Audio', wait 2 seconds, then re-enable it. If other apps are also silent, restart the Mac.",
         "do_not": "do not adjust faders, output routing, or plugin settings first \u2014 the issue is at the macOS audio system level"
       },
       "kind": "diagnosis",
@@ -138,13 +141,17 @@
       "name": "audio interface not recognized in Logic",
       "tier": "established",
       "content": {
-        "symptom": "the interface doesn't appear in Logic Pro > Settings > Audio device list, or Logic shows no input signal even with the interface connected and working in other apps",
+        "symptom": "the interface doesn't appear in the Audio settings device list, or Logic shows no input signal even with the interface connected and working in other apps",
         "cause": "the interface is not visible to macOS Core Audio, Logic lacks microphone privacy permission, or a driver conflict exists",
-        "fix": "Step 1: Open macOS Audio MIDI Setup \u2014 if the interface doesn't appear there, Logic won't see it either; try a different USB port/cable. Step 2: Check System Settings > Privacy & Security > Microphone and ensure Logic Pro has access. Step 3: Reinstall the interface's driver if one is required.",
+        "fix": "Step 1: Open macOS Audio MIDI Setup \u2014 if the interface doesn't appear there, Logic won't see it either; try a different USB port/cable. Step 2: Check macOS microphone access and ensure Logic Pro has access. Step 3: Reinstall the interface's driver if one is required.",
         "do_not": "do not adjust buffer size or device settings in Logic until the interface appears correctly in macOS Audio MIDI Setup"
       },
       "kind": "diagnosis",
-      "aliases": []
+      "aliases": [],
+      "where": [
+        "audio settings",
+        "macos microphone access"
+      ]
     },
     {
       "name": "CPU overload",
@@ -152,14 +159,17 @@
       "content": {
         "symptom": "spinning beach ball, dropout clicks, or Logic's System Overload alert",
         "cause": "real-time plugin processing demand exceeds what the buffer can deliver",
-        "fix": "increase the I/O buffer size (try 256 or 512 samples while mixing); then freeze CPU-heavy tracks (right-click the track header > Freeze Track)",
+        "fix": "increase the I/O buffer size (try 256 or 512 samples while mixing); then freeze CPU-heavy tracks (from the track header's context menu)",
         "do_not": "do not dismiss the alert and keep working at the same settings \u2014 the dropout will keep happening"
       },
       "kind": "diagnosis",
       "aliases": [],
       "action": {
         "open_setting": "buffer size"
-      }
+      },
+      "where": [
+        "freeze from track header"
+      ]
     },
     {
       "name": "system overload on Apple Silicon Mac",
@@ -181,12 +191,15 @@
       "tier": "established",
       "content": {
         "symptom": "channel strip meters don't move or respond at all when you sing or play, even with a working, correctly-configured audio interface connected",
-        "fix": "macOS System Settings > Privacy & Security > Microphone \u2014 toggle Logic Pro on. After granting access, quit and relaunch Logic Pro \u2014 macOS does not apply a newly granted permission to an already-running process."
+        "fix": "In macOS microphone access, toggle Logic Pro on. After granting access, quit and relaunch Logic Pro \u2014 macOS does not apply a newly granted permission to an already-running process."
       },
       "kind": "diagnosis",
       "aliases": [
         "meters dont move at all",
         "no input signal even with a different mic"
+      ],
+      "where": [
+        "macos microphone access"
       ]
     },
     {
@@ -195,7 +208,7 @@
       "content": {
         "symptom": "you can hear yourself delayed by 20\u201350ms or more when singing or playing through Logic with software monitoring active; recorded audio appears slightly late on the timeline",
         "cause": "the I/O buffer size is too large, or plugins with high latency in the channel strip are adding monitoring delay (PDC)",
-        "fix": "Do both while recording: lower the I/O buffer size (64 or 128 samples) and turn on Record > Low Latency Monitoring Mode, which bypasses latency-adding plugins on record-enabled tracks. A smaller buffer adds CPU load -- raise it again for mixing if the project starts to crackle or overload -- and bypassed plugins (reverb, tuning) won't be heard in the headphones while it's on. If the audio interface has direct monitoring, that avoids the delay entirely.",
+        "fix": "Do both while recording: lower the I/O buffer size (64 or 128 samples) and turn on Low Latency Monitoring Mode, which bypasses latency-adding plugins on record-enabled tracks. A smaller buffer adds CPU load -- raise it again for mixing if the project starts to crackle or overload -- and bypassed plugins (reverb, tuning) won't be heard in the headphones while it's on. If the audio interface has direct monitoring, that avoids the delay entirely.",
         "do_not": "do not leave a large buffer and try to sing or play along to the delayed signal \u2014 the perceived delay will affect your performance and the recorded timing"
       },
       "kind": "diagnosis",
@@ -604,7 +617,7 @@
         "render in place"
       ],
       "content": {
-        "opens": "Bounce in Place \u2014 render a region with its effects baked in: commits/prints the selected region's track plugins permanently into new audio, in place, so they're no longer separately editable afterward. Opens the Bounce in Place dialog. Select a region first, then press Ctrl+B. Also accessible by right-clicking a region and choosing Bounce or Join > Bounce In Place."
+        "opens": "Bounce in Place \u2014 render a region with its effects baked in: commits/prints the selected region's track plugins permanently into new audio, in place, so they're no longer separately editable afterward. Opens the Bounce in Place dialog. Select a region first, then press Ctrl+B."
       },
       "action": {
         "open_setting": "bounce in place"
@@ -620,7 +633,7 @@
         "stem export"
       ],
       "content": {
-        "opens": "Export dialog \u2014 exports each track as a separate individual audio file (stems), one file per track \u2014 this is NOT a single mixed-down file (for a single final mixed file, use Bounce Project, Cmd+B, instead). Options for format, bit depth, sample rate, and whether to include the master effects chain. Shortcut: Shift+Cmd+E. Menu path: File > Export > All Tracks as Audio Files..."
+        "opens": "Export dialog \u2014 exports each track as a separate individual audio file (stems), one file per track \u2014 this is NOT a single mixed-down file (for a single final mixed file, use Bounce Project, Cmd+B, instead). Options for format, bit depth, sample rate, and whether to include the master effects chain. Shortcut: Shift+Cmd+E."
       },
       "action": {
         "open_setting": "export all tracks"
@@ -694,7 +707,7 @@
         "note chase setting"
       ],
       "content": {
-        "opens": "Project Settings window, MIDI tab \u2014 Chase section controls whether Logic re-triggers notes, controllers, and program changes when playback starts mid-section. If held chords don't sound when starting playback in the middle of a section, enable Chase > Notes here."
+        "opens": "Project Settings window, MIDI tab \u2014 Chase section controls whether Logic re-triggers notes, controllers, and program changes when playback starts mid-section. If held chords don't sound when starting playback in the middle of a section, enable Notes in the Chase section here."
       },
       "action": {
         "open_setting": "midi project settings"
@@ -941,7 +954,7 @@
         "create audio track"
       ],
       "content": {
-        "opens": "Creates a new Audio track directly, with a channel strip ready for recording or importing audio \u2014 this is the track type for recording vocals or any live instrument. Faster than the general New Tracks\u2026 dialog when you already know you want an audio track. Shortcut: Option+Cmd+A (also Track > New Audio Track)."
+        "opens": "Creates a new Audio track directly, with a channel strip ready for recording or importing audio \u2014 this is the track type for recording vocals or any live instrument. Faster than the general New Tracks\u2026 dialog when you already know you want an audio track. Shortcut: Option+Cmd+A."
       },
       "action": {
         "open_setting": "new audio track"
@@ -956,7 +969,7 @@
         "create software instrument track"
       ],
       "content": {
-        "opens": "Creates a new Software Instrument track directly, ready to load an instrument plugin. Faster than the general New Tracks\u2026 dialog when you already know you want a software instrument. Shortcut: Option+Cmd+S (also Track > New Software Instrument Track)."
+        "opens": "Creates a new Software Instrument track directly, ready to load an instrument plugin. Faster than the general New Tracks\u2026 dialog when you already know you want a software instrument. Shortcut: Option+Cmd+S."
       },
       "action": {
         "open_setting": "new software instrument track"
@@ -970,7 +983,7 @@
         "add external MIDI track"
       ],
       "content": {
-        "opens": "Creates a new External MIDI track \u2014 routes MIDI to an external hardware synth or sound module rather than a software instrument inside Logic. Shortcut: Option+Cmd+X (also Track > New External MIDI Track)."
+        "opens": "Creates a new External MIDI track \u2014 routes MIDI to an external hardware synth or sound module rather than a software instrument inside Logic. Shortcut: Option+Cmd+X."
       },
       "action": {
         "open_setting": "new external midi track"
@@ -986,7 +999,7 @@
         "session player track dialog"
       ],
       "content": {
-        "opens": "Opens the New Session Player Track dialog \u2014 Logic's session players (Drummer and other AI performers) generate parts that follow the song. Shortcut: Option+Cmd+U (also Track > New Session Player SI Track\u2026). See the drummer editor entry for editing an existing Drummer region."
+        "opens": "Opens the New Session Player Track dialog \u2014 Logic's session players (Drummer and other AI performers) generate parts that follow the song. Shortcut: Option+Cmd+U. See the drummer editor entry for editing an existing Drummer region."
       },
       "action": {
         "open_setting": "new session player track"
@@ -1001,11 +1014,14 @@
         "copy channel strip to new track"
       ],
       "content": {
-        "opens": "Creates a new track with the same channel strip settings (inserts, sends, routing) as the currently selected track, but no audio/MIDI content copied. Use New Track With Duplicate Settings and Content (Track > Other) instead to also duplicate the region content. Shortcut: Cmd+D."
+        "opens": "Creates a new track with the same channel strip settings (inserts, sends, routing) as the currently selected track, but no audio/MIDI content copied. Use New Track With Duplicate Settings and Content instead to also duplicate the region content. Shortcut: Cmd+D."
       },
       "action": {
         "open_setting": "new track with duplicate settings"
-      }
+      },
+      "where": [
+        "new track with duplicate content"
+      ]
     },
     {
       "name": "new track",
@@ -1016,7 +1032,7 @@
         "add track"
       ],
       "content": {
-        "opens": "New Tracks dialog \u2014 choose the track type (Audio, Software Instrument, External MIDI, or a Session Player) and how many to create, in one place, before anything is created. Use this when you're not yet sure which specific type you want; if you already know, the direct shortcuts are faster (Option+Cmd+A audio, Option+Cmd+S software instrument, Option+Cmd+X external MIDI, Option+Cmd+U session player). Menu: Track > New Tracks\u2026 (shortcut Option+Cmd+N)."
+        "opens": "New Tracks dialog \u2014 choose the track type (Audio, Software Instrument, External MIDI, or a Session Player) and how many to create, in one place, before anything is created. Use this when you're not yet sure which specific type you want; if you already know, the direct shortcuts are faster (Option+Cmd+A audio, Option+Cmd+S software instrument, Option+Cmd+X external MIDI, Option+Cmd+U session player)."
       },
       "action": {
         "open_setting": "new track"
@@ -1287,7 +1303,7 @@
       "content": {
         "symptom": "playing the keyboard produces no notes in Logic; the keyboard works in other apps or in macOS Audio MIDI Setup but not in Logic; or the keyboard worked before and suddenly stopped",
         "cause": "Logic has registered the controller as a control surface instead of a MIDI instrument, a macOS driver issue, or a USB power problem",
-        "fix": "Step 1: Try Logic Pro > Control Surfaces > Bypass All Control Surfaces \u2014 some keyboards are detected as control surfaces which prevents them from sending MIDI notes to tracks. Step 2: Confirm the keyboard appears in macOS Audio MIDI Setup. Step 3: Plug the keyboard directly into the Mac rather than through a USB hub. Step 4: Create a new empty project and test \u2014 the issue may be project-specific routing.",
+        "fix": "Step 1: Try Bypass All Control Surfaces \u2014 some keyboards are detected as control surfaces which prevents them from sending MIDI notes to tracks. Step 2: Confirm the keyboard appears in macOS Audio MIDI Setup. Step 3: Plug the keyboard directly into the Mac rather than through a USB hub. Step 4: Create a new empty project and test \u2014 the issue may be project-specific routing.",
         "do_not": "do not spend time adjusting Logic's MIDI settings before confirming the keyboard appears in macOS Audio MIDI Setup"
       },
       "kind": "diagnosis",
@@ -1302,11 +1318,14 @@
       "content": {
         "symptom": "a Logic project stored on iCloud opens empty, shows 'Audio Files Not Found' errors for all regions, or audio regions appear grayed out; the project worked locally but broke when opened on another Mac or after iCloud synced",
         "cause": "iCloud's file-on-demand system converts files inside the Logic project bundle to '.icloud' placeholder stubs to save local space \u2014 Logic cannot read these placeholders and treats them as missing audio",
-        "fix": "Move the project off iCloud to a local folder. To recover: in Finder, navigate inside the project bundle (right-click > Show Package Contents), find any .icloud placeholder files, right-click each and choose 'Download Now'. After all files download, move the whole project to a local drive before opening.",
+        "fix": "Move the project off iCloud to a local folder. To recover: in Finder, navigate inside the project bundle, find any .icloud placeholder files, right-click each and choose 'Download Now'. After all files download, move the whole project to a local drive before opening.",
         "do_not": "do not store active Logic project bundles directly inside iCloud Drive \u2014 the .logicx bundle contains many small files that iCloud aggressively offloads to the cloud"
       },
       "kind": "diagnosis",
-      "aliases": []
+      "aliases": [],
+      "where": [
+        "project package contents"
+      ]
     },
     {
       "name": "Logic crashes on launch",
@@ -1326,11 +1345,14 @@
       "content": {
         "symptom": "Mastering Assistant, Stem Splitter, or other AI-powered features appear grayed out or unavailable on an M1/M2/M3/M4 Mac",
         "cause": "Logic Pro is running under Rosetta 2 Intel emulation mode instead of natively on Apple Silicon \u2014 these features require the native ARM build and Apple's Neural Engine",
-        "fix": "In Finder, navigate to Applications, right-click Logic Pro > Get Info. If 'Open using Rosetta' is checked, uncheck it, close Get Info, and relaunch Logic. The AI features will be available after relaunching natively.",
+        "fix": "Open Logic Pro's Get Info window in Finder. If 'Open using Rosetta' is checked, uncheck it, close Get Info, and relaunch Logic. The AI features will be available after relaunching natively.",
         "do_not": "do not reinstall Logic expecting this to fix itself \u2014 the Rosetta checkbox persists across reinstalls if not explicitly unchecked in Get Info"
       },
       "kind": "diagnosis",
-      "aliases": []
+      "aliases": [],
+      "where": [
+        "logic get info"
+      ]
     },
     {
       "name": "Sound Library missing or not downloading after Logic update",
@@ -1338,11 +1360,15 @@
       "content": {
         "symptom": "patches, loops, or instrument sounds are missing after a Logic update; downloads fail with 'Check your Internet connection' even on a fast connection; or downloads appear to complete but content is still absent",
         "cause": "the Logic update requires a new version of the Sound Library, or the Sound Library was relocated to an external drive that Logic can no longer find",
-        "fix": "Step 1: Logic Pro > Sound Library > Download All Available Sounds. Step 2: If downloads fail, update Logic Pro to the latest version first (App Store > Updates), then retry \u2014 some library versions only work with specific Logic versions. Step 3: If the library was moved to an external drive, reconnect the drive and confirm its name hasn't changed since Logic configured the path.",
+        "fix": "Step 1: Download All Available Sounds from the Sound Library menu. Step 2: If downloads fail, update Logic Pro to the latest version first, then retry \u2014 some library versions only work with specific Logic versions. Step 3: If the library was moved to an external drive, reconnect the drive and confirm its name hasn't changed since Logic configured the path.",
         "do_not": "do not delete and reinstall Logic to fix missing sounds \u2014 the application and the Sound Library are stored separately; reinstalling Logic does not restore downloaded content"
       },
       "kind": "diagnosis",
-      "aliases": []
+      "aliases": [],
+      "where": [
+        "download sound library",
+        "update logic pro"
+      ]
     },
     {
       "name": "MIDI notes silent when starting playback mid-section",
@@ -1350,7 +1376,7 @@
       "content": {
         "symptom": "when you start playback from the middle of a section, held chords or sustained notes that should already be playing are silent until a new Note On event arrives in the timeline",
         "cause": "MIDI Chase is disabled \u2014 Logic is not re-triggering Note On messages whose start position is earlier than the current playhead",
-        "fix": "Enable MIDI Chase: File > Project Settings > MIDI > Chase tab > check 'Notes'. You can also enable chase for Program Changes, Pitch Bend, and Controllers in the same panel for complete chase behavior.",
+        "fix": "Enable MIDI Chase: in the Project Settings MIDI tab, check 'Notes' under Chase. You can also enable chase for Program Changes, Pitch Bend, and Controllers in the same panel for complete chase behavior.",
         "do_not": "do not move the MIDI notes forward in the Piano Roll as a workaround \u2014 enable Chase instead; moving notes changes the musical timing"
       },
       "kind": "diagnosis",
@@ -1365,11 +1391,14 @@
       "content": {
         "symptom": "after comping takes in a Take Folder, there are audible clicks or pops at the boundaries where the comp switches from one take to another",
         "cause": "the edit points between takes have no crossfade \u2014 the audio waveform is cut abruptly, creating a discontinuity in the waveform",
-        "fix": "Select the Crossfade tool (press X with the pointer tool active in the Tracks Area) and drag across the edit point to create a 5\u201310ms crossfade. Alternatively, after comping, select the Take Folder, use Edit > Select All to select all comp regions, then apply crossfades via the Crossfade tool across all boundaries at once.",
+        "fix": "Select the Crossfade tool (press X with the pointer tool active in the Tracks Area) and drag across the edit point to create a 5\u201310ms crossfade. Alternatively, after comping, select the Take Folder, use Select All to select all comp regions, then apply crossfades via the Crossfade tool across all boundaries at once.",
         "do_not": "do not re-record takes to eliminate clicks \u2014 crossfades at edit points are the standard fix for this in any DAW"
       },
       "kind": "diagnosis",
-      "aliases": []
+      "aliases": [],
+      "where": [
+        "select all"
+      ]
     },
     {
       "name": "unwanted pitch bend data on MIDI recordings",

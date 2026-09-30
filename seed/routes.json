@@ -23,7 +23,8 @@
         "type": "shortcut",
         "value": "Ctrl+B"
       }
-    ]
+    ],
+    "also": "right-click a region > Bounce or Join > Bounce In Place"
   },
   "bounce project": {
     "desc": "Bounce dialog",
@@ -109,7 +110,8 @@
         "type": "shortcut",
         "value": "Shift+Cmd+E"
       }
-    ]
+    ],
+    "also": "File > Export > All Tracks as Audio Files\u2026"
   },
   "flashback capture": {
     "desc": "Retroactively captures MIDI played during the last playback pass",
@@ -338,7 +340,8 @@
         "type": "shortcut",
         "value": "Option+Cmd+A"
       }
-    ]
+    ],
+    "also": "Track > New Audio Track"
   },
   "new external midi track": {
     "desc": "Creates a new External MIDI track",
@@ -347,7 +350,8 @@
         "type": "shortcut",
         "value": "Option+Cmd+X"
       }
-    ]
+    ],
+    "also": "Track > New External MIDI Track"
   },
   "new session player track": {
     "desc": "Opens the New Session Player Track dialog",
@@ -356,7 +360,8 @@
         "type": "shortcut",
         "value": "Option+Cmd+U"
       }
-    ]
+    ],
+    "also": "Track > New Session Player SI Track\u2026"
   },
   "new software instrument track": {
     "desc": "Creates a new Software Instrument track directly, ready to load an instrument plugin",
@@ -365,7 +370,8 @@
         "type": "shortcut",
         "value": "Option+Cmd+S"
       }
-    ]
+    ],
+    "also": "Track > New Software Instrument Track"
   },
   "new track": {
     "desc": "New Tracks dialog",
@@ -378,7 +384,8 @@
         "type": "menu",
         "value": "New Tracks\u2026"
       }
-    ]
+    ],
+    "also": "shortcut Option+Cmd+N"
   },
   "new track with duplicate settings": {
     "desc": "Creates a new track with the same channel strip settings (inserts, sends, routing) as the currently selected t",
@@ -588,5 +595,53 @@
         "value": "Ctrl+X"
       }
     ]
+  },
+  "macos microphone access": {
+    "desc": "macOS microphone permission for Logic Pro",
+    "text": "System Settings > Privacy & Security > Microphone (macOS, outside Logic)",
+    "reference": true,
+    "source": "kb-text"
+  },
+  "download sound library": {
+    "desc": "Download Logic's Sound Library content",
+    "text": "Logic Pro > Sound Library > Download All Available Sounds",
+    "reference": true,
+    "source": "kb-text"
+  },
+  "update logic pro": {
+    "desc": "Update Logic Pro to the latest version",
+    "text": "App Store > Updates (macOS, outside Logic)",
+    "reference": true,
+    "source": "kb-text"
+  },
+  "select all": {
+    "desc": "Select everything in the focused area",
+    "text": "Edit > Select All",
+    "reference": true,
+    "source": "kb-text"
+  },
+  "freeze from track header": {
+    "desc": "Freeze a track from its header's context menu",
+    "text": "right-click the track header > Freeze Track",
+    "reference": true,
+    "source": "kb-text"
+  },
+  "new track with duplicate content": {
+    "desc": "New Track With Duplicate Settings and Content",
+    "text": "Track > Other (New Track With Duplicate Settings and Content)",
+    "reference": true,
+    "source": "kb-text"
+  },
+  "project package contents": {
+    "desc": "Inside a Logic project bundle in Finder",
+    "text": "Finder: right-click the project > Show Package Contents (outside Logic)",
+    "reference": true,
+    "source": "kb-text"
+  },
+  "logic get info": {
+    "desc": "Logic Pro's Get Info window (Open using Rosetta)",
+    "text": "Finder > Applications: right-click Logic Pro > Get Info (outside Logic)",
+    "reference": true,
+    "source": "kb-text"
   }
 }

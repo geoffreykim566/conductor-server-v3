@@ -682,8 +682,33 @@ def test_card_descriptions_dropdowns() -> None:
     print("PASS: the writer is told whether a dropdown route picks a value or stops at the pane.")
 
 
+def test_paths_only_in_routes() -> None:
+    # 2026-09-29: routes.json is the only source of menu paths. No KB prose
+    # carries one; each solution's Where line renders its routes' paths.
+    from app import kb
+    prose = [(s["name"], f) for s in kb.SOLUTIONS.values()
+             for f, v in (s.get("content") or {}).items() if isinstance(v, str) and " > " in v]
+    assert not prose, prose
+    for s in kb.SOLUTIONS.values():
+        for name in kb.where_names(s):
+            assert name in kb.ROUTES or name in kb.REFERENCES, (s["name"], name)
+    assert "Where: sample rate: File > Project Settings > Audio" in kb.summary("sample rate mismatch")
+    mic = kb.summary("microphone permissions")
+    assert "System Settings > Privacy & Security > Microphone" in mic and "[not runnable]" in mic, mic
+    # Reference entries are shown, never runnable.
+    assert kb.REFERENCES and not set(kb.REFERENCES) & set(tools.ROUTES)
+    assert not set(kb.REFERENCES) & set(tools.OPEN_SETTING_SCHEMA["input_schema"]["properties"]["name"]["enum"])
+    for name in kb.REFERENCES:
+        assert tools.queue_open_setting({"name": name})["attached"] is False, name
+    desc = tools.OPEN_SETTING_SCHEMA["description"]
+    assert "- sample rate: Project Settings window, Audio tab -- File > Project Settings > Audio" in desc, desc
+    assert "- select all: Edit > Select All" in desc.split("Verified locations")[1]
+    print(f"PASS: paths live only in routes.json; {len(kb.REFERENCES)} reference entries shown, never queued.")
+
+
 async def main() -> None:
     test_executor_validation()
+    test_paths_only_in_routes()
     test_dropdown_routes()
     test_offered_text()
     test_card_descriptions_dropdowns()

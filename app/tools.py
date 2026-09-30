@@ -204,9 +204,9 @@ SET_PARAM_SCHEMA = {
 # The model only ever names a route; the path it runs is always this file's.
 # Model-written menu paths are the failure this codebase has hit most
 # (confidently wrong, and wrong in ways the user can't catch).
-ROUTES: dict[str, dict] = json.loads(
-    (Path(__file__).parent.parent / "seed" / "routes.json").read_text()
-)
+# Loaded by kb (which renders their paths into the KB's Where lines); runnable
+# routes only -- reference entries (kb.REFERENCES) can never be queued.
+ROUTES: dict[str, dict] = kb.ROUTES
 
 # A route that ends on a dropdown carries a `choice` block: the dropdown's
 # options, whether they're ordered (so larger/smaller means something), and
@@ -231,7 +231,7 @@ TURN_OFFERED_TEXT: ContextVar[str] = ContextVar("turn_offered_text", default="")
 
 
 def _route_line(name: str, route: dict) -> str:
-    line = f"- {name}: {route['desc']}"
+    line = f"- {name}: {route['desc']} -- {kb.route_path_text(name)}"
     choice = route.get("choice")
     if choice is None:
         return line
@@ -259,6 +259,9 @@ OPEN_SETTING_SCHEMA = {
         "choose one of its options, or omit it to open the pane with the current value showing "
         "and let the user pick.\n\nRoutes:\n"
         + "\n".join(_route_line(name, route) for name, route in sorted(ROUTES.items()))
+        + "\n\nVerified locations you may state but NOT pass to open_setting (no runnable steps; "
+        "say where it is and let the user do it):\n"
+        + "\n".join(f"- {name}: {kb.route_path_text(name)}" for name in sorted(kb.REFERENCES))
     ),
     "strict": True,
     "input_schema": {

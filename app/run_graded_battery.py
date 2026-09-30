@@ -210,27 +210,34 @@ def _norm_path(text: str) -> str:
 
 
 def _route_chains() -> list[str]:
-    from app import tools
+    """Every verified path the model is shown (2026-09-29: routes.json is the
+    only source): runnable routes' menu chains and display-only alternatives,
+    and reference entries' text, each split into its " > " chains."""
+    from app import kb
     chains = []
-    for route in tools.ROUTES.values():
-        menus = [st["value"] for st in route.get("path") or [] if st.get("type") == "menu"]
-        if len(menus) > 1:
-            chains.append(_norm_path(" > ".join(menus)))
+    for name, route in kb._ALL_ROUTES.items():
+        text = kb.route_path_text(name)
+        for piece in re.split(r", then |\(also |\(|\)|: ", text):
+            if " > " in piece:
+                chains.append(_norm_path(piece))
         chains.append(_norm_path(route.get("desc") or ""))
     return chains
 
 
 def ungrounded_paths(trace: list[dict], response_text: str) -> list[str]:
     """Menu paths ("X > Y") the answer states that appear neither in the text
-    of any tool result this turn (a lookup's or citation's KB entries, a route
-    card's steps) nor in an approved route. Reported for both sides of the
+    of any tool result this turn (a citation's KB entries with their Where
+    lines, a route card's steps) nor in any route or reference path. Reported for both sides of the
     2026-09-28 KB-in-prompt A/B, not asserted: a path the model knew from the
     KB but didn't cite counts as ungrounded, which is the point."""
     source = _norm_path(" ".join(json.dumps(c.get("output"), ensure_ascii=False) for c in trace))
     chains = _route_chains()
     out = []
     for m in _MENU_PATH.finditer(response_text or ""):
-        first, *rest = _norm_path(_TRAILING.sub("", m.group(0))).split(" > ")
+        # A path item may end a sentence ("... > Recording. In the pane ..."):
+        # cut at the first ". " so the next sentence isn't read as part of it.
+        found = re.split(r"\.\s", m.group(0), maxsplit=1)[0].rstrip(".")
+        first, *rest = _norm_path(_TRAILING.sub("", found)).split(" > ")
         # The first item can swallow sentence words ("Go to File > ..."), so
         # every tail of it is tried: grounded if any version is.
         words = first.split()
