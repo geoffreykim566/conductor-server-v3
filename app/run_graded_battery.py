@@ -199,7 +199,7 @@ def _actual_outcome(trace: list[dict], response_text: str = "", confidence_tier:
 
 # A menu path as answers write it: "File > Project Settings > Audio". Items
 # start with a capital or digit; later words may be lowercase connectors.
-_PATH_ITEM = r"[A-Z0-9][\w&/.'’…-]*(?: (?:[A-Z0-9][\w&/.'’…-]*|and|of|to|in|for|as|or|with))*"
+_PATH_ITEM = r"[A-Z0-9][\w&/.'’…-]*(?: (?:[A-Z0-9][\w&/.'’…-]*|&|and|of|to|in|for|as|or|with))*"
 _MENU_PATH = re.compile(_PATH_ITEM + r"(?:\s*>\s*" + _PATH_ITEM + r")+")
 _TRAILING = re.compile(r"(?: (?:and|of|to|in|for|as|or|with))+$")
 
@@ -234,9 +234,9 @@ def ungrounded_paths(trace: list[dict], response_text: str) -> list[str]:
     chains = _route_chains()
     out = []
     for m in _MENU_PATH.finditer(response_text or ""):
-        # A path item may end a sentence ("... > Recording. In the pane ..."):
-        # cut at the first ". " so the next sentence isn't read as part of it.
-        found = re.split(r"\.\s", m.group(0), maxsplit=1)[0].rstrip(".")
+        # A sentence break inside the match ("1. Open X > Y", "... > Recording.
+        # In the pane"): keep the sentence that holds the path.
+        found = next(p for p in re.split(r"\.\s", m.group(0)) if ">" in p).rstrip(".")
         first, *rest = _norm_path(_TRAILING.sub("", found)).split(" > ")
         # The first item can swallow sentence words ("Go to File > ..."), so
         # every tail of it is tried: grounded if any version is.
