@@ -149,10 +149,10 @@ async def run(variants: list[str], runs: int, out_dir: Path) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     log_path = out_dir / "latency_variants.log"
     jsonl_path = out_dir / "latency_variants.jsonl"
-    all_scn = {s["name"]: s for s in json.loads(battery.SCENARIOS_FILE.read_text())}
+    all_scn = {s["name"]: s for s in battery.load_scenarios("all")}
     missing = [n for n in SCENARIOS if n not in all_scn]
     if missing:
-        sys.exit(f"scenarios not in battery.json: {missing}")
+        sys.exit(f"scenarios not in evals/scenarios/: {missing}")
 
     model_io.call_model = _timed_call_model
     battery.respond = _timed_respond

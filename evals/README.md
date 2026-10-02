@@ -6,9 +6,11 @@ Model-in-the-loop evaluation. These hit the real API and the real KB, unlike `te
 
 | Path | What |
 |---|---|
-| `battery/runner.py` | Runs `scenarios/battery.json` through `respond()` and prints transcripts and verdicts |
+| `battery/runner.py` | Runs a scenario set through `respond()` and prints transcripts and verdicts |
 | `battery/grader.py` | Turns a trace into an outcome and grades it against the scenario's `expect` block |
-| `scenarios/battery.json` | The scenarios: `name`, `note`, `turns` (`text`, optional `ax_fixture` / `ax_state` / `expect`), `expect` |
+| `scenarios/core.json` | **The core battery** (39 scenarios, 48 turns): one or two per distinct behaviour. The regression and quality check |
+| `scenarios/extended.json` | Everything else (79). Variations on core behaviours, kept for targeted runs, not run by default |
+| `battery/paths.py` | `ungrounded_paths`: menu paths stated with no route or cited source behind them |
 | `latency_variants.py` | A/B harness: the same scenarios under several `pipeline.settings` overrides, interleaved |
 | `drive_turn.py` | One turn at a time, with state kept in a file between calls: for reactive multi-turn probing |
 
@@ -18,22 +20,23 @@ Rebuild first if `app/` or `seed/` changed, or you're grading the old code.
 
 ```bash
 mkdir -p test_runs/$(date +%F)
-docker compose exec -T app python -m evals.battery.runner > test_runs/$(date +%F)/run.log 2>&1   # all 113, ~35 min serial
-docker compose exec -T app python -m evals.battery.runner name1 name2                            # some
+docker compose exec -T app python -m evals.battery.runner > test_runs/$(date +%F)/run.log 2>&1   # core (default), ~12 min serial
+docker compose exec -T app python -m evals.battery.runner --set extended                         # or: all
+docker compose exec -T app python -m evals.battery.runner name1 name2                            # by name, from any set
 docker compose exec -T app python -m evals.battery.runner --runs 3 name1                         # flakiness check
 ```
 
-**Shard it 3-way in parallel** (~15 min). Rate limits are not a constraint:
+**Shard it 3-way in parallel** (~5 min for core). Rate limits are not a constraint:
 
 ```bash
 for i in 0 1 2; do
-  NAMES=$(python3 -c "import json;s=json.load(open('evals/scenarios/battery.json'));print(' '.join(x['name'] for x in s[$i::3]))")
+  NAMES=$(python3 -c "import json;s=json.load(open('evals/scenarios/core.json'));print(' '.join(x['name'] for x in s[$i::3]))")
   docker compose exec -T app python -m evals.battery.runner $NAMES > test_runs/$(date +%F)/run_shard$i.log 2>&1 &
 done; wait
 grep -c '\[PASS\]' test_runs/$(date +%F)/run_shard*.log; grep -h -B1 '\[FAIL\]' test_runs/$(date +%F)/run_shard*.log
 ```
 
-Compare against a baseline run of the same scenarios, never against memory. Pass counts move by ±2 between identical runs, so read *which* assertions changed and read the answers themselves.
+Compare against a baseline run of the same scenarios, never against memory. Run core ×2 for a comparison: pass counts move by ±2 between identical runs, so read *which* assertions changed and read the answers themselves. For latency and cost too, run `latency_variants.py` with `--scenarios` set to the core names.
 
 ## Expect keys (`grader.grade`)
 
@@ -64,4 +67,9 @@ A top-level `expect` grades the final turn. A per-turn `expect` grades that turn
 
 ## Adding a scenario
 
-Add it to `scenarios/battery.json` with a `note` (what it tests and why) and an `expect` written from the desired behaviour. Run it alone 3× (`--runs 3`) to see whether it's stable before relying on it.
+**Don't grow the core battery by default.** The battery used to gain cases with every new feature until it was 118 scenarios, mostly variations on the same few code paths. That made every run slow and expensive without catching more.
+
+- **When you build something new, test it directly:** unit tests in `tests/`, plus a few targeted scenarios you run by name while developing. Put those in `extended.json`.
+- **Add to `core.json` only when the scenario exercises behaviour no core scenario covers:** a new code path, a new tool, a new failure class. Not a new phrasing of a covered one. If it replaces a weaker core scenario, swap it rather than add it.
+- **Day to day, the core battery is the regression and quality check.** Run it after any pipeline, prompt or KB change, and before a merge.
+- **Format:** each scenario has a `note` (what it tests and why) and an `expect` written from the desired behaviour. Run a new one alone 3× (`--runs 3`) to check it's stable before relying on it.

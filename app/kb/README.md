@@ -36,7 +36,7 @@ The knowledge base lives **in the decider's prompt**. At import, `seed/problems.
 - **Citations are always `match_confidence: "strong"`.** The confidence bands are gone; the tier code still reads the field.
 - **Reference entries** (`"reference": true` in routes.json) are paths outside Logic or never given steps. The model may state them, but they're never in open_setting's enum and can't be queued.
 - **Keep the KB block byte-stable.** It's part of cache breakpoint 1. Anything per-turn goes elsewhere (`pipeline/context.py`).
-- **Aliases still matter**, as the model's vocabulary for matching user wording. They cost tokens, though, and dropping them is an open idea (`v042-log.md`).
+- **Aliases still matter**, as the model's vocabulary for matching user wording. They cost tokens, though, and dropping them is an open idea.
 - **DB tables** (`problems`, `solutions`, `problem_solutions`, `query_log`) and their migrations are left in place but unused. Drop them in a release migration.
 
 ## Editing the KB

@@ -1,8 +1,8 @@
-"""Graded battery runner: runs evals/scenarios/battery.json through the pipeline and
-prints each transcript with its verdicts. Redirect to a file so runs are diffable.
-How to run (and shard): README.md.
+"""Graded battery runner: runs a scenario set through the pipeline and prints each
+transcript with its verdicts. Redirect to a file so runs are diffable. Sets: core
+(default, the regression check), extended, all. How to run (and shard): README.md.
 
-    docker compose exec app python -m evals.battery.runner [--runs N] [scenario_name ...]
+    docker compose exec app python -m evals.battery.runner [--set core|extended|all] [--runs N] [scenario_name ...]
 """
 from __future__ import annotations
 
@@ -17,7 +17,12 @@ from app.core import db
 from app.pipeline import respond
 from evals.battery.grader import action_calls, actual_outcome, grade
 
-SCENARIOS_FILE = Path(__file__).parents[1] / "scenarios" / "battery.json"
+SCENARIOS_DIR = Path(__file__).parents[1] / "scenarios"
+SETS = {"core": ["core.json"], "extended": ["extended.json"], "all": ["core.json", "extended.json"]}
+
+
+def load_scenarios(set_name: str = "all") -> list[dict]:
+    return [s for f in SETS[set_name] for s in json.loads((SCENARIOS_DIR / f).read_text())]
 # Voyage limits are high now; BATTERY_DELAY_S overrides per run.
 BETWEEN_SCENARIOS_DELAY_S = float(os.environ.get("BATTERY_DELAY_S", 2))
 
@@ -157,15 +162,21 @@ async def run_battery_once(scenarios: list[dict], run_label: str = "") -> dict:
 
 
 async def main() -> None:
-    all_scenarios = json.loads(SCENARIOS_FILE.read_text())
     args = sys.argv[1:]
+    set_name = "core"
+    if "--set" in args:
+        idx = args.index("--set")
+        set_name = args[idx + 1]
+        args = args[:idx] + args[idx + 2:]
     runs = 1
     if "--runs" in args:
         idx = args.index("--runs")
         runs = int(args[idx + 1])
         args = args[:idx] + args[idx + 2:]
     requested = args
-    scenarios = [s for s in all_scenarios if s["name"] in requested] if requested else all_scenarios
+    # Named scenarios are found in any set; otherwise the whole chosen set runs.
+    scenarios = ([s for s in load_scenarios("all") if s["name"] in requested] if requested
+                 else load_scenarios(set_name))
     if requested and len(scenarios) != len(requested):
         missing = set(requested) - {s["name"] for s in scenarios}
         print(f"WARNING: scenario(s) not found: {missing}", file=sys.stderr)
