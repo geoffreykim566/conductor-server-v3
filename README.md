@@ -38,6 +38,7 @@ docker compose exec app python -m evals.battery.runner > test_runs/$(date +%F)/r
 - **Migrations only run on a fresh volume** (they're mounted as `docker-entrypoint-initdb.d`). For an existing DB, apply the new file by hand: `docker compose exec -T db psql -U conductor -d conductor < migrations/00N_x.sql`. Prod gets the same by hand.
 - **Second stack for a branch or worktree:** `docker compose -p <name> -f docker-compose.yml -f docker-compose.standalone.yml up -d --build`. It has no ports, bind-mounts the whole checkout with `PYTHONPATH=/srv` (so `app/` edits are live), and uses its own DB volume (seed it once). Drive it with `docker compose -p <name> -f docker-compose.yml -f docker-compose.standalone.yml exec -T app ...`.
 - **Stale code before new theories.** If behaviour doesn't match the code, first check the image was rebuilt and the KB reseeded.
+- **Log with `log.warning("[marker] ...")`, never `log.info`.** The root logger isn't configured, so info lines never reach `docker compose logs`; grep-able `[markers]` are the convention.
 - **Stateless.** Nothing is stored between requests except users/events. The client round-trips the full history (`app/api/README.md`).
 
 ## Deploying

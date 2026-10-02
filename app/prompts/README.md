@@ -11,6 +11,8 @@ System prompts, one file per model role. Each file is a single string constant; 
 
 - **The writer prompt never mentions tools, the KB, confidence, or any of the machinery.** It exists to stop the decider's vocabulary leaking into replies, which a word-ban list in the decider prompt couldn't fully close. The writer gets already-decided facts to phrase, never raw tool results.
 - **Prompt-only rules are requests, not guarantees.** If something must hold every time (a cap, a refusal, "nothing has run yet"), enforce it in `pipeline/` code and keep the prompt line as guidance only. Prompt-only versions have held roughly 40–50% of the time.
+- **Live AX state is authoritative only for what it lists; the screenshot is evidence for the rest.** Calling AX "ground truth that outranks screenshots" made the model defer to an incomplete dump and say it couldn't see the screen.
+- **The dropdown paragraph is behaviour only.** Which value to recommend for a setting (buffer, flex, threads) lives in the KB rows, so prompt and KB can't contradict each other.
 - **The decider prompt is cached.** Keep it byte-identical across turns. Anything per-turn goes in its own system block (`pipeline/context.py`) so the cache still hits.
 
 ## Changing a prompt

@@ -27,7 +27,8 @@ The decider's tools: their schemas (`TOOLS`) and executors. There are two kinds:
 - **`set_param.value` is a string**, parsed server-side (`_parse_param_value`). A number-or-on/off union wasn't held by the model even under strict mode.
 - **Routes are the only way to navigate.** The model names a route; the path that runs is always `seed/routes.json`'s. Model-written menu paths have been confidently wrong more than anything else in this codebase.
 - **`lookup_concept` ranks problems and solutions in one pass.** Checking one type first starved better matches of the other. A solution hit always resolves to its bucket (the one it's weighted highest in), so distance noise can't hide its siblings.
-- **The confidence bands (0.40 / 0.60)** are advisory text for the model, not a filter. A hard floor kept admitting a different wrong match on every rephrase. They were tuned at 8 problems and never recalibrated, so gibberish can still read "moderate".
+- **The confidence bands (0.40 / 0.60)** are advisory text for the model, not a filter. A hard floor kept admitting a different wrong match on every rephrase. They were tuned at 8 problems and never recalibrated, so gibberish can still read "moderate". Recalibrating was rejected: correct and wrong top-1 distances overlap, so no cutoff separates them. `query_log` holds real queries if it's ever revisited.
+- **No MCP.** One client and one server, both ours: it would add per-call overhead for no interop benefit.
 - **The toggle gate:** a route with `toggle_ax_key` is refused when live state says it's already in its target state, because running it would flip it *away*.
 
 ### Dropdown routes (`choice` block in routes.json)
@@ -40,6 +41,9 @@ The decider's tools: their schemas (`TOOLS`) and executors. There are two kinds:
 - **`picks`:** a route fixed to one option ("flex pitch") ends on a `choose` step, not a click. The client closes stray menus before every step except a choose, and a choose ledgers the old value for Revert.
 - **`wait_for_run`:** the route's target depends on the user's selection, so its card never auto-runs.
 - An ambiguous value ("flex on" fits four options) is refused with the list, so the reply asks which one.
+- **Offered options count as the user's pick** (user call: users shouldn't have to type option names). It's a word match on the previous decider text, so any option it mentioned is allowed; a first turn has none.
+- **`_user_named` compares letters and digits only** (no punctuation needed) and reads "smart tempo" as Logic's "ST" abbreviation.
+- **`processing threads` has `model_may_pick: []`:** the KB says max threads, not "Automatic", and the client can't pick a number, so the card stops at the pane.
 
 ## Adding things
 

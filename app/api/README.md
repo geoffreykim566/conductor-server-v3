@@ -50,6 +50,7 @@ The HTTP layer. `main.py` builds the FastAPI app (lifespan opens and closes the 
 - **The body-size cap is middleware**, because uvicorn reads the body before pydantic runs. It's bounded by one turn's screenshots plus a text history; screenshots never accumulate.
 - **The confidence badge is disabled:** `done.source_tier` is always `""`. The tier is a trace rule and fired on plain observations ("which tracks are muted"). It's still computed for the battery and logs.
 - **Known soft spot:** history isn't signed, so a hand-built "parked" transcript gets one uncharged answer. Accepted; the free tier is a soft cap.
+- **Pipeline exceptions are logged as `[turn_error]`** with the traceback before the `error` event goes out. Without it a missing migration failed every lookup and nothing reached the logs.
 - **Cancelling:** when the client disconnects mid-turn (Esc), the pipeline task is cancelled. A cancelled turn still uses up its free message.
 - **Admin auth fails closed:** with no `ADMIN_PASSWORD`, nobody gets in.
 

@@ -67,6 +67,7 @@ Without it, the model answered real questions from memory with zero grounding. E
 - Bare "again" and "forgot" are excluded ("thanks again, that fixed it").
 - "cant find it" was removed after it matched 7 battery turns.
 - The destructive list is project-scoped only, because "delete everything on this track" is undo-able.
+- **Undo requests are declined in code** (`is_undo_request`, skipped when question-shaped). A decider prompt line alone let the writer answer "press Command-Z" (wrong for settings, which aren't in Logic's Undo), and a writer-prompt line also denied "how do i undo a cut".
 - **Re-sweep the full battery after changing any list.** Checking only the scenario you were fixing has given false confidence more than once.
 
 ### Auto-run (`respond.respond`)
@@ -76,6 +77,8 @@ A card runs without Run only when all of these hold:
 - no route on the card has `wait_for_run`.
 
 This exists because a "bypass control surfaces" card off a moderate match once auto-ran on a turn whose own reply said "I don't have a verified fix".
+
+There's deliberately no user-facing explain/do mode toggle (user call): the decider picks per turn, and the Run press stays the floor for anything the rules above don't clear.
 
 ### Writer
 - **Why there's a separate writer.** The decider leaked its own vocabulary into replies ("that result isn't relevant"), and a word-ban list couldn't close the leak. The writer only *phrases*: it never sees tools, results, or confidence.
@@ -107,6 +110,7 @@ If the user asks to see something again and the model answers from memory with n
 
 ### History round-trip
 - `model_io.serialize_content` turns SDK blocks into plain dicts. Raw response objects carry fields the request schema rejects, which broke turn 2.
+- **History is the decider's transcript.** The writer's reply never enters it, so the next turn (including the offered-option check, `heuristics.offered_text`) reads what the decider wrote, not what the user saw.
 - Thinking blocks are dropped: the validator doesn't accept them, and this non-interleaved loop doesn't need them.
 
 ### Research approval

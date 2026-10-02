@@ -18,6 +18,7 @@ Shared infrastructure that every other package imports. Nothing in here imports 
   - `MODEL` is the decider.
   - `WRITER_MODEL` is a cheaper Haiku, because the writer only phrases decided facts and never weighs evidence.
   - Changing the decider model needs a battery run first (the model switch has its own log).
+  - Haiku as decider was rejected: it missed cards, and its prompt falls under Haiku's 4096-token cache minimum, so it cost more per turn.
 - **`RESEARCH_CALL_TIMEOUT_S` = 150s.** 90s timed out every real research call, and a timed-out call can never earn the "research" tier.
 - **`VOYAGE_MODEL`** must be the same at index and query time. After changing it, reseed (`python -m app.kb.load`).
 - **Signing:** only `/v3/register` signs. A forged or bare uuid fails verification before touching the DB, and a valid token whose row was lost (DB reset) is upserted lazily (`api/deps.py`). No secret configured = registration returns 503 and every verify fails, closed.

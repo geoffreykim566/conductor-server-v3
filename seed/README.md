@@ -10,3 +10,4 @@ Content, not code. Both files are baked into the image, so rebuild after editing
 - **The schema and quirks** for each: `app/kb/README.md` (KB) and `app/tools/README.md` (routes, dropdown `choice` blocks).
 - **After editing `problems.json`:** `docker compose up -d --build && docker compose exec app python -m app.kb.load`, then run the battery.
 - **After editing `routes.json`:** rebuild. Verify any new or changed path live in Logic Pro before trusting it, and ask the user to confirm menu paths against the running app rather than asserting them.
+- **Dropdown `options` are copied from the running Logic** (the client's AX read or the user's screenshot), never guessed: guessed strings failed the client's choose and read-back.
