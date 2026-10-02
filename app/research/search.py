@@ -8,7 +8,7 @@ import time as _time
 
 from anthropic import AsyncAnthropic
 
-from app.core.config import CENTRAL_ANTHROPIC_KEY, MODEL, RESEARCH_CALL_TIMEOUT_S
+from app.core.config import CENTRAL_ANTHROPIC_KEY, RESEARCH_CALL_TIMEOUT_S, RESEARCH_MODEL
 from app.research.parse import (
     CONFIDENCE_TO_TIER,
     extract_sources,
@@ -70,7 +70,7 @@ async def web_research(query: str) -> dict:
         try:
             response = await asyncio.wait_for(
                 _client.messages.create(
-                    model=MODEL,
+                    model=RESEARCH_MODEL,
                     max_tokens=2048,
                     system=_RESEARCH_SYSTEM,
                     messages=api_messages,

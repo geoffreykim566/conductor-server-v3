@@ -12,11 +12,10 @@ RESEARCH_DECLINED = {
     )
 }
 
-LOOKUP_CAP_ERROR = (
-    "Too many lookups without a clear answer. "
-    "Stop searching now — answer from general Logic Pro knowledge if you're "
-    "genuinely confident, or tell the user you don't have a verified answer "
-    "for this. Do not call lookup_concept again this turn."
+TOOL_NUDGE = (
+    "Call a tool before you answer: the action the user just agreed to (each turn gets its own "
+    "card, so queue it again even if an earlier reply offered it), or ask_clarifying_question "
+    "if you can't tell what they want run."
 )
 
 ON_CARD_NOTE = (
@@ -30,12 +29,11 @@ PANE_ONLY_NOTE = (
     "they want, naming the options exactly."
 )
 PICK_NUDGE = (
-    "A lookup this turn returned solutions that map to an action. If your answer "
+    "You cited a problem whose candidate fixes map to actions. If your answer "
     "recommends one, call its action so the user gets it on the card; if you can't tell "
-    "which applies, ask the one question that would decide it (ask_clarifying_question); "
-    "if the match isn't actually what they asked about, look up something more specific. "
-    "If the candidate you recommend has no action of its own, call lookup_concept with its "
-    "name -- don't queue a different candidate's action instead."
+    "which applies, ask the one question that would decide it (ask_clarifying_question). "
+    "If the candidate you recommend has no action of its own, cite it with cite_kb "
+    "-- don't queue a different candidate's action instead."
 )
 FINAL_ANSWER_NUDGE = "\n\nAnswer now with your best available information — no more tool calls."
 

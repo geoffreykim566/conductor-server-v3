@@ -67,7 +67,7 @@ def test_order_matters() -> None:
 def test_true_negative() -> None:
     """no_action_calls passes a route-only turn and fails even a refused action call."""
     expect = {"no_action_calls": True, "action_calls": None}
-    question = [{"tool": "lookup_concept", "input": {"problem": "buffer size"}, "output": {"match": "single"}},
+    question = [{"tool": "cite_kb", "input": {"entries": ["buffer size"]}, "output": {"match": "single"}},
                 {"tool": "open_setting", "input": {"name": "buffer size"}, "output": {"attached": True, "destination": "buffer size"}}]
     assert not _failed(grade(expect, actual_outcome(question)))
     refused_only = [{"tool": "open_plugin", "input": {"plugin": "x"}, "output": {"attached": False, "reason": "r"}}]

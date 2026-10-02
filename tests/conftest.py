@@ -1,5 +1,6 @@
 """Shared fakes: scripted model responses, KB/route helpers, and the `run` fixture
-that drives one pipeline turn with the model client, lookup and research mocked.
+that drives one pipeline turn with the model client and research mocked (cite_kb
+runs for real against seed/problems.json).
 
 Test modules import the builders with `from conftest import ...` (tests/ is on
 sys.path under pytest's default import mode; keep this the only conftest.py)."""
@@ -11,7 +12,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from app import pipeline, tools
-from app.pipeline import executors, model_io
+from app.pipeline import executors, model_io, settings
 
 # --- model response builders -------------------------------------------------
 
@@ -42,31 +43,9 @@ def set_param(plugin: str, param: str, value: str, id_: str) -> SimpleNamespace:
     return tool_use("set_param", {"plugin": plugin, "param": param, "value": value}, id_)
 
 
-# --- lookup_concept outputs --------------------------------------------------
-
-
-def single(solution: str, action: dict, conf: str = "strong") -> dict:
-    """A single-solution lookup match whose solution maps to `action`."""
-    return {"match": "single", "problem": solution, "match_confidence": conf,
-            "solutions": [{"name": solution, "action": action}]}
-
-
-def bucket(problem: str, cands: dict[str, dict]) -> dict:
-    """A strong problem-bucket match: candidate name -> its action."""
-    return {"match": "problem", "problem": problem, "match_confidence": "strong",
-            "solutions": [{"name": n, "action": a} for n, a in cands.items()]}
-
-
-def fake_lookup(outputs: list[dict]):
-    """lookup_concept executor stub returning `outputs` in order (last one repeats)."""
-    n = 0
-
-    async def fake(inp: dict, fixture) -> dict:
-        nonlocal n
-        out = outputs[min(n, len(outputs) - 1)]
-        n += 1
-        return out
-    return fake
+def cite_kb(entries: list[str], id_: str) -> SimpleNamespace:
+    """A cite_kb call; the real executor (app.kb.cite) resolves it against seed/."""
+    return tool_use("cite_kb", {"entries": entries}, id_)
 
 
 # --- routes (real seed/routes.json, no DB) -----------------------------------
@@ -130,14 +109,14 @@ def research():
 
 @pytest.fixture
 def run(model, research):
-    """async run(responses, lookups=None, messages=None, **respond_kwargs) ->
+    """async run(responses, messages=None, early_exit=False, **respond_kwargs) ->
     (Result, decider_calls). Drives pipeline.respond() through scripted decider
-    responses with lookup_concept stubbed to return `lookups` in order."""
-    async def _run(responses: list, lookups: list[dict] | None = None,
-                   messages: list[dict] | None = None, **kwargs):
+    responses. settings.EARLY_EXIT_ON_ACTION is off unless asked for: most scripts
+    keep the decider going after an action, which is what they exercise."""
+    async def _run(responses: list, messages: list[dict] | None = None,
+                   early_exit: bool = False, **kwargs):
         calls = model.script(responses)
-        stubs = {"lookup_concept": fake_lookup(lookups or [{"match": "none"}])}
-        with patch.dict(executors.EXECUTORS, stubs):
+        with patch.object(settings, "EARLY_EXIT_ON_ACTION", early_exit):
             result = await pipeline.respond(messages or [{"role": "user", "content": "test"}], **kwargs)
         return result, calls
     return _run

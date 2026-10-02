@@ -60,7 +60,8 @@ def ordered_subsequence(expected: list[dict], got: list[dict]) -> bool:
 
 def actual_outcome(trace: list[dict], response_text: str = "", confidence_tier: str = "", sources: list | None = None,
                    auto_run: bool | None = None) -> dict:
-    lookup_calls = [c for c in trace if c["tool"] == "lookup_concept"]
+    # cite_kb keeps lookup_concept's result shape, so lookup fields grade citations the same way.
+    lookup_calls = [c for c in trace if c["tool"] in ("lookup_concept", "cite_kb")]
     research_calls = [c for c in trace if c["tool"] == "web_research"]
 
     # match / resolved_problem grade the FIRST lookup: a later lookup by exact

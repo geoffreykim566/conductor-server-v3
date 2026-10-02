@@ -1,7 +1,8 @@
 """Code-side reads of the user's own message: is it a question, an undo request, a
-greeting or closer, may its card auto-run, does it need a forced first lookup.
+greeting or closer, may its card auto-run, is it a go-ahead that forces a tool call.
 Each phrase list is deliberately narrow; why each phrase is in or out: README.md
 (Heuristics). Re-sweep the battery whenever a list changes."""
+import json
 import re
 
 from app.pipeline.transcript import last_user_text_index
@@ -42,7 +43,7 @@ _CLOSING_SIGNALS = (
     "bye", "goodbye", "see ya",
 )
 
-# Whole-project destructive requests: declined outright, so no forced lookup.
+# Whole-project destructive requests: declined outright, never forced to call a tool.
 _IRREVERSIBLE_SIGNALS = (
     "delete my entire project", "delete the entire project",
     "delete my whole project", "delete the whole project",
@@ -130,16 +131,33 @@ def is_bare_greeting(messages: list[dict]) -> bool:
     return normalized in _GREETING_SIGNALS
 
 
-def needs_first_lookup(messages: list[dict]) -> bool:
-    """Whether the turn's first decider call must call a tool, so a real question
-    can't be answered from memory with zero grounding. Re-asks, closers,
-    irreversible requests and greetings are exempt (README: Forced first call)."""
-    if last_user_message_matches(messages, _REASK_SIGNALS):
+def follows_a_card(messages: list[dict]) -> bool:
+    """Whether the reply before this turn's user message queued a card."""
+    cur = last_user_text_index(messages)
+    if cur is None:
         return False
-    if last_user_message_matches(messages, _CLOSING_SIGNALS):
-        return False
-    if last_user_message_matches(messages, _IRREVERSIBLE_SIGNALS):
-        return False
-    if is_bare_greeting(messages):
-        return False
-    return True
+    prev = last_user_text_index(messages[:cur])
+    for m in messages[(prev or 0):cur]:
+        if m.get("role") == "user" and isinstance(m.get("content"), list):
+            for b in m["content"]:
+                try:
+                    out = json.loads(b.get("content") or "{}") if isinstance(b, dict) else {}
+                except (TypeError, ValueError):
+                    continue
+                if isinstance(out, dict) and (out.get("attached") or any(
+                        (o.get("output") or {}).get("attached") for o in out.get("on_card") or [])):
+                    return True
+    return False
+
+
+def force_first_call(messages: list[dict]) -> bool:
+    """The one case the turn's first decider call must call a tool: a go-ahead
+    ("yes please, do it") after a reply that queued a card. Unforced, it got "press
+    Run" about the earlier card. Questions, re-asks, closers, irreversible requests
+    and greetings are never forced (README: Forced first call)."""
+    text = last_user_text(messages)
+    return (bool(text) and follows_a_card(messages) and not is_question(text)
+            and not last_user_message_matches(messages, _REASK_SIGNALS)
+            and not last_user_message_matches(messages, _CLOSING_SIGNALS)
+            and not last_user_message_matches(messages, _IRREVERSIBLE_SIGNALS)
+            and not is_bare_greeting(messages))

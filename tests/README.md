@@ -1,7 +1,7 @@
 # tests/
 
 pytest unit tests. Deterministic: the model is mocked, nothing hits the Anthropic,
-Voyage or web-search APIs, and no test needs the database.
+web-search APIs, and no test needs the database.
 
 ## Layout
 
@@ -35,9 +35,11 @@ docker compose -p <name> -f docker-compose.yml -f docker-compose.standalone.yml 
 
 - pytest + pytest-asyncio in auto mode (`pyproject.toml`): write `async def test_...`, no marker needed.
 - Never hit the API. Drive a turn with the `run` fixture:
-  `result, decider_calls = await run([resp(...), ...], lookups=[...], messages=[...], **respond_kwargs)`.
+  `result, decider_calls = await run([resp(...), ...], messages=[...], early_exit=False, **respond_kwargs)`.
   Decider calls take the scripted responses in order (last repeats); the writer call gets "writer text".
-  `lookup_concept` is stubbed to return `lookups` in order; `web_research` is the `research` mock.
+  `cite_kb` runs for real (`app.kb.cite` on `seed/problems.json`): cite real entry names via
+  `cite_kb([...], id)`. `web_research` is the `research` mock. `settings.EARLY_EXIT_ON_ACTION`
+  is off unless `early_exit=True`, so scripts keep the decider going after an action.
 - Builders come from conftest: `from conftest import resp, text_block, tool_use, single, bucket, route, ...`.
   Keep `tests/conftest.py` the only conftest so that import stays unambiguous.
 - Tunables: `patch.object(settings, "NAME", value)` on `app.pipeline.settings`. Never

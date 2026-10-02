@@ -15,4 +15,4 @@ class Result:
     pending_research_query: str | None = None
     sources: list[dict] = field(default_factory=list)  # web_research citations
     auto_run: bool = False  # card may run without Run (client setting permitting)
-    card_from_lookup: bool = False  # some step was queued by a lookup; never auto-runs
+    card_from_lookup: bool = False  # some step was queued by a citation; never auto-runs

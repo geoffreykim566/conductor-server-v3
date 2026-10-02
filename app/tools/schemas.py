@@ -1,36 +1,36 @@
 """The tool definitions sent to the decider. What each tool is for, and why the action
 tools are typed tools rather than KB rows: README.md."""
+from app import kb
 from app.tools.routes import ROUTES, route_line
 
-LOOKUP_CONCEPT_SCHEMA = {
-    "name": "lookup_concept",
+CITE_KB_SCHEMA = {
+    "name": "cite_kb",
     "description": (
-        "Call this before diagnosing any Logic Pro problem or naming any menu path, "
-        "shortcut, or settings location — never state one from memory. Results include "
-        "a match_confidence ('strong'/'moderate'/'weak') — this is advisory, not a "
-        "filter; judge for yourself whether a 'moderate' or 'weak' result is actually "
-        "relevant rather than treating it as grounded. If you already know the exact "
-        "name of a specific setting or destination (from a solution's own fix text, "
-        "from a bucket you were just given, or from your own knowledge), query with "
-        "that name directly rather than paraphrasing the user's original wording."
+        "Record which knowledge-base entries (the problems and solutions in your instructions) "
+        "your answer relies on. Call it in the same response as your answer and any action "
+        "call, whenever you diagnose a Logic Pro problem or state a fix, setting, menu path or "
+        "shortcut that comes from the KB -- never state one from memory. Cite the problem bucket "
+        "you diagnosed and the one solution you recommend; a cited solution that has an action "
+        "is queued on the reply's card if you don't call its action yourself. Don't cite a "
+        "candidate you only mention as the next thing to try. Pass an empty list when nothing in "
+        "the KB covers the question. Not needed for a plain command to open, add or set "
+        "something."
     ),
+    "strict": True,
     "input_schema": {
         "type": "object",
         "properties": {
-            "problem": {
-                "type": "string",
-                "description": (
-                    "Your own short (2-8 word) query — either a normalized description of the "
-                    "user's symptom (not their literal wording; recognize the underlying issue "
-                    "and phrase it the way this KB names things), or the exact name of a "
-                    "specific setting/destination you already know you want."
-                ),
+            "entries": {
+                "type": "array",
+                "items": {"type": "string", "enum": kb.ENTRY_NAMES},
+                "description": "Exact KB entry names (problem or solution headings), most important first.",
             }
         },
-        "required": ["problem"],
+        "required": ["entries"],
         "additionalProperties": False,
     },
 }
+
 
 # No side effect: it makes "this turn makes no claim" a fact in the trace rather
 # than something guessed from the reply text.
@@ -40,29 +40,38 @@ ASK_CLARIFYING_QUESTION_SCHEMA = {
         "Call this when your entire response for this turn is a clarifying question "
         "and nothing else -- no diagnosis, guidance, or claim alongside it. Marks the "
         "turn as making no claim, so it won't be hedged as an unconfirmed answer. Only "
-        "for the genuine-toss-up case this prompt already describes (a 'problem' result "
-        "with no distinguishing evidence yet). Never call this if you're also offering "
+        "for the genuine-toss-up case this prompt already describes (a KB problem with "
+        "several candidate causes and no distinguishing evidence yet). Never call this if you're also offering "
         "any guidance, even tentative guidance, in the same response -- that response "
         "should stand as a real (possibly hedged) answer, not a claim-free question. "
-        "Never call this alongside an action tool."
+        "Never call this alongside an action tool. If the question is about a KB problem, cite "
+        "it with cite_kb in the same response."
     ),
     "input_schema": {
         "type": "object",
-        "properties": {},
+        "properties": {
+            # Required: called with no text, the writer had nothing and invented an answer.
+            "question": {
+                "type": "string",
+                "description": "The exact clarifying question to ask the user, numbered options included.",
+            }
+        },
+        "required": ["question"],
         "additionalProperties": False,
     },
 }
 
-# Executor: app/research. The description is the only trigger; nothing forces a call.
+# Executor: app/research. The description is the only trigger; nothing forces a call
+# (research on every KB miss was rejected as the costlier, more eager option).
 WEB_RESEARCH_SCHEMA = {
     "name": "web_research",
     "description": (
         "Search the web for information outside this KB's coverage -- specific artist/producer "
-        "techniques, gear, current Logic Pro features/changes, or anything else lookup_concept has "
-        "no real match for (its match_confidence came back 'weak' or there was no match at all). "
+        "techniques, gear, current Logic Pro features/changes, or anything else the knowledge base "
+        "doesn't cover. "
         "Call this instead of answering from pretrained knowledge when a question asks for "
         "something you'd otherwise have to guess at. Don't call it for ordinary troubleshooting or "
-        "navigation questions lookup_concept already covers -- this is for genuinely out-of-KB "
+        "navigation questions the knowledge base already covers -- this is for genuinely out-of-KB "
         "information, not a first resort."
     ),
     "input_schema": {
@@ -87,7 +96,7 @@ OPEN_PLUGIN_SCHEMA = {
         "window if that plugin is already on the track. It runs on the user's Mac after your "
         "reply, when they press Run -- it has NOT happened when you write your reply. Works for "
         "any installed plugin, Apple or third-party, whether or not the KB mentions it. Use it "
-        "for a direct request to add / put / load / open a plugin; no lookup_concept call is "
+        "for a direct request to add / put / load / open a plugin; no KB entry is "
         "needed first. Several action calls in one reply run in call order as one card."
     ),
     "strict": True,
@@ -157,6 +166,9 @@ OPEN_SETTING_SCHEMA = {
         "choose one of its options, or omit it to open the pane with the current value showing "
         "and let the user pick.\n\nRoutes:\n"
         + "\n".join(route_line(name, route) for name, route in sorted(ROUTES.items()))
+        + "\n\nVerified locations you may state but NOT pass to open_setting (no runnable steps; "
+        "say where it is and let the user do it):\n"
+        + "\n".join(f"- {name}: {kb.route_path_text(name)}" for name in sorted(kb.REFERENCES))
     ),
     "strict": True,
     "input_schema": {
@@ -176,6 +188,6 @@ OPEN_SETTING_SCHEMA = {
     "cache_control": {"type": "ephemeral"},
 }
 
-TOOLS = [LOOKUP_CONCEPT_SCHEMA, ASK_CLARIFYING_QUESTION_SCHEMA, WEB_RESEARCH_SCHEMA,
+TOOLS = [CITE_KB_SCHEMA, ASK_CLARIFYING_QUESTION_SCHEMA, WEB_RESEARCH_SCHEMA,
          OPEN_PLUGIN_SCHEMA, SET_PARAM_SCHEMA, OPEN_SETTING_SCHEMA]
 ACTION_TOOLS = {"open_plugin", "set_param", "open_setting"}

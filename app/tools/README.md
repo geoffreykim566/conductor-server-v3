@@ -2,7 +2,7 @@
 
 The decider's tools: their schemas (`TOOLS`) and executors. There are two kinds:
 
-- **Knowledge:** `lookup_concept` (KB vector search), `web_research` (executor in `app/research/`), and `ask_clarifying_question` (no-op marker).
+- **Knowledge:** `cite_kb` (records the KB entries an answer used; executor in `app/kb/`), `web_research` (executor in `app/research/`), and `ask_clarifying_question` (carries the question).
 - **Actions:** `open_plugin`, `set_param`, `open_setting`. These don't *do* anything server-side. They validate and emit wire steps that the client runs when the user presses Run.
 
 ## Files
@@ -10,10 +10,9 @@ The decider's tools: their schemas (`TOOLS`) and executors. There are two kinds:
 | File | What |
 |---|---|
 | `schemas.py` | The six tool definitions sent to the model, plus `TOOLS` and `ACTION_TOOLS` |
-| `lookup.py` | `lookup_concept`: ranked search over problems + solutions; confidence labels; Voyage retry |
 | `actions.py` | Executors for the three action tools; `action_calls` (a KB solution's stored action -> calls) |
 | `choices.py` | Dropdown routes: match a value to an option, check the user named it |
-| `routes.py` | `ROUTES` loaded from `seed/routes.json`; how a route is described to the model |
+| `routes.py` | Runnable `ROUTES` (from `app.kb`); how a route is described to the model (desc + path) |
 | `route_steps.py` | A route's `path` -> client wire steps (menu chains, shortcuts, clicks) |
 | `turn_text.py` | ContextVars holding this turn's user text and the reply it answers |
 
@@ -23,10 +22,12 @@ The decider's tools: their schemas (`TOOLS`) and executors. There are two kinds:
 
 ## Quirks & why
 
-- **Actions are typed tools, not KB rows.** When they were KB rows ("open plugin" behind `lookup_concept`), the model had to find them first, and their names collided with plugin vocabulary ("plugin manager", "multipressor").
+- **Actions are typed tools, not KB rows.** When they were KB rows ("open plugin" behind the old vector lookup), the model had to find them first, and their names collided with plugin vocabulary ("plugin manager", "multipressor").
 - **`set_param.value` is a string**, parsed server-side (`_parse_param_value`). A number-or-on/off union wasn't held by the model even under strict mode.
 - **Routes are the only way to navigate.** The model names a route; the path that runs is always `seed/routes.json`'s. Model-written menu paths have been confidently wrong more than anything else in this codebase.
-- **`lookup_concept` ranks problems and solutions in one pass.** Checking one type first starved better matches of the other. A solution hit always resolves to its bucket (the one it's weighted highest in), so distance noise can't hide its siblings.
+- **`cite_kb`'s enum is every KB entry name**, so the model can't cite something that doesn't exist. How a citation resolves: `app/kb/README.md`.
+- **`ask_clarifying_question` requires the question text.** Called with no text, the writer had nothing to phrase and invented an answer.
+- **open_setting's description lists each route's path, plus the reference locations** the model may state but not queue.
 - **The confidence bands (0.40 / 0.60)** are advisory text for the model, not a filter. A hard floor kept admitting a different wrong match on every rephrase. They were tuned at 8 problems and never recalibrated, so gibberish can still read "moderate". Recalibrating was rejected: correct and wrong top-1 distances overlap, so no cutoff separates them. `query_log` holds real queries if it's ever revisited.
 - **No MCP.** One client and one server, both ours: it would add per-call overhead for no interop benefit.
 - **The toggle gate:** a route with `toggle_ax_key` is refused when live state says it's already in its target state, because running it would flip it *away*.
@@ -48,5 +49,5 @@ The decider's tools: their schemas (`TOOLS`) and executors. There are two kinds:
 ## Adding things
 
 - **A route:** add it to `seed/routes.json` (`desc`, `path`, optional `choice` / `picks` / `wait_for_run` / `toggle_ax_key`). Verify the path live in Logic first. Rebuild (it's read at import).
-- **A KB solution that maps to an action:** set its `action` in `seed/problems.json` (`{"open_setting": "route name"}` or `{"open_plugin": {...}}`). `app.kb.load` rejects unknown routes.
+- **A KB solution that maps to an action:** set its `action` in `seed/problems.json` (`{"open_setting": "route name"}`, `{"open_setting": {"name", "value"}}` or `{"open_plugin": {...}}`). `app/kb/data.py` rejects unknown routes at import.
 - **A new action tool:** schema in `schemas.py` + `ACTION_TOOLS`, executor in `actions.py`, a case in `action_calls`, then the pipeline side (`app/pipeline/README.md`, Adding things), then the client executor.

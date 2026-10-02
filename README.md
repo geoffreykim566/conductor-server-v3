@@ -8,10 +8,10 @@ The API the Conductor macOS client talks to. A user's message plus live Logic Pr
 |---|---|
 | `app/api/` | HTTP layer: routes, request validation, SSE, `/admin` dashboard |
 | `app/pipeline/` | One turn: decider tool loop -> card -> writer reply. **Start here for behaviour.** |
-| `app/tools/` | Tool schemas the decider sees, and their executors (lookup, actions, routes) |
+| `app/tools/` | Tool schemas the decider sees, and their executors (actions, routes) |
 | `app/prompts/` | Decider and writer system prompts |
 | `app/research/` | `web_research`: nested web-search call |
-| `app/kb/` | Embeddings and seeding the KB from `seed/` |
+| `app/kb/` | The KB, rendered from `seed/` into the decider's prompt; `cite_kb` |
 | `app/core/` | Config, DB, signing, rate limit, budget |
 | `seed/` | KB content (`problems.json`) and approved navigation routes (`routes.json`) |
 | `migrations/` | SQL schema, applied on a fresh DB volume |
@@ -25,19 +25,18 @@ Each folder has its own README with the details and quirks for that part.
 
 ```bash
 docker compose up -d --build                         # db on :5435, API on :8000
-docker compose exec app python -m app.kb.load        # seed/reseed the KB (fresh volume, or after editing seed/)
 docker compose exec app python -m pytest             # unit tests
 docker compose exec app python -m evals.battery.runner > test_runs/$(date +%F)/run.log   # battery
 ```
 
-`.env.local` holds the secrets (`CENTRAL_ANTHROPIC_KEY`, `VOYAGE_API_KEY`, `CONDUCTOR_ID_SECRET`, `ADMIN_PASSWORD`). Every setting is in `app/core/config.py`.
+`.env.local` holds the secrets (`CENTRAL_ANTHROPIC_KEY`, `CONDUCTOR_ID_SECRET`, `ADMIN_PASSWORD`). Every setting is in `app/core/config.py`.
 
 ## Quirks
 
 - **`app/` is baked into the image.** After editing anything under `app/` or `seed/`, run `docker compose up -d --build` or the container keeps running the old code. `tests/`, `evals/` and `test_runs/` are bind-mounted and live.
 - **Migrations only run on a fresh volume** (they're mounted as `docker-entrypoint-initdb.d`). For an existing DB, apply the new file by hand: `docker compose exec -T db psql -U conductor -d conductor < migrations/00N_x.sql`. Prod gets the same by hand.
 - **Second stack for a branch or worktree:** `docker compose -p <name> -f docker-compose.yml -f docker-compose.standalone.yml up -d --build`. It has no ports, bind-mounts the whole checkout with `PYTHONPATH=/srv` (so `app/` edits are live), and uses its own DB volume (seed it once). Drive it with `docker compose -p <name> -f docker-compose.yml -f docker-compose.standalone.yml exec -T app ...`.
-- **Stale code before new theories.** If behaviour doesn't match the code, first check the image was rebuilt and the KB reseeded.
+- **Stale code before new theories.** If behaviour doesn't match the code, first check the image was rebuilt (the KB is read from `seed/` at import).
 - **Log with `log.warning("[marker] ...")`, never `log.info`.** The root logger isn't configured, so info lines never reach `docker compose logs`; grep-able `[markers]` are the convention.
 - **Stateless.** Nothing is stored between requests except users/events. The client round-trips the full history (`app/api/README.md`).
 

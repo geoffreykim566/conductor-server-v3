@@ -13,15 +13,15 @@ DATABASE_URL = os.environ.get(
     "DATABASE_URL", "postgresql://conductor:conductor@localhost:5432/conductor"
 )
 
-MODEL = "claude-sonnet-5"  # the decider
+# The decider. Sonnet 5.5 rejects forced tool_choice; see pipeline/settings.py.
+MODEL = "claude-sonnet-5-5"
 MAX_TOKENS = 3072
 # The writer only phrases already-decided facts, so it runs on a cheaper model.
 WRITER_MODEL = "claude-haiku-4-5-20251001"
-# web_research's nested call; 90s timed out every real research call.
+# web_research's nested call (Sonnet 5 timed out at 150s on half the battery's calls).
+RESEARCH_MODEL = "claude-sonnet-5-5"
+# 90s timed out every real research call.
 RESEARCH_CALL_TIMEOUT_S = float(os.environ.get("RESEARCH_CALL_TIMEOUT_S", "150.0"))
-
-VOYAGE_API_KEY = os.environ.get("VOYAGE_API_KEY", "")
-VOYAGE_MODEL = "voyage-3.5"  # 1024-dim; index and query must use the same model
 
 FREE_LIMIT = int(os.environ.get("FREE_LIMIT", "50"))
 

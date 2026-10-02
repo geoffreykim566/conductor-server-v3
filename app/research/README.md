@@ -1,6 +1,6 @@
 # research
 
-`web_research(query)`: the executor for the `web_research` tool. It's one nested `MODEL` + `web_search` call (up to 3 searches, up to 2 `pause_turn` continuations) that returns `findings`, `sources`, `source_tier`, and `_usage`.
+`web_research(query)`: the executor for the `web_research` tool. It's one nested `RESEARCH_MODEL` + `web_search` call (up to 3 searches, up to 2 `pause_turn` continuations) that returns `findings`, `sources`, `source_tier`, and `_usage`.
 
 | File | What |
 |---|---|
@@ -9,8 +9,8 @@
 
 ## How it's wired
 
-- **The decider decides when to research.** The tool description is the only trigger. Firing it on every weak lookup was rejected as the costlier, more eager option.
-- **Research on a KB miss is the intended fallback** (user call), so a turn that escalates to research after the lookup cap isn't graded as a failure.
+- **The decider decides when to research.** The tool description is the only trigger. Firing it on every KB miss was rejected as the costlier, more eager option.
+- **Research on a KB miss is the intended fallback** (user call), so a turn that escalates to research when nothing in the KB fits isn't graded as a failure.
 - **`_usage`** is popped by `pipeline/dispatch.py`. It counts toward the turn's spend but never reaches the model.
 - **The "research" tier:** a successful call earns it (`pipeline/confidence.py`), trusted like "strong". A timed-out or empty call doesn't. Sources reach the client as chips.
 - **With `research_confirm`,** the turn parks for user approval before this runs (`pipeline/README.md`, Research approval).

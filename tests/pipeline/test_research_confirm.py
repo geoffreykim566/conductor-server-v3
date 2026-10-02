@@ -21,7 +21,7 @@ def parked_history_with_prior_attach() -> list[dict]:
     successful open_setting) BEFORE deciding to research something else."""
     return USER + [
         {"role": "assistant", "content": [
-            {"type": "tool_use", "id": "call_l", "name": "lookup_concept", "input": {"problem": "sample rate"}},
+            {"type": "tool_use", "id": "call_l", "name": "cite_kb", "input": {"entries": ["sample rate mismatch"]}},
         ]},
         {"role": "user", "content": [
             {"type": "tool_result", "tool_use_id": "call_l", "content": json.dumps({"match": "problem"})},
@@ -65,7 +65,7 @@ async def test_resume_deny_skips_research_and_restores_state(run, research) -> N
     result, _ = await run([FINAL], messages=parked, resume="deny_research", research_confirm=True)
     assert research.await_count == 0, "deny must never run the research executor"
     tools_called = [c["tool"] for c in result.trace]
-    assert tools_called == ["lookup_concept", "open_setting", "web_research"], tools_called
+    assert tools_called == ["cite_kb", "open_setting", "web_research"], tools_called
     assert result.trace[-1]["output"] == notes.RESEARCH_DECLINED, result.trace[-1]["output"]
     assert result.walkthrough_steps == [["menu", "File"]], "attach made before the prompt must survive the resume"
     # The model sees the decline as a normal tool_result, so the transcript is API-valid.

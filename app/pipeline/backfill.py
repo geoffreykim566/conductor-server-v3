@@ -25,7 +25,7 @@ def backfill_walkthrough(messages: list[dict], text: str) -> dict | None:
                 result = json.loads(block["content"])
             except (TypeError, ValueError):
                 continue
-            # on_card: an action a lookup queued itself, recorded only there.
+            # on_card: an action a citation queued itself, recorded only there.
             for r in [result] + [o.get("output") or {} for o in result.get("on_card") or []]:
                 if r.get("attached") and r.get("destination") and r.get("steps"):
                     attached_by_destination[r["destination"]] = r["steps"]

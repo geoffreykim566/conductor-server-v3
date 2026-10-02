@@ -152,7 +152,9 @@ def action_calls(action) -> list[tuple[str, dict]]:
     for call in (action if isinstance(action, list) else [action] if action else []):
         for tool, arg in call.items():
             if tool == "open_setting":
-                out.append((tool, {"name": arg}))
+                # a route name, or {"name", "value"} to choose a dropdown value,
+                # checked like a model's call
+                out.append((tool, dict(arg) if isinstance(arg, dict) else {"name": arg}))
             elif tool in ACTION_TOOLS and isinstance(arg, dict):
                 out.append((tool, dict(arg)))
     return out

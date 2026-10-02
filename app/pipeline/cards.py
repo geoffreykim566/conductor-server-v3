@@ -4,7 +4,6 @@ Rules and why: README.md (One card per turn)."""
 import json
 
 from app import tools
-from app.pipeline import settings
 
 
 def attach_key(name: str, inp: dict) -> str:
@@ -14,7 +13,7 @@ def attach_key(name: str, inp: dict) -> str:
 
 def endorse_key(name: str, inp: dict) -> str:
     """Identity by target only. The model calling open_plugin{plugin, track} after a
-    lookup queued open_plugin{plugin} is agreement, so its version replaces the step."""
+    citation queued open_plugin{plugin} is agreement, so its version replaces the step."""
     if name == "open_plugin":
         return f"open_plugin:{str(inp.get('plugin', '')).strip().lower()}"
     if name == "set_param":
@@ -31,45 +30,39 @@ def _cand_key(name: str, inp: dict) -> str:
     return attach_key(name, inp)
 
 
-def bucket_candidates(trace: list[dict]) -> dict[str, str]:
-    """Candidate key -> problem bucket, for every multi-candidate lookup this turn
-    plus moderate single matches (settings.PICK_ON_MODERATE_SINGLE). Weak matches
-    are skipped: forcing a pick on one pressures the model into queuing a half-match."""
-    out: dict[str, str] = {}
+def bucket_candidates(trace: list[dict]) -> dict[str, tuple[str, str]]:
+    """Candidate key -> (problem bucket, solution), for every bucket cited this turn."""
+    out: dict[str, tuple[str, str]] = {}
     for c in trace:
-        o = c["output"] if c["tool"] == "lookup_concept" else {}
-        conf = str(o.get("match_confidence", ""))
-        moderate_single = (
-            settings.PICK_ON_MODERATE_SINGLE and o.get("match") == "single" and conf.startswith("moderate")
-        )
-        if o.get("match") != "problem" and not moderate_single:
-            continue
-        if conf.startswith("weak"):
+        o = c["output"] if c["tool"] == "cite_kb" else {}
+        if o.get("match") != "problem":
             continue
         for sol in o.get("solutions") or []:
             for tool, inp in tools.action_calls(sol.get("action")):
-                out.setdefault(_cand_key(tool, inp), o.get("problem"))
+                # Keyed by solution too: one solution's several actions are one
+                # candidate, not alternatives ("do both": buffer + low latency mode).
+                out.setdefault(_cand_key(tool, inp), (o.get("problem"), sol.get("name")))
     return out
 
 
 def is_alternative_pick(name: str, inp: dict, trace: list[dict]) -> bool:
-    """True if another candidate from this action's bucket is already on the card:
-    a fallback fix, not a second request."""
+    """True if a different solution from this action's bucket is already on the
+    card: a fallback fix, not a second request."""
     cands = bucket_candidates(trace)
     key = _cand_key(name, inp)
-    problem = cands.get(key)
-    if problem is None:
+    mine = cands.get(key)
+    if mine is None:
         return False
-    return any(
-        c["tool"] in tools.ACTION_TOOLS and c["output"].get("attached")
-        and cands.get(_cand_key(c["tool"], c["input"])) == problem
-        and _cand_key(c["tool"], c["input"]) != key
-        for c in trace
-    )
+    for c in trace:
+        other = cands.get(_cand_key(c["tool"], c["input"])) if c["tool"] in tools.ACTION_TOOLS else None
+        if (other and c["output"].get("attached") and _cand_key(c["tool"], c["input"]) != key
+                and other[0] == mine[0] and other[1] != mine[1]):
+            return True
+    return False
 
 
 def needs_pick(trace: list[dict], card: list) -> bool:
-    """A bucket lookup returned actionable candidates and the turn is about to end
+    """A cited bucket has actionable candidates and the turn is about to end
     with nothing on the card and no clarifying question."""
     if card or any(c["tool"] == "ask_clarifying_question" for c in trace):
         return False

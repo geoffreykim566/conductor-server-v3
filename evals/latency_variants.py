@@ -3,7 +3,7 @@ pipeline variants (settings overrides), interleaved so every variant sees the sa
 conditions, and records per-turn timings, cache accounting, verdicts and the FULL answer
 text (latency without answers can't judge anything). See README.md.
 
-    docker compose exec -T app python -m evals.latency_variants [--runs N] [--variants A,A3] [--out DIR] [--scenarios a,b]
+    docker compose exec -T app python -m evals.latency_variants [--runs N] [--variants A,no-early-exit] [--out DIR] [--scenarios a,b]
 
 Outputs <out>/latency_variants.log (transcripts + tables) and
 <out>/latency_variants.jsonl (one record per turn).
@@ -19,20 +19,20 @@ import sys
 import time
 from pathlib import Path
 
-import httpx
 
 from app.core import db
 from app.core.config import MODEL
 from app.pipeline import model_io, settings
-from app.tools import lookup as tools_lookup
 from evals.battery import runner as battery
+from evals.battery.paths import ungrounded_paths
 
 # name -> pipeline settings attributes to set for that variant. Every attribute
 # any variant touches is reset to its import-time value before each turn, so
 # variants can't leak into each other.
 VARIANTS: dict[str, dict] = {
-    "A": {},                              # pipeline as is
-    "A3": {"LOOKUP_ATTEMPT_LIMIT": 3},    # one fewer lookup before the cap
+    "A": {},                                       # pipeline as is
+    "no-early-exit": {"EARLY_EXIT_ON_ACTION": False},
+    "effort-default": {"DECIDER_EFFORT": None},    # the model's default (high)
 }
 
 # A diverse subset: direct / indirect / ambiguous in-KB, collisions, KB gaps,
@@ -81,16 +81,18 @@ def _call_usd(model: str, u) -> float:
 
 
 _orig_call_model = model_io.call_model
-_orig_embed = tools_lookup.embed
+_KB_TOOLS = ("lookup_concept", "cite_kb")  # either side of a KB-in-prompt comparison
 
 
-async def _timed_call_model(system, tools_param, msgs, on_chunk, tool_choice=None, model=MODEL):
+async def _timed_call_model(system, tools_param, msgs, on_chunk, tool_choice=None, model=None):
     t0 = time.monotonic()
     resp = await _orig_call_model(system, tools_param, msgs, on_chunk, tool_choice, model)
     u = getattr(resp, "usage", None)
+    role = "decider" if model is None else "writer"
+    model = model or MODEL
     _model_calls.append({
         "model": model.split("-")[1] if "-" in model else model,
-        "role": "writer" if "haiku" in model else "decider",
+        "role": role,
         "usd": round(_call_usd(model, u), 6),
         "s": round(time.monotonic() - t0, 2),
         "in": getattr(u, "input_tokens", None),
@@ -100,17 +102,6 @@ async def _timed_call_model(system, tools_param, msgs, on_chunk, tool_choice=Non
         "forced": tool_choice is not None,
     })
     return resp
-
-
-async def _timed_embed_ok(texts, input_type="document"):
-    t0 = time.monotonic()
-    try:
-        out = await _orig_embed(texts, input_type=input_type)
-    except httpx.HTTPStatusError as exc:
-        _embeds.append({"s": round(time.monotonic() - t0, 2), "status": exc.response.status_code})
-        raise
-    _embeds.append({"s": round(time.monotonic() - t0, 2), "status": 200})
-    return out
 
 
 _turn_records: list[dict] = []
@@ -123,11 +114,9 @@ async def _timed_respond(messages, **kwargs):
     t0 = time.monotonic()
     result = await _orig_respond(messages, **kwargs)
     wall = time.monotonic() - t0
-    # _embed_with_retry sleeps 15/30/45... between attempts; that sleep is
-    # not inside embed() so it shows up as wall - model - embed.
     model_s = sum(c["s"] for c in _model_calls)
     embed_s = sum(e["s"] for e in _embeds)
-    pre = next((c for c in result.trace if c["tool"] == "lookup_concept"), None)
+    pre = next((c for c in result.trace if c["tool"] in _KB_TOOLS), None)
     _turn_records.append({
         "text": messages[-1]["content"] if isinstance(messages[-1].get("content"), str) else "",
         "wall_s": round(wall, 2),
@@ -139,13 +128,15 @@ async def _timed_respond(messages, **kwargs):
         "usd": round(sum(c["usd"] for c in _model_calls), 5),
         "n_embeds": len(_embeds),
         "n_429": sum(1 for e in _embeds if e["status"] == 429),
-        "n_lookups": sum(1 for c in result.trace if c["tool"] == "lookup_concept"),
+        "n_lookups": sum(1 for c in result.trace if c["tool"] in _KB_TOOLS),
         "tools": [c["tool"] for c in result.trace],
-        "first_lookup_query": (pre or {}).get("input", {}).get("problem"),
+        "first_lookup_query": (pre or {}).get("input", {}).get("problem") or (pre or {}).get("input", {}).get("entries"),
         "first_lookup_conf": ((pre or {}).get("output") or {}).get("match_confidence"),
         "first_lookup_match": ((pre or {}).get("output") or {}).get("match"),
         "first_lookup_problem": ((pre or {}).get("output") or {}).get("problem"),
         "attached": result.walkthrough_steps is not None,
+        # Menu paths stated that aren't in any cited text or approved route.
+        "ungrounded_paths": ungrounded_paths(result.trace, result.text),
         "tier": result.confidence_tier,
         "response": result.text,
     })
@@ -164,7 +155,6 @@ async def run(variants: list[str], runs: int, out_dir: Path) -> None:
         sys.exit(f"scenarios not in battery.json: {missing}")
 
     model_io.call_model = _timed_call_model
-    tools_lookup.embed = _timed_embed_ok
     battery.respond = _timed_respond
 
     defaults = {attr: getattr(settings, attr) for v in VARIANTS.values() for attr in v}

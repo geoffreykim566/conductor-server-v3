@@ -14,7 +14,7 @@ Model-in-the-loop evaluation. These hit the real API and the real KB, unlike `te
 
 ## Running the battery
 
-Rebuild and reseed first if `app/` or `seed/` changed, or you're grading the old code.
+Rebuild first if `app/` or `seed/` changed, or you're grading the old code.
 
 ```bash
 mkdir -p test_runs/$(date +%F)
@@ -56,7 +56,8 @@ A top-level `expect` grades the final turn. A per-turn `expect` grades that turn
 
 - **`expect` is written before running, never fitted to what happened.** A note that describes behaviour without asserting it is untested; add the assert.
 - **The grader keeps its own `ACTION_TOOLS`** rather than importing `app.tools`, so it can grade any build.
-- **`match` / `resolved_problem` grade the first lookup**, since later lookups by exact name are a legitimate second step.
+- **`match` / `resolved_problem` grade the first `cite_kb` (or old `lookup_concept`) call.** A later call is a legitimate second step.
+- **`battery/paths.py` (`ungrounded_paths`)** reports menu paths an answer states that are in neither its cited text nor a route. The latency harness records it per turn; it's not asserted.
 - **Known grader issues:** `no_completion_claims` flags descriptive "is set", and `match` checks can fail correct final answers. Read the FAIL before believing it.
 - **Code-guaranteed scenarios** (e.g. the toggle gate refusing an attach) pass whatever the model does. They're regression tests for that code path, not model judgment.
 - **Latency A/B must record full answers.** Use the same prompts and interleave the variants. n=2 per cell can't judge quality; the battery can. Add a variant in `VARIANTS` as `{"SETTING_NAME": value}`.

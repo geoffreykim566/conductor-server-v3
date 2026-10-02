@@ -1,7 +1,7 @@
 # Overlay for a second, isolated stack (a worktree or branch) next to the main one:
 # no published ports, and the whole checkout bind-mounted with PYTHONPATH=/srv so
-# app/ edits are live without a rebuild. Own volume per project name, so seed it
-# once with `exec app python -m app.kb.load`. See README.md.
+# app/ edits are live without a rebuild. Own DB volume per project name (the KB is
+# read from seed/ at import; nothing to seed). See README.md.
 #
 #   docker compose -p <name> -f docker-compose.yml -f docker-compose.standalone.yml up -d --build
 services:

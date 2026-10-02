@@ -3,21 +3,29 @@ from __future__ import annotations
 
 import pytest
 
-from conftest import bucket, open_plugin, resp, text_block, tool_use
+from conftest import cite_kb, open_plugin, resp, text_block, tool_use
 
 
-async def test_a_lookup_turn_never_auto_runs(run) -> None:
-    """A card the KB led to waits for Run; the same action asked for directly auto-runs."""
-    lookups = [bucket("track deselects", {"bypass control surfaces": {"open_setting": "bypass control surfaces"}})]
+async def test_a_citation_turn_never_auto_runs(run) -> None:
+    """A card the KB led to waits for Run (even once the model endorses it); the
+    same action asked for directly auto-runs."""
     result, _ = await run([
-        resp(tool_use("lookup_concept", {"problem": "track deselects on plugin click"}, "l1")),
+        resp(cite_kb(["MIDI keyboard not triggering notes in Logic"], "l1")),
         resp(tool_use("open_setting", {"name": "bypass control surfaces"}, "w1")),
         resp(text_block("try disabling control surfaces")),
-    ], lookups=lookups, messages=[{"role": "user", "content": "logic randomly deselects my track when i click a knob"}])
+    ], messages=[{"role": "user", "content": "logic ignores my midi keyboard, fix it"}])
     assert result.walkthrough_steps and result.auto_run is False, (result.walkthrough_steps, result.auto_run)
     result, _ = await run([resp(tool_use("open_setting", {"name": "bypass control surfaces"}, "w1")), resp(text_block("ok"))],
                           messages=[{"role": "user", "content": "turn off control surfaces"}])
     assert result.auto_run is True, result.auto_run
+
+
+async def test_empty_citation_does_not_block_auto_run(run) -> None:
+    """Only a citation that names entries makes the card wait; citing nothing doesn't."""
+    result, _ = await run([resp(cite_kb([], "l1"), tool_use("open_setting", {"name": "bypass control surfaces"}, "w1")),
+                           resp(text_block("ok"))],
+                          messages=[{"role": "user", "content": "turn off control surfaces"}])
+    assert result.walkthrough_steps and result.auto_run is True, (result.walkthrough_steps, result.auto_run)
 
 
 async def test_wait_for_run_route_never_auto_runs(run) -> None:

@@ -1,18 +1,16 @@
-"""Approved navigation routes (seed/routes.json). The model only ever names a route;
-the path that runs is always this file's. Route format and `choice` blocks: README.md."""
-import json
-from pathlib import Path
+"""Approved navigation routes (seed/routes.json, loaded by app.kb). The model only ever
+names a route; the path that runs is always the file's. Route format: README.md."""
+from app import kb
 
-ROUTES: dict[str, dict] = json.loads(
-    (Path(__file__).parents[2] / "seed" / "routes.json").read_text()
-)
+# Runnable routes only: reference entries (kb.REFERENCES) can never be queued.
+ROUTES: dict[str, dict] = kb.ROUTES
 
 # Values an ordered dropdown route accepts besides its listed options.
 RELATIVE_VALUES = ("larger", "smaller")
 
 
 def route_line(name: str, route: dict) -> str:
-    line = f"- {name}: {route['desc']}"
+    line = f"- {name}: {route['desc']} -- {kb.route_path_text(name)}"
     choice = route.get("choice")
     if choice is None:
         return line

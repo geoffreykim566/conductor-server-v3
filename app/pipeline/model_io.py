@@ -7,6 +7,7 @@ from typing import Awaitable, Callable
 from anthropic import AsyncAnthropic
 
 from app.core.config import CENTRAL_ANTHROPIC_KEY, MAX_TOKENS, MODEL
+from app.pipeline import settings
 
 OnChunk = Callable[[str], Awaitable[None]]
 OnStatus = Callable[[str], Awaitable[None]]
@@ -22,12 +23,19 @@ async def call_model(
     msgs: list[dict],
     on_chunk: OnChunk | None,
     tool_choice: dict | None = None,
-    model: str = MODEL,
+    model: str | None = None,
 ):
     """One messages.create call, or the streamed equivalent when on_chunk is given
-    (only the writer streams). Logs per-call timing and cache accounting as
-    [model_call] so cache breakpoints can be checked from prod logs."""
+    (only the writer streams). model=None means the decider: config.MODEL, resolved
+    at call time, plus settings.DECIDER_EFFORT / DECIDER_THINKING. Logs per-call
+    timing and cache accounting as [model_call]."""
+    decider = model is None
+    model = MODEL if decider else model
     kwargs = dict(model=model, max_tokens=MAX_TOKENS, system=system, messages=msgs)
+    if decider and settings.DECIDER_EFFORT is not None:
+        kwargs["output_config"] = {"effort": settings.DECIDER_EFFORT}
+    if decider and settings.DECIDER_THINKING is not None:
+        kwargs["thinking"] = settings.DECIDER_THINKING
     if tools_param is not None:
         kwargs["tools"] = tools_param
     if tool_choice is not None:

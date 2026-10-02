@@ -4,19 +4,7 @@ import json
 from dataclasses import dataclass, field
 
 from app import tools
-from app.pipeline import settings
 from app.pipeline.cards import attach_key, endorse_key, mark_replaced, replace_span
-
-
-def _lookup_is_unproductive(output: dict, buckets_seen: set) -> bool:
-    """See settings.COUNT_ALL_LOOKUPS. A capped/errored call isn't a lookup result at all."""
-    if "error" in output:
-        return False
-    if output.get("match") == "none":
-        return True
-    if str(output.get("match_confidence", "")).startswith("weak"):
-        return True
-    return output.get("problem") in buckets_seen
 
 
 @dataclass
@@ -25,8 +13,6 @@ class TurnState:
     # Every iteration's text, not just the last: text written alongside a tool
     # call is part of the answer.
     text_parts: list[str] = field(default_factory=list)
-    lookups_counted: int = 0  # toward settings.LOOKUP_ATTEMPT_LIMIT
-    buckets_seen: set = field(default_factory=set)
     card_steps: list = field(default_factory=list)  # every attach this turn, in call order
     attach_keys: set = field(default_factory=set)
     queued_by_lookup: dict[str, tuple[int, int]] = field(default_factory=dict)  # endorse key -> its span
@@ -45,11 +31,6 @@ class TurnState:
 
     def replace_steps(self, start: int, end: int, new: list) -> None:
         replace_span(self.card_steps, start, end, new, self.queued_by_lookup, self.route_spans)
-
-    def count_lookup(self, output: dict) -> None:
-        if settings.COUNT_ALL_LOOKUPS or _lookup_is_unproductive(output, self.buckets_seen):
-            self.lookups_counted += 1
-        self.buckets_seen.add(output.get("problem"))
 
 
 def restore_turn_state(tail: list[dict]) -> TurnState:
@@ -78,9 +59,8 @@ def restore_turn_state(tail: list[dict]) -> TurnState:
                 if not isinstance(output, dict):
                     output = {"raw": output}
                 state.trace.append({"tool": call["tool"], "input": call["input"], "output": output})
-                if call["tool"] == "lookup_concept":
-                    state.count_lookup(output)
-                    # Actions a lookup queued itself are recorded only in its own result.
+                if call["tool"] == "cite_kb":
+                    # Actions a citation queued itself are recorded only in its own result.
                     for auto in output.get("on_card") or []:
                         state.trace.append({"tool": auto["tool"], "input": auto["input"],
                                             "output": auto["output"], "auto_from": output.get("problem")})

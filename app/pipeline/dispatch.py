@@ -1,6 +1,6 @@
 """Running one tool call against the turn's card: duplicates, endorsements of
-lookup-queued steps, re-visited settings, the attach cap, commit-to-one, the lookup
-cap, and the auto-attach a strong single lookup triggers. Rules: README.md (One card per turn)."""
+citation-queued steps, re-visited settings, the attach cap, commit-to-one, and the
+auto-attach a citation triggers. Rules: README.md (One card per turn)."""
 import json
 
 from app import tools
@@ -12,10 +12,8 @@ from app.pipeline.turn_state import TurnState
 
 async def _execute(tu, state: TurnState, ax_fixture: dict | None, research_denied: bool) -> dict:
     name, inp = tu.name, tu.input
-    if name == "lookup_concept" and state.lookups_counted >= settings.LOOKUP_ATTEMPT_LIMIT:
-        return {"error": notes.LOOKUP_CAP_ERROR}
     if name in tools.ACTION_TOOLS and endorse_key(name, inp) in state.queued_by_lookup:
-        # The model called what a lookup already queued: agreement. Its version
+        # The model called what a citation already queued: agreement. Its version
         # replaces the step, which stops counting as lookup-queued (may auto-run).
         result = await EXECUTORS[name](inp, ax_fixture)
         if result.get("attached"):
@@ -54,22 +52,26 @@ async def _execute(tu, state: TurnState, ax_fixture: dict | None, research_denie
     return {"error": f"unknown tool {name!r}"} if executor is None else await executor(inp, ax_fixture)
 
 
-def _is_strong_single(result: dict) -> bool:
-    return (result.get("match") == "single"
-            and str(result.get("match_confidence", "")).startswith("strong"))
-
-
-async def _queue_from_lookup(result: dict, state: TurnState, ax_fixture: dict | None) -> tuple[dict, list[dict]]:
-    """A strong single-solution lookup queues that solution's action itself.
-    Recorded in the lookup's own result as on_card (the only record of it)."""
+async def _queue_from_citation(result: dict, state: TurnState, ax_fixture: dict | None) -> tuple[dict, list[dict]]:
+    """Cited solutions' actions are queued, in citation order, if the model didn't
+    call them. Commit-to-one holds inside one citation too: a second cited
+    candidate from a bucket an earlier one filled is an alternative. Recorded in
+    the citation's own result as on_card (the only record of it)."""
     on_card: list[dict] = []
-    sol = (result.get("solutions") or [{}])[0]
-    for tool, inp in tools.action_calls(sol.get("action")):
+    sols = {sol["name"]: sol for sol in result.get("solutions") or []}
+    calls, used_buckets = [], set()
+    for name in result["recommended"]:
+        sol = sols.get(name) or {}
+        alt = sol.get("bucket") is not None and sol["bucket"] in used_buckets
+        if sol.get("bucket") is not None:
+            used_buckets.add(sol["bucket"])
+        calls += [(tool, inp, alt) for tool, inp in tools.action_calls(sol.get("action"))]
+    for tool, inp, alt in calls:
         key = attach_key(tool, inp)
         if (key in state.attach_keys or len(state.attach_keys) >= settings.MAX_ATTACHES_PER_TURN
                 or (tool == "open_setting" and endorse_key(tool, inp) in state.route_spans)):
             continue
-        if is_alternative_pick(tool, inp, state.trace):
+        if alt or is_alternative_pick(tool, inp, state.trace):
             on_card.append({"tool": tool, "input": inp,
                             "output": {"attached": False, "reason": notes.FALLBACK_REFUSAL}})
             continue
@@ -97,12 +99,10 @@ async def handle_tool_use(tu, state: TurnState, ax_fixture: dict | None,
     if call_usage:
         usage.append(call_usage)
     on_card: list[dict] = []
-    if tu.name == "lookup_concept" and _is_strong_single(result):
-        result, on_card = await _queue_from_lookup(result, state, ax_fixture)
+    if tu.name == "cite_kb" and result.get("recommended"):
+        result, on_card = await _queue_from_citation(result, state, ax_fixture)
     state.trace.append({"tool": tu.name, "input": tu.input, "output": result})
     state.trace.extend({**o, "auto_from": result.get("problem")} for o in on_card)
-    if tu.name == "lookup_concept" and "error" not in result:
-        state.count_lookup(result)
     if (tu.name in tools.ACTION_TOOLS and result.get("attached")
             and not result.get("already_queued") and not result.get("replaces_earlier")):
         span = state.append_steps(tu.name, tu.input, result.get("steps"))

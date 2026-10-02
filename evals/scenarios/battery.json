@@ -185,10 +185,13 @@
   },
   {
     "name": "recording_silent_context",
-    "note": "distinguisher: meters dont move at all + tried a different mic -> points to permissions not the interface. 'microphone permissions' has no path by design (v1's original data leaves it path-less -- it's a macOS System Settings location, not a Logic Pro one), so no walkthrough is ever expected even when the diagnosis is correct",
+    "note": "distinguisher: meters dont move at all + tried a different mic -> points to permissions not the interface. 'microphone permissions' has no path by design (v1's original data leaves it path-less -- it's a macOS System Settings location, not a Logic Pro one), so no walkthrough is ever expected even when the diagnosis is correct 2026-09-28: an Audio settings card (checking the input device, the second candidate) is accepted alongside the permission fix (user call).",
     "expect": {
       "match": "problem",
-      "walkthrough_destination": null
+      "walkthrough_destination": [
+        null,
+        "audio settings"
+      ]
     },
     "turns": [
       {
@@ -694,15 +697,35 @@
   },
   {
     "name": "hedge_autotune_rewrite_example",
-    "note": "2026-08-11 hedge-battery addition \u2014 the on-disk prompt rewrite's own get_walkthrough example claims an autotune ask should get 'that window open', but at the time no pitch-correction destination existed anywhere in the KB. SUPERSEDED 2026-08-18: the Phase 1 port added 'vocals are out of tune' (problem) / 'flex pitch vocal tuning' (solution, resolves to the 'flex pitch' destination) -- live-verified 2026-08-17 battery run resolves it correctly. Re-expressed as a positive control instead of a true negative.",
+    "note": "2026-08-11 hedge-battery addition \u2014 the on-disk prompt rewrite's own get_walkthrough example claims an autotune ask should get 'that window open', but at the time no pitch-correction destination existed anywhere in the KB. SUPERSEDED 2026-08-18: the Phase 1 port added 'vocals are out of tune' (problem) / 'flex pitch vocal tuning' (solution, resolves to the 'flex pitch' destination) -- live-verified 2026-08-17 battery run resolves it correctly. Re-expressed as a positive control instead of a true negative. 2026-09-28: 'autotune' now means the Pitch Correction plugin (user call: that's the right answer); Flex Pitch stays for note-by-note fixes (autotune_one_note_flex_pitch). The Pitch Correction card is the check, not whether a lookup ran: open_plugin needs no lookup for a named plugin, and Sonnet 5.5 often loads it directly.",
     "expect": {
-      "match": "problem",
-      "walkthrough_destination": "flex pitch",
-      "walkthrough_solution": "flex pitch vocal tuning"
+      "action_calls": [
+        {
+          "tool": "open_plugin",
+          "args": {
+            "plugin": "pitch correction"
+          }
+        }
+      ],
+      "walkthrough_destination_absent": "flex pitch"
     },
     "turns": [
       {
         "text": "how do i put autotune on my vocals"
+      }
+    ]
+  },
+  {
+    "name": "autotune_one_note_flex_pitch",
+    "note": "2026-09-28 sibling of hedge_autotune_rewrite_example: fixing one note by hand is Flex Pitch, not the Pitch Correction plugin.",
+    "expect": {
+      "match": "problem",
+      "walkthrough_destination": "flex pitch",
+      "no_action_calls": true
+    },
+    "turns": [
+      {
+        "text": "one note in my vocal take is flat, how do i fix just that note"
       }
     ]
   },
@@ -2036,5 +2059,57 @@
         "press revert"
       ]
     }
+  },
+  {
+    "name": "offkb_track_color",
+    "note": "2026-09-28 true negative: not in the KB or routes -- no card; a hedged general answer or 'no verified answer', never a stated menu path as fact",
+    "expect": {
+      "walkthrough_destination": null,
+      "no_action_calls": true
+    },
+    "turns": [
+      {
+        "text": "how do i change the color of a track"
+      }
+    ]
+  },
+  {
+    "name": "offkb_chord_track",
+    "note": "2026-09-28 true negative: chord track / song key isn't in the KB -- must not stretch a nearby entry (key/tempo/Smart Tempo) to fit",
+    "expect": {
+      "walkthrough_destination": null,
+      "no_action_calls": true
+    },
+    "turns": [
+      {
+        "text": "how do i use the chord track to set the key of my song"
+      }
+    ]
+  },
+  {
+    "name": "offkb_gibberish",
+    "note": "2026-09-28 true negative: nonsense input -- no citation-driven card, no action",
+    "expect": {
+      "walkthrough_destination": null,
+      "no_action_calls": true
+    },
+    "turns": [
+      {
+        "text": "asdkjqwe zzzxxx"
+      }
+    ]
+  },
+  {
+    "name": "offkb_laptop_advice",
+    "note": "2026-09-28 true negative: gear advice outside the KB -- research or a hedged answer, no card",
+    "expect": {
+      "walkthrough_destination": null,
+      "no_action_calls": true
+    },
+    "turns": [
+      {
+        "text": "whats the best laptop for running big logic sessions"
+      }
+    ]
   }
 ]

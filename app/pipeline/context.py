@@ -1,9 +1,10 @@
-"""What the decider sees besides history: the cached system prompt, this turn's live
+"""What the decider sees besides history: the cached system prompt (with the KB), this turn's live
 state block, and this turn's screenshots spliced into the user message per call.
 Cache breakpoints and why screenshots never enter `msgs`: README.md (Context & caching)."""
 from dataclasses import dataclass
 
 from app.pipeline.transcript import last_user_text_index
+from app import kb
 from app.prompts import SYSTEM_PROMPT
 
 _LIVE_STATE_HEADER = (
@@ -47,9 +48,10 @@ class TurnContext:
             state_blocks.append(ax_state)
         live_state = "\n\n".join(state_blocks) if state_blocks else None
 
-        # Breakpoint 1: the static prompt. Breakpoint 2: live state, its own block so
-        # the static prompt still hits the cache across turns.
-        system = [{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}]
+        # Breakpoint 1: the static prompt with the whole KB. Breakpoint 2: live state,
+        # its own block so the static prompt still hits the cache across turns.
+        system = [{"type": "text", "text": SYSTEM_PROMPT + "\n\n# Knowledge base\n\n" + kb.KB_TEXT,
+                   "cache_control": {"type": "ephemeral"}}]
         if state_blocks:
             system.append({
                 "type": "text",
