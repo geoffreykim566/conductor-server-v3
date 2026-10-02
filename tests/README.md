@@ -46,7 +46,7 @@ docker compose -p <name> -f docker-compose.yml -f docker-compose.standalone.yml 
 - Routes are the real `seed/routes.json`; use `route(name)` / `queue_setting(...)` for expected steps.
 - Plain `unittest.mock.patch` / `patch.object` / `patch.dict`; no other mocking libs.
 - Test basenames are unique across folders (no `__init__.py` files).
-- Docstring: one line on what the test proves. History belongs in `../log.md`.
+- Docstring: one line on what the test proves. History belongs in the feature log (`../../README.md`, Logs).
 
 ## Adding a test
 
