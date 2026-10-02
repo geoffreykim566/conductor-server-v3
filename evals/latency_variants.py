@@ -66,6 +66,20 @@ BETWEEN_TURNS_S = 2.0
 _model_calls: list[dict] = []
 _embeds: list[dict] = []
 
+# $/MTok (input, output); cache read 0.1x input, cache write 1.25x (5m TTL).
+PRICES = {"sonnet": (2.0, 10.0), "haiku": (1.0, 5.0)}
+
+
+def _call_usd(model: str, u) -> float:
+    p_in, p_out = PRICES["haiku" if "haiku" in model else "sonnet"]
+    return (
+        (getattr(u, "input_tokens", 0) or 0) * p_in
+        + (getattr(u, "cache_read_input_tokens", 0) or 0) * p_in * 0.1
+        + (getattr(u, "cache_creation_input_tokens", 0) or 0) * p_in * 1.25
+        + (getattr(u, "output_tokens", 0) or 0) * p_out
+    ) / 1e6
+
+
 _orig_call_model = model_io.call_model
 _orig_embed = tools_lookup.embed
 
@@ -76,6 +90,8 @@ async def _timed_call_model(system, tools_param, msgs, on_chunk, tool_choice=Non
     u = getattr(resp, "usage", None)
     _model_calls.append({
         "model": model.split("-")[1] if "-" in model else model,
+        "role": "writer" if "haiku" in model else "decider",
+        "usd": round(_call_usd(model, u), 6),
         "s": round(time.monotonic() - t0, 2),
         "in": getattr(u, "input_tokens", None),
         "cache_read": getattr(u, "cache_read_input_tokens", 0) or 0,
@@ -120,6 +136,7 @@ async def _timed_respond(messages, **kwargs):
         "other_s": round(wall - model_s - embed_s, 2),
         "model_calls": list(_model_calls),
         "n_model_calls": len(_model_calls),
+        "usd": round(sum(c["usd"] for c in _model_calls), 5),
         "n_embeds": len(_embeds),
         "n_429": sum(1 for e in _embeds if e["status"] == 429),
         "n_lookups": sum(1 for c in result.trace if c["tool"] == "lookup_concept"),
@@ -184,7 +201,7 @@ async def run(variants: list[str], runs: int, out_dir: Path) -> None:
                         calls = " ".join(
                             f"{c['model'][:1]}{'F' if c['forced'] else ''}{c['s']}s(cr{c['cache_read']}/cw{c['cache_write']}/in{c['in']}/out{c['out']})"
                             for c in tr["model_calls"])
-                        out(f"# turn {ti}: wall={tr['wall_s']}s model={tr['model_s']}s embed={tr['embed_s']}s other={tr['other_s']}s "
+                        out(f"# turn {ti}: wall={tr['wall_s']}s usd={tr['usd']} model={tr['model_s']}s embed={tr['embed_s']}s other={tr['other_s']}s "
                             f"calls={tr['n_model_calls']} lookups={tr['n_lookups']} 429s={tr['n_429']} "
                             f"attached={tr['attached']} tier={tr['tier']} first_lookup={tr['first_lookup_match']}/{tr['first_lookup_conf']}")
                         out(f"#   model calls: {calls}")
@@ -200,7 +217,7 @@ async def run(variants: list[str], runs: int, out_dir: Path) -> None:
 
         # ---- summary ----
         out(f"\n\n{'=' * 100}\nSUMMARY  (per turn means; embed = Voyage call time only, retry sleeps land in 'other')")
-        out(f"{'variant':8s} {'turns':>5s} {'wall':>7s} {'model':>7s} {'embed':>7s} {'other':>7s} {'calls':>6s} {'lookups':>8s} {'429s':>5s} {'attached':>9s} {'graded':>9s}")
+        out(f"{'variant':8s} {'turns':>5s} {'wall':>7s} {'model':>7s} {'embed':>7s} {'other':>7s} {'calls':>6s} {'$/turn':>8s} {'lookups':>8s} {'429s':>5s} {'attached':>9s} {'graded':>9s}")
         for v in variants:
             rs = [r for r in records if r["variant"] == v]
             if not rs:
@@ -208,7 +225,7 @@ async def run(variants: list[str], runs: int, out_dir: Path) -> None:
             verd = [x for r in rs for x in r["verdicts"]]
             out(f"{v:8s} {len(rs):5d} {statistics.mean(r['wall_s'] for r in rs):7.1f} "
                 f"{statistics.mean(r['model_s'] for r in rs):7.1f} {statistics.mean(r['embed_s'] for r in rs):7.1f} "
-                f"{statistics.mean(r['other_s'] for r in rs):7.1f} {statistics.mean(r['n_model_calls'] for r in rs):6.1f} "
+                f"{statistics.mean(r['other_s'] for r in rs):7.1f} {statistics.mean(r['n_model_calls'] for r in rs):6.1f} {statistics.mean(r['usd'] for r in rs):8.4f} "
                 f"{statistics.mean(r['n_lookups'] for r in rs):8.1f} {sum(r['n_429'] for r in rs):5d} "
                 f"{sum(1 for r in rs if r['attached']):9d} {sum(1 for x in verd if x['pass']):4d}/{len(verd):<4d}")
 
