@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "conductor-server-v3"
 version = "0.1.0"
-description = "Conductor v3 pipeline: problem/solution-bucket KB + model-driven tool-calling loop."
+description = "Conductor v3 server: Logic Pro assistant API, tool-calling pipeline, KB."
 requires-python = ">=3.11"
 dependencies = [
     "asyncpg>=0.29",
@@ -17,5 +17,16 @@ dependencies = [
     "slowapi>=0.1.9",
 ]
 
-[tool.setuptools]
-packages = ["app"]
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-asyncio>=0.24", "pyflakes>=3"]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.setuptools.package-data]
+"app.api.admin" = ["static/*.html"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"

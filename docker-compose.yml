@@ -1,5 +1,5 @@
-# v3 pipeline — standalone stack, own repo, own database, no shared runtime
-# with the real conductor-server. Run with: docker compose up -d --build
+# Local stack: Postgres + pgvector and the API. See README.md.
+#   docker compose up -d --build
 services:
   db:
     image: pgvector/pgvector:pg16
@@ -11,6 +11,7 @@ services:
       - "127.0.0.1:5435:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      # Runs only when the volume is first created.
       - ./migrations:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U conductor -d conductor"]
@@ -19,7 +20,10 @@ services:
       retries: 15
 
   app:
-    build: .
+    build:
+      context: .
+      args:
+        DEV: "1"
     env_file: .env.local
     environment:
       PYTHONUNBUFFERED: "1"
@@ -28,11 +32,13 @@ services:
         condition: service_healthy
     ports:
       - "127.0.0.1:8000:8000"
-    # Serves the /v3/chat, /v3/register HTTP layer (app/api.py) for
-    # client-v3 to talk to. The old scenario-runner scripts (run_scenarios,
-    # run_graded_battery, drive_turn) still work via `docker compose exec`
-    # regardless of what the container's own foreground command is.
-    command: ["uvicorn", "app.api:app", "--host", "0.0.0.0", "--port", "8000"]
+    # Tests, evals and run output aren't in the image; mounted so they're live
+    # without a rebuild. app/ IS baked in: rebuild after editing it.
+    volumes:
+      - ./tests:/srv/tests
+      - ./evals:/srv/evals
+      - ./test_runs:/srv/test_runs
+    command: ["uvicorn", "app.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 volumes:
   pgdata:
